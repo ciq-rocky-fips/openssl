@@ -103,10 +103,6 @@ DEFINE_RUN_ONCE_STATIC(ossl_init_ssl_base)
         EVP_add_cipher(EVP_aes_256_gcm());
         EVP_add_cipher(EVP_aes_128_ccm());
         EVP_add_cipher(EVP_aes_256_ccm());
-        EVP_add_cipher(EVP_aes_128_cbc_hmac_sha1());
-        EVP_add_cipher(EVP_aes_256_cbc_hmac_sha1());
-        EVP_add_cipher(EVP_aes_128_cbc_hmac_sha256());
-        EVP_add_cipher(EVP_aes_256_cbc_hmac_sha256());
 # ifndef OPENSSL_NO_MD5
         /* needed even in the FIPS mode for TLS-1.0 */
         EVP_add_digest(EVP_md5_sha1());

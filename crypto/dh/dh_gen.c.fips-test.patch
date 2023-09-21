@@ -27,7 +27,7 @@ int DH_generate_parameters_ex(DH *ret, int prime_len, int generator,
                               BN_GENCB *cb)
 {
 #ifdef OPENSSL_FIPS
-    if (FIPS_mode() && prime_len < 2048) {
+    if (FIPS_mode()) {
         DHerr(DH_F_DH_GENERATE_PARAMETERS_EX, DH_R_NON_FIPS_METHOD);
         return 0;
     }

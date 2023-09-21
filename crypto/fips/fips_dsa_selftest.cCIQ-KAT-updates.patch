@@ -69,7 +69,6 @@ static const RAND_METHOD *old_rand;
 static int use_fake = 0;
 static const unsigned char *numbers[2];
 static int numbers_len[2];
-static int fbytes_counter = 0;
 
 static int change_rand(void)
 {
@@ -90,7 +89,6 @@ static int change_rand(void)
 
 static int restore_rand(void)
 {
-  fbytes_counter = 0;
   if (!RAND_set_rand_method(old_rand))
     return 0;
   
@@ -100,6 +98,7 @@ static int restore_rand(void)
 static int fbytes(unsigned char *buf, int num)
 {
   int ret = 0;
+  static int fbytes_counter = 0;
   
   if (use_fake == 0)
     return old_rand->bytes(buf, num);

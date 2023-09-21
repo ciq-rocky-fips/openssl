@@ -77,7 +77,6 @@ static const RAND_METHOD *old_rand;
 static int use_fake = 0;
 static const unsigned char *numbers[2];
 static int numbers_len[2];
-static int fbytes_counter = 0;
 
 static int change_rand(void)
 {
@@ -98,7 +97,6 @@ static int change_rand(void)
 
 static int restore_rand(void)
 {
-  fbytes_counter = 0;
   if (!RAND_set_rand_method(old_rand))
     return 0;
   
@@ -108,6 +106,7 @@ static int restore_rand(void)
 static int fbytes(unsigned char *buf, int num)
 {
   int ret = 0;
+  static int fbytes_counter = 0;
   
   if (use_fake == 0)
     return old_rand->bytes(buf, num);
@@ -248,7 +247,6 @@ int FIPS_selftest_ecdsa()
     unsigned char *tsig = NULL;
     unsigned char *p_buf = NULL;
     ECDSA_SIG *dsa_sig = NULL;
-    int rand_set = 0;
     rv = 0;
     
     ECDSA_KAT_SELFTEST_DATA *ecd = test_ecdsa_data + i;
@@ -270,11 +268,8 @@ int FIPS_selftest_ecdsa()
     numbers[1] = ecd->k;
     numbers_len[1] = ecd->klen;
     /* swap the RNG source */
-    if (!change_rand()) {
+    if (!change_rand())
       goto err;
-    } else {
-      rand_set = 1;
-    }
     
     ec = EC_KEY_new_by_curve_name(ecd->nid);
     if (!ec)
@@ -347,14 +342,14 @@ int FIPS_selftest_ecdsa()
     if (EVP_DigestVerify(mdctx, sig, siglen, ecd->msg, ecd->msglen) != 1)
       goto err;
     
+    if (1 != restore_rand())
+      goto err;
+    
     /* Success */
     rv = 1;
     
     
   err:
-    if (rand_set){
-      restore_rand();
-    }
     
     if (mdctx)
       EVP_MD_CTX_free(mdctx);

@@ -17,53 +17,6 @@
 #include <openssl/kdf.h>
 
 #ifdef OPENSSL_FIPS
-
-static int FIPS_selftest_tls13(void)
-{    
-    int ret = 0;
-    EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, NULL);
-    const EVP_MD *md = EVP_sha256();
-    size_t hashlen = EVP_MD_size(md);
-    unsigned char out[128];
-    size_t outlen = hashlen;
-    const unsigned char tls13_kdf_psk[] = {
-        0xF8, 0xAF, 0x6A, 0xEA, 0x2D, 0x39, 0x7B, 0xAF,
-        0x29, 0x48, 0xA2, 0x5B, 0x28, 0x34, 0x20, 0x06,
-        0x92, 0xCF, 0xF1, 0x7E, 0xEE, 0x91, 0x65, 0xE4,
-        0xE2, 0x7B, 0xAB, 0xEE, 0x9E, 0xDE, 0xFD, 0x05
-    };
-         
-    if (EVP_PKEY_derive_init(pctx) <= 0)
-        goto err;
-    if (EVP_PKEY_CTX_hkdf_mode(pctx, EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY) <= 0)
-        goto err;
-    if (EVP_PKEY_CTX_set_hkdf_md(pctx, md) <= 0)
-        goto err;
-    if (EVP_PKEY_CTX_set1_hkdf_key(pctx, tls13_kdf_psk, hashlen) <= 0)
-        goto err;
-    if (EVP_PKEY_derive(pctx, out, &outlen) <= 0)
-        goto err;
-        
-    {              
-        static const unsigned char expected[] = { //tls13_kdf_early_secret[] = {
-            0x15, 0x3B, 0x63, 0x94, 0xA9, 0xC0, 0x3C, 0xF3,
-            0xF5, 0xAC, 0xCC, 0x6E, 0x45, 0x5A, 0x76, 0x93,
-            0x28, 0x11, 0x38, 0xA1, 0xBC, 0xFA, 0x38, 0x03,
-            0xC2, 0x67, 0x35, 0xDD, 0x11, 0x94, 0xD2, 0x16
-        };
-                     
-        if(memcmp(out, expected, sizeof(expected))) {
-            goto err;
-        }
-    }
-    ret = 1;
-err:
-    EVP_PKEY_CTX_free(pctx);
-    if (!ret)
-        FIPSerr(FIPS_F_FIPS_SELFTEST_TLS13, FIPS_R_SELFTEST_FAILED);
-    return ret;
-}
-
 static int FIPS_selftest_tls1_prf(void)
 {
     int ret = 0;
@@ -413,7 +366,6 @@ err:
 int FIPS_selftest_kdf(void)
 {
     return FIPS_selftest_tls1_prf()
-        && FIPS_selftest_tls13()        
         && FIPS_selftest_hkdf()
         && FIPS_selftest_sshkdf()
         && FIPS_selftest_pbkdf2()

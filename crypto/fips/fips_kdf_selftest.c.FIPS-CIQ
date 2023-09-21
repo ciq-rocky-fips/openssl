@@ -369,7 +369,9 @@ int FIPS_selftest_kdf(void)
         && FIPS_selftest_hkdf()
         && FIPS_selftest_sshkdf()
         && FIPS_selftest_pbkdf2()
-        && FIPS_selftest_kbkdf();
+        && FIPS_selftest_kbkdf()
+        && FIPS_selftest_krb5kdf()
+        && FIPS_selftest_sskdf();
 }
 
 #endif

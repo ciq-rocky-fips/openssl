@@ -74,16 +74,30 @@ static const unsigned char ret[][SHA_DIGEST_LENGTH] = {
 int FIPS_selftest_sha1()
 {
     int n;
+    int subid = -1;
 
     for (n = 0; n < sizeof(test) / sizeof(test[0]); ++n) {
         unsigned char md[SHA_DIGEST_LENGTH];
+        subid = EVP_MD_type(EVP_sha1());
+		if (!fips_post_started(FIPS_TEST_DIGEST, subid, 0))
+			continue;
 
-        EVP_Digest(test[n], strlen(test[n]), md, NULL,
-                   EVP_sha1(), NULL);
+        if (!fips_post_corrupt(FIPS_TEST_DIGEST, subid, 0)) {
+            static const char ctest[][60] = {
+                "d",
+                "fbc",
+                "gbcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"
+            };
+            EVP_Digest(ctest[n], strlen(ctest[n]), md, NULL, EVP_sha1(), NULL);
+        } else
+            EVP_Digest(test[n], strlen(test[n]), md, NULL, EVP_sha1(), NULL);
+
         if (memcmp(md, ret[n], sizeof md)) {
             FIPSerr(FIPS_F_FIPS_SELFTEST_SHA1, FIPS_R_SELFTEST_FAILED);
+            fips_post_failed(FIPS_TEST_DIGEST, subid, NULL);
             return 0;
-        }
+        }  else if (!fips_post_success(FIPS_TEST_DIGEST, subid, NULL))
+			return 0;
     }
     return 1;
 }
@@ -119,18 +133,39 @@ static const unsigned char dig_sha512[] =
 int FIPS_selftest_sha2(void)
 {
     unsigned char md[SHA512_DIGEST_LENGTH];
+    int subid = EVP_MD_type(EVP_sha256());
 
-    EVP_Digest(msg_sha256, sizeof(msg_sha256), md, NULL, EVP_sha256(), NULL);
+    if (!fips_post_started(FIPS_TEST_DIGEST, subid, 0))
+        return 0;
+
+    if (!fips_post_corrupt(FIPS_TEST_DIGEST, subid, 0)) {        
+        const unsigned char cmsg_sha256[] =
+        { 0x00, 0x48, 0x59, 0x2a, 0xe1, 0xae, 0x1f, 0x30, 0xfc };
+        EVP_Digest(cmsg_sha256, sizeof(cmsg_sha256), md, NULL, EVP_sha256(), NULL);
+    } else {
+        EVP_Digest(msg_sha256, sizeof(msg_sha256), md, NULL, EVP_sha256(), NULL);
+    }
     if (memcmp(dig_sha256, md, sizeof(dig_sha256))) {
         FIPSerr(FIPS_F_FIPS_SELFTEST_SHA2, FIPS_R_SELFTEST_FAILED);
+        fips_post_failed(FIPS_TEST_DIGEST, subid, NULL);
         return 0;
-    }
+    } else if (!fips_post_success(FIPS_TEST_DIGEST, subid, NULL))
+		return 0;
+
+    subid = EVP_MD_type(EVP_sha512());
+    if (!fips_post_started(FIPS_TEST_DIGEST, subid, 0))
+        return 0;
 
     EVP_Digest(msg_sha512, sizeof(msg_sha512), md, NULL, EVP_sha512(), NULL);
+    if (!fips_post_corrupt(FIPS_TEST_DIGEST, subid, 0)) {   
+        md[0] ^= 1;
+    }
     if (memcmp(dig_sha512, md, sizeof(dig_sha512))) {
         FIPSerr(FIPS_F_FIPS_SELFTEST_SHA2, FIPS_R_SELFTEST_FAILED);
+        fips_post_failed(FIPS_TEST_DIGEST, subid, NULL);
         return 0;
-    }
+    } else if (!fips_post_success(FIPS_TEST_DIGEST, subid, NULL))
+		return 0;
 
     return 1;
 }
@@ -192,30 +227,65 @@ static const unsigned char dig_shake_256[] = {
 int FIPS_selftest_sha3(void)
 {
     unsigned char md[SHA512_DIGEST_LENGTH];
+    int subid = EVP_MD_type(EVP_sha3_256());
+    if (!fips_post_started(FIPS_TEST_DIGEST, subid, 0))
+        return 0;
 
     EVP_Digest(msg_sha3_256, sizeof(msg_sha3_256), md, NULL, EVP_sha3_256(), NULL);
+    if (!fips_post_corrupt(FIPS_TEST_DIGEST, subid, 0)) {
+        md[0] ^= 1;
+    }
     if (memcmp(dig_sha3_256, md, sizeof(dig_sha3_256))) {
         FIPSerr(FIPS_F_FIPS_SELFTEST, FIPS_R_SELFTEST_FAILED);
+        fips_post_failed(FIPS_TEST_DIGEST, subid, NULL);
         return 0;
-    }
+    } else if (!fips_post_success(FIPS_TEST_DIGEST, subid, NULL))
+		return 0;
 
+    subid = EVP_MD_type(EVP_sha3_512());
+    if (!fips_post_started(FIPS_TEST_DIGEST, subid, 0))
+        return 0;
     EVP_Digest(msg_sha3_512, sizeof(msg_sha3_512), md, NULL, EVP_sha3_512(), NULL);
+
+    if (!fips_post_corrupt(FIPS_TEST_DIGEST, subid, 0)) {
+        md[0] ^= 1;
+    }
     if (memcmp(dig_sha3_512, md, sizeof(dig_sha3_512))) {
         FIPSerr(FIPS_F_FIPS_SELFTEST, FIPS_R_SELFTEST_FAILED);
+        fips_post_failed(FIPS_TEST_DIGEST, subid, NULL);
         return 0;
-    }
+    } else if (!fips_post_success(FIPS_TEST_DIGEST, subid, NULL))
+		return 0;
+
+    subid = EVP_MD_type(EVP_shake128());
+    if (!fips_post_started(FIPS_TEST_DIGEST, subid, 0))
+        return 0;
 
     EVP_Digest(msg_shake_128, sizeof(msg_shake_128), md, NULL, EVP_shake128(), NULL);
+    if (!fips_post_corrupt(FIPS_TEST_DIGEST, subid, 0)) {
+            md[0] ^= 1;
+    }
     if (memcmp(dig_shake_128, md, sizeof(dig_shake_128))) {
         FIPSerr(FIPS_F_FIPS_SELFTEST, FIPS_R_SELFTEST_FAILED);
+        fips_post_failed(FIPS_TEST_DIGEST, subid, NULL);
         return 0;
-    }
+    } else if (!fips_post_success(FIPS_TEST_DIGEST, subid, NULL))
+		return 0;
+
+    subid = EVP_MD_type(EVP_shake256());
+    if (!fips_post_started(FIPS_TEST_DIGEST, subid, 0))
+        return 0;
 
     EVP_Digest(msg_shake_256, sizeof(msg_shake_256), md, NULL, EVP_shake256(), NULL);
+    if (!fips_post_corrupt(FIPS_TEST_DIGEST, subid, 0)) {
+        md[0] ^= 1;
+    }
     if (memcmp(dig_shake_256, md, sizeof(dig_shake_256))) {
         FIPSerr(FIPS_F_FIPS_SELFTEST, FIPS_R_SELFTEST_FAILED);
+        fips_post_failed(FIPS_TEST_DIGEST, subid, NULL);
         return 0;
-    }
+    } else if (!fips_post_success(FIPS_TEST_DIGEST, subid, NULL))
+		return 0;
 
     return 1;
 }

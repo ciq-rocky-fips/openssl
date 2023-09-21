@@ -242,10 +242,10 @@ int FIPS_selftest_ecdsa()
   for (i = 0; i < sizeof(test_ecdsa_data) / sizeof(ECDSA_KAT_SELFTEST_DATA); i++) {
     EC_KEY *ec = NULL;
     BIGNUM *r = NULL, *s = NULL;
-    BIGNUM *sig_r = NULL, *sig_s = NULL;
+    const BIGNUM *sig_r = NULL, *sig_s = NULL;
     EVP_PKEY *pk = NULL;
     unsigned char *sig = NULL;
-    unsigned char *tsig = NULL;
+    const unsigned char *tsig = NULL;
     unsigned char *p_buf = NULL;
     ECDSA_SIG *dsa_sig = NULL;
     int rand_set = 0;
@@ -289,6 +289,9 @@ int FIPS_selftest_ecdsa()
       goto err;
     
     EVP_PKEY_assign_EC_KEY(pk, ec);
+
+    if (!fips_post_started(FIPS_TEST_SIGNATURE, ecd->nid, pk))
+		  return 1;
     
     p_len = EC_KEY_key2buf(ec, POINT_CONVERSION_UNCOMPRESSED, &p_buf, NULL);
     if (!p_len)
@@ -318,6 +321,11 @@ int FIPS_selftest_ecdsa()
     if(!(sig = OPENSSL_malloc(siglen)))
       goto err;
     
+    if (!fips_post_corrupt(FIPS_TEST_SIGNATURE, ecd->nid, pk)) {
+      if (!EVP_DigestSignUpdate(mdctx, ecd->msg, 1))
+        goto err;
+	  }
+
     /* Use k[] for signature. */
     use_fake = 1;
     
@@ -349,11 +357,15 @@ int FIPS_selftest_ecdsa()
     
     /* Success */
     rv = 1;
-    
+    fips_post_success(FIPS_TEST_SIGNATURE, ecd->nid, pk);
     
   err:
     if (rand_set){
       restore_rand();
+    }
+
+    if (rv != 1) {
+      fips_post_failed(FIPS_TEST_SIGNATURE, ecd->nid, pk);
     }
     
     if (mdctx)

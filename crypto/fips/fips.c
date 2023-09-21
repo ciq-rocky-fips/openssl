@@ -255,6 +255,7 @@ static char *make_hmac_path(const char *origpath)
     return path;
 }
 
+int fips_post_corrupt(int id, int subid, void *ex);
 static const char hmackey[] = "orboDeJITITejsirpADONivirpUkvarP";
 
 static int compute_file_hmac(const char *path, void **buf, size_t *hmaclen)
@@ -369,11 +370,75 @@ static int FIPSCHECK_verify(const char *path)
     return 1;
 }
 
+/*   ** Function return value meaning
+ * -1 cannot open source file 
+ * -2 cannot open destination file
+ * 0 Success
+ */
+static int File_Copy (char FileSource [], char FileDestination [])
+{
+    int   c;
+    FILE *stream_R;
+    FILE *stream_W; 
+
+    stream_R = fopen (FileSource, "r");
+    if (stream_R == NULL)
+        return -1;
+    stream_W = fopen (FileDestination, "w");   //create and write to file
+    if (stream_W == NULL)
+     {
+        fclose (stream_R);
+        return -2;
+     }    
+    while ((c = fgetc(stream_R)) != EOF)
+        fputc (c, stream_W);
+    fclose (stream_R);
+    fclose (stream_W);
+
+    return 0;
+}
+
+static int inject_bad_char (char FileSource [])
+{
+    FILE * pFile;
+    char c = 0x90;
+
+    pFile = fopen(FileSource, "w+");
+
+    if (pFile != NULL) {
+        fseek(pFile, 0, SEEK_END);
+        fputc(c, pFile);
+        fclose(pFile);
+    }
+
+    return 0;
+}
+
+static int corrupt_bin(char *path)
+{
+    
+
+    rename(path, ".ssl.bck");
+    File_Copy(".ssl.bck", path);
+    inject_bad_char(path);
+
+    return 0;
+}
+
+static void restore_bin(char *path)
+{
+    rename(".ssl.bck", path);
+}
+
 static int verify_checksums(void)
 {
     int rv;
     char path[PATH_MAX + 1];
     char *p;
+    int corrpt = 0;
+
+    if (!fips_post_started(FIPS_TEST_INTEGRITY, 1, NULL))
+	    return 1;
 
     /* we need to avoid dlopening libssl, assume both libcrypto and libssl
        are in the same directory */
@@ -382,10 +447,21 @@ static int verify_checksums(void)
                           "FIPS_mode_set", path, sizeof(path));
     if (rv < 0)
         return 0;
-
+    if (!fips_post_corrupt(FIPS_TEST_INTEGRITY, 1, NULL)) {
+	    corrupt_bin(path);
+        corrpt = 1;
+    }
     rv = FIPSCHECK_verify(path);
-    if (!rv)
+    if ( corrpt ){        
+        restore_bin(path);
+        corrpt = 0;
+    }
+    if (!rv) {
+        fips_post_failed(FIPS_TEST_INTEGRITY, 1, NULL);
         return 0;
+    } else {
+        fips_post_success(FIPS_TEST_INTEGRITY, 1, NULL);
+    }
 
     /* replace libcrypto with libssl */
     while ((p = strstr(path, "libcrypto.so")) != NULL) {
@@ -393,9 +469,24 @@ static int verify_checksums(void)
         memmove(p, p + 3, strlen(p + 2));
     }
 
+    if (!fips_post_started(FIPS_TEST_INTEGRITY, 2, NULL))
+	    return 1;
+
+    if (!fips_post_corrupt(FIPS_TEST_INTEGRITY, 2, NULL)){
+        corrupt_bin(path);
+        corrpt = 1;
+    }
+
     rv = FIPSCHECK_verify(path);
-    if (!rv)
+    if ( corrpt ) {        
+        restore_bin(path);
+    }    
+
+    if (!rv) {
+        fips_post_failed(FIPS_TEST_INTEGRITY, 2, NULL);
         return 0;
+    }
+    fips_post_success(FIPS_TEST_INTEGRITY, 2, NULL);
     return 1;
 }
 

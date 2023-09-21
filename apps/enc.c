@@ -288,12 +288,12 @@ int enc_main(int argc, char **argv)
         BIO_printf(bio_err, "%s: AEAD ciphers not supported\n", prog);
         goto end;
     }
-
+#if 0
     if (cipher && (EVP_CIPHER_mode(cipher) == EVP_CIPH_XTS_MODE)) {
         BIO_printf(bio_err, "%s XTS ciphers not supported\n", prog);
         goto end;
     }
-
+#endif
     if (dgst == NULL)
         dgst = EVP_sha256();
 

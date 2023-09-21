@@ -138,17 +138,34 @@ int FIPS_selftest_hmac()
     unsigned char out[EVP_MAX_MD_SIZE];
     const EVP_MD *md;
     const HMAC_KAT *t;
+    int subid = -1;
+    int rv = 1;
 
     for (n = 0, t = vector; n < sizeof(vector) / sizeof(vector[0]); n++, t++) {
         md = (*t->alg) ();
-        HMAC(md, t->key, strlen(t->key),
-             (const unsigned char *)t->iv, strlen(t->iv), out, &outlen);
+        subid = EVP_MD_type(md);
+		if (!fips_post_started(FIPS_TEST_HMAC, subid, 0))
+			continue;
+        if (!fips_post_corrupt(FIPS_TEST_HMAC, subid, 0)) {
+            HMAC(md, t->key, strlen(t->key),
+                (const unsigned char *)"t->iv", sizeof("t->iv"), out, &outlen);
+        } else {
+            HMAC(md, t->key, strlen(t->key),
+                (const unsigned char *)t->iv, strlen(t->iv), out, &outlen);
+        }
 
         if (memcmp(out, t->kaval, outlen)) {
             FIPSerr(FIPS_F_FIPS_SELFTEST_HMAC, FIPS_R_SELFTEST_FAILED);
-            return 0;
-        }
-    }
-    return 1;
+            if ( !fips_post_failed(FIPS_TEST_HMAC, subid, NULL) ) {
+                return 0;
+            } else {
+                if ( rv == 1 ) {
+                    rv = 0;
+                }
+            }
+        } else if (!fips_post_success(FIPS_TEST_HMAC, subid, NULL))
+			return 0;
+    }         
+    return rv;
 }
 #endif

@@ -28,7 +28,7 @@ static int fips_check_dsa(DSA *dsa)
 
     EVP_PKEY_set1_DSA(pk, dsa);
 
-    if (fips_pkey_signature_test(pk, tbs, -1, NULL, 0, NULL, 0, NULL))
+    if (fips_pkey_signature_test(FIPS_TEST_PAIRWISE, pk, tbs, -1, NULL, 0, NULL, 0, NULL))
         ret = 1;
 
  err:

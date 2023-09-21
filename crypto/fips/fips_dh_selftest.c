@@ -144,6 +144,9 @@ int FIPS_selftest_dh()
     BIGNUM *p = NULL, *g = NULL, *priv_key = NULL, *tmp_pub_key = NULL;
     const BIGNUM *pub_key;
 
+    if (!fips_post_started(FIPS_TEST_DH, -1, NULL))
+        return 1;
+
     fips_load_key_component(p, dh_test_2048);
     fips_load_key_component(g, dh_test_2048);
     /* note that the private key is much shorter than normally used
@@ -174,6 +177,10 @@ int FIPS_selftest_dh()
         goto err;
     BN_bn2bin(pub_key, pub_key_bin);
 
+    if (!fips_post_corrupt(FIPS_TEST_DH, -1, NULL)) {
+        len = 1;
+    }
+
     if (len != sizeof(dh_test_2048_pub_key) ||
         memcmp(pub_key_bin, dh_test_2048_pub_key, len) != 0)
         goto err;
@@ -189,6 +196,11 @@ int FIPS_selftest_dh()
         BN_free(priv_key);
         BN_free(tmp_pub_key);
     }
+
+    if ( ret == 0 )
+        fips_post_failed(FIPS_TEST_DH, -1, NULL);
+    else
+        fips_post_success(FIPS_TEST_DH, -1, NULL);
 
     OPENSSL_free(pub_key_bin);
     return ret;

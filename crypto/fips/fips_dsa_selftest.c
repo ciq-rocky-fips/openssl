@@ -238,12 +238,13 @@ static const unsigned char data1_k[] = {
   0xb9, 0x67, 0x07, 0x87, 0x64, 0x2a, 0x68, 0xde
 };
 
-static int fips_pkey_signature_test2(EVP_PKEY *pkey,
+static int fips_pkey_signature_test2(int id, EVP_PKEY *pkey,
                              const unsigned char *tbs, int tbslen,
                              const unsigned char *kat, unsigned int katlen,
                              const EVP_MD *digest, unsigned int flags,
                              const char *fail_str)
 {
+    int subid;
     int ret = 0;
     unsigned char sigtmp[256], *sig = sigtmp;
     size_t siglen = sizeof(sigtmp);
@@ -252,6 +253,11 @@ static int fips_pkey_signature_test2(EVP_PKEY *pkey,
 
     if (digest == NULL)
         digest = EVP_sha256();
+
+    subid = EVP_MD_type(digest);
+
+    if (!fips_post_started(id, subid, pkey))
+		  return 1;
 
     mctx = EVP_MD_CTX_new();
     use_fake = 1;
@@ -270,6 +276,11 @@ static int fips_pkey_signature_test2(EVP_PKEY *pkey,
     
     if (EVP_DigestSignUpdate(mctx, tbs, tbslen) <= 0)
         goto error;
+
+    if (!fips_post_corrupt(id, subid, pkey)) {
+      if (!EVP_DigestSignUpdate(mctx, tbs, 1))
+        goto error;
+	  } 
     
     use_fake = 1;
     if (EVP_DigestSignFinal(mctx, sig, &siglen) <= 0)
@@ -294,9 +305,10 @@ static int fips_pkey_signature_test2(EVP_PKEY *pkey,
         FIPSerr(FIPS_F_FIPS_PKEY_SIGNATURE_TEST, FIPS_R_TEST_FAILURE);
         if (fail_str)
             ERR_add_error_data(2, "Type=", fail_str);
+        fips_post_failed(id, subid, pkey);
         return 0;
     }
-    return 1;
+    return fips_post_success(id, subid, pkey);
 }
 
 int FIPS_selftest_dsa()
@@ -336,7 +348,7 @@ int FIPS_selftest_dsa()
 
     EVP_PKEY_assign_DSA(pk, dsa);
     
-    if (!fips_pkey_signature_test2(pk, kat_tbs, sizeof(kat_tbs) -1,
+    if (!fips_pkey_signature_test2(FIPS_TEST_SIGNATURE, pk, kat_tbs, sizeof(kat_tbs) -1,
                                   kat_DSA_SHA256, sizeof(kat_DSA_SHA256), EVP_sha256(), 0, "DSA SHA256"))
         goto err;
     ret = 1;

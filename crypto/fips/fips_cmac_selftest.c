@@ -105,7 +105,7 @@ int FIPS_selftest_cmac()
     const EVP_CIPHER *cipher;
     CMAC_CTX *ctx = CMAC_CTX_new();
     const CMAC_KAT *t;
-    int rv = 1;
+    int subid = -1, rv = 1;
 
     if (ctx == NULL) {
         rv = -1;
@@ -118,6 +118,10 @@ int FIPS_selftest_cmac()
             rv = -1;
             goto err;
         }
+        subid = EVP_CIPHER_nid(cipher);
+		if (!fips_post_started(FIPS_TEST_CMAC, subid, 0))
+			continue;
+
         if (!CMAC_Init(ctx, t->key, t->keysize / 8, cipher, 0)) {
             rv = -1;
             goto err;
@@ -126,6 +130,14 @@ int FIPS_selftest_cmac()
             rv = -1;
             goto err;
         }
+        if (!fips_post_corrupt(FIPS_TEST_CMAC, subid, NULL))
+			{
+			if (!CMAC_Update(ctx, t->msg, 1))
+				{
+				rv = -1;
+				goto err;
+				}
+			}
 
         if (!CMAC_Final(ctx, out, &outlen)) {
             rv = -1;
@@ -133,14 +145,19 @@ int FIPS_selftest_cmac()
         }
 
         if (outlen < t->macsize / 8 || memcmp(out, t->mac, t->macsize / 8)) {
+            fips_post_failed(FIPS_TEST_CMAC, subid, NULL);
             rv = 0;
-        }
+        } else if (!fips_post_success(FIPS_TEST_CMAC, subid, NULL)) {
+			rv = 0;
+			goto err;
+		}
     }
 
  err:
     CMAC_CTX_free(ctx);
 
     if (rv == -1) {
+        fips_post_failed(FIPS_TEST_CMAC, subid, NULL);
         rv = 0;
     }
     if (!rv)

@@ -29,6 +29,8 @@
 #include "apps.h"
 #define INCLUDE_FUNCTION_TABLE
 #include "progs.h"
+#include "openssl/fips.h"
+#include "openssl/fips_rand.h"
 
 /* Structure to hold the number of columns to be displayed and the
  * field width used to display them.
@@ -116,6 +118,374 @@ static char *make_config_name(void)
     return p;
 }
 
+typedef struct 
+	{
+	int id;
+	const char *name;
+	} POST_ID;
+
+POST_ID id_list[] = {
+	{NID_sha1, "SHA1"},
+	{NID_sha224, "SHA224"},
+	{NID_sha256, "SHA256"},
+	{NID_sha384, "SHA384"},
+	{NID_sha512, "SHA512"},
+	{NID_hmacWithSHA1, "HMAC-SHA1"},
+	{NID_hmacWithSHA224, "HMAC-SHA224"},
+	{NID_hmacWithSHA256, "HMAC-SHA256"},
+	{NID_hmacWithSHA384, "HMAC-SHA384"},
+	{NID_hmacWithSHA512, "HMAC-SHA512"},
+    {NID_sha3_256, "SHA3-256"},
+    {NID_sha3_512, "SHA3-512"},
+    {NID_shake128, "shake128"},
+    {NID_shake256, "shake256"},
+	{EVP_PKEY_RSA, "RSA"},
+	{EVP_PKEY_DSA, "DSA"},
+	{EVP_PKEY_EC, "ECDSA"},
+	{EVP_PKEY_DH, "DH"},	
+	{NID_aes_128_cbc, "AES-128-CBC"},
+	{NID_aes_192_cbc, "AES-192-CBC"},
+	{NID_aes_256_cbc, "AES-256-CBC"},
+	{NID_aes_128_ctr, "AES-128-CTR"},
+	{NID_aes_192_ctr, "AES-192-CTR"},
+	{NID_aes_256_ctr, "AES-256-CTR"},
+    {NID_aes_256_gcm, "AES-256-GCM"},
+    {NID_aes_192_ccm, "AES-192-CCM"},
+	{NID_aes_128_ecb, "AES-128-ECB"},
+	{NID_aes_128_xts, "AES-128-XTS"},
+	{NID_aes_256_xts, "AES-256-XTS"},
+	{NID_des_ede3_cbc, "DES-EDE3-CBC"},
+	{NID_des_ede3_ecb, "DES-EDE3-ECB"},
+	{NID_secp224r1, "P-224"},
+	{NID_sect233r1, "B-233"},
+	{NID_sect233k1, "K-233"},
+	{NID_X9_62_prime256v1, "P-256"},
+	{NID_secp384r1, "P-384"},
+	{NID_secp521r1, "P-521"},
+    {NID_secp256k1, "secp256k1"},
+    {RSA_NO_PADDING, "RSA_NO_PADDING"},
+    {0, NULL}
+};
+
+static const char *lookup_id(int id)
+	{
+	POST_ID *n;
+	static char out[40];
+	for (n = id_list; n->name; n++)
+		{
+		if (n->id == id)
+			return n->name;
+		}
+	sprintf(out, "ID=%d", id);
+	return out;
+	}
+
+static int fail_id = -1;
+static int fail_sub = -1;
+static int fail_key = -1;
+
+static int st_err, post_quiet = 0;
+
+static int post_cb(int op, int id, int subid, void *ex)
+	{
+	const char *idstr, *exstr = "";
+	char asctmp[20];
+	int keytype = -1;
+	int exp_fail = 0;
+#ifdef FIPS_POST_TIME
+	static struct timespec start, end, tstart, tend;
+#endif
+	switch(id)
+		{
+        case FIPS_TEST_RSA_ENCRYPT:
+		idstr = "RSA ENCRYPT";
+        exstr = lookup_id(subid);
+		break;
+		case FIPS_TEST_RSA_DECRYPT:
+		idstr = "RSA DECRYPT";
+        exstr = lookup_id(subid);
+		break;
+		case FIPS_TEST_INTEGRITY:
+		idstr = "Integrity";
+		if (subid == 1)
+			exstr = "libcrypto";
+		else if (subid == 2)
+			exstr = "libssl";
+		else
+		   return 1;
+		break;
+
+		case FIPS_TEST_DIGEST:
+		idstr = "Digest";
+		exstr = lookup_id(subid);
+		break;
+
+		case FIPS_TEST_CIPHER:
+		exstr = lookup_id(subid);
+		idstr = "Cipher";
+		break;
+
+		case FIPS_TEST_SIGNATURE:
+		if (ex)
+			{
+			EVP_PKEY *pkey = ex;
+			keytype = EVP_PKEY_base_id(pkey);
+			if (keytype == EVP_PKEY_EC)
+				{
+				const EC_GROUP *grp;
+				int cnid;
+				grp = EC_KEY_get0_group(EVP_PKEY_get0_EC_KEY(pkey));
+				cnid = EC_GROUP_get_curve_name(grp);
+				sprintf(asctmp, "ECDSA %s", lookup_id(cnid));
+				exstr = asctmp;
+				}
+			else
+				exstr = lookup_id(keytype);
+			}
+		idstr = "Signature";
+		break;
+
+		case FIPS_TEST_HMAC:
+		exstr = lookup_id(subid);
+		idstr = "HMAC";
+		break;
+
+		case FIPS_TEST_CMAC:
+		idstr = "CMAC";
+		exstr = lookup_id(subid);
+		break;
+
+		case FIPS_TEST_GCM:
+		idstr = "GCM";
+		break;
+
+		case FIPS_TEST_XTS:
+		idstr = "XTS";
+		exstr = lookup_id(subid);
+		break;
+
+		case FIPS_TEST_CCM:
+		idstr = "CCM";
+		break;
+
+		case FIPS_TEST_X931:
+		idstr = "X9.31 PRNG";
+		sprintf(asctmp, "keylen=%d", subid);
+		exstr = asctmp;
+		break;
+
+		case FIPS_TEST_DRBG:
+		idstr = "DRBG";
+		if (*(int *)ex & DRBG_FLAG_CTR_USE_DF)
+			{
+			sprintf(asctmp, "%s DF", lookup_id(subid));
+			exstr = asctmp;
+			}
+		else if (subid >> 16)
+			{
+			sprintf(asctmp, "%s %s",
+					lookup_id(subid >> 16),
+					lookup_id(subid & 0xFFFF));
+			exstr = asctmp;
+			}
+		else
+			exstr = lookup_id(subid);
+		break;
+
+		case FIPS_TEST_PAIRWISE:
+		if (ex)
+			{
+            if (subid == EVP_PKEY_DH){
+                DH *pkey = ex;
+                keytype = EVP_PKEY_base_id(pkey);
+            } else {
+                EC_KEY *pkey = ex;
+                keytype = EVP_PKEY_base_id(pkey);
+                if (keytype == 0)
+                    {                    
+                    const EC_GROUP *grp;
+                    int cnid;                
+                    keytype = EVP_PKEY_ECDH;
+                    grp = EC_KEY_get0_group(pkey);
+                    cnid = EC_GROUP_get_curve_name(grp);
+                    sprintf(asctmp, "%s", lookup_id(cnid));
+                    exstr = asctmp;
+                    }
+                else
+                    exstr = lookup_id(keytype);
+            }
+			}
+		idstr = "Pairwise Consistency";
+		break;
+
+		case FIPS_TEST_CONTINUOUS:
+		idstr = "Continuous PRNG";
+		break;
+
+		case FIPS_TEST_ECDH:
+		idstr = "ECDH";
+		exstr = lookup_id(subid);
+		break;
+
+        case FIPS_TEST_TLS1:
+		idstr = "TLS_PRF";		
+		break;
+
+        case FIPS_TEST_PBKDF:
+		idstr = "PBKDF";		
+		break;
+
+		case FIPS_TEST_DH:
+		idstr = "DH";		
+		break;
+
+        case FIPS_TEST_HKDF:
+		idstr = "HKDF";		
+		break;
+
+        case FIPS_TEST_TLS13:
+		idstr = "TLS13";
+		break;
+		case FIPS_TEST_KBKDF:
+		idstr = "KBKDF";
+		break;
+		case FIPS_TEST_SSHKDF:
+		idstr = "SSHKDF";
+		break;
+
+        case FIPS_TEST_DUP:
+        idstr = "XTS DUP";
+		break;
+
+		default:
+		idstr = "Unknown";
+		break;
+
+		}
+
+	if (fail_id == id
+		&& (fail_key == -1 || fail_key == keytype)
+		&& (fail_sub == -1 || fail_sub == subid)) {
+			exp_fail = 1;
+		}
+
+	switch(op)
+		{
+		case FIPS_POST_BEGIN:
+#ifdef FIPS_POST_TIME
+		clock_getres(CLOCK_REALTIME, &tstart);
+		printf("\tTimer resolution %ld s, %ld ns\n",
+				(long)tstart.tv_sec, (long)tstart.tv_nsec);
+		clock_gettime(CLOCK_REALTIME, &tstart);
+#endif
+		printf("\tPOST started\n");
+		break;
+
+		case FIPS_POST_END:
+		printf("\tPOST %s\n", id ? "Success" : "Failed");
+#ifdef FIPS_POST_TIME
+		clock_gettime(CLOCK_REALTIME, &tend);
+		printf("\t\tTook %f seconds\n",
+			(double)((tend.tv_sec+tend.tv_nsec*1e-9)
+                        - (tstart.tv_sec+tstart.tv_nsec*1e-9)));
+#endif
+		break;
+
+		case FIPS_POST_STARTED:
+		if (!post_quiet && !exp_fail)
+			printf("\t\t%s %s test started\n", idstr, exstr);
+#ifdef FIPS_POST_TIME
+		clock_gettime(CLOCK_REALTIME, &start);
+#endif
+		break;
+
+		case FIPS_POST_SUCCESS:
+		if (exp_fail)
+			{
+			printf("\t\t%s %s test OK but should've failed\n",
+								idstr, exstr);
+			st_err++;
+			}
+		else if (!post_quiet)
+			printf("\t\t%s %s test OK\n", idstr, exstr);
+#ifdef FIPS_POST_TIME
+		clock_gettime(CLOCK_REALTIME, &end);
+		printf("\t\t\tTook %f seconds\n",
+			(double)((end.tv_sec+end.tv_nsec*1e-9)
+                        - (start.tv_sec+start.tv_nsec*1e-9)));
+#endif
+		break;
+
+		case FIPS_POST_FAIL:
+		if (exp_fail) {
+			printf("\t\t%s %s test failed as expected\n",
+							idstr, exstr);
+		} else	{
+            printf("\t\t%s %s test Failed Incorrectly!!\n",  idstr, exstr);
+            st_err++;
+        }
+		break;
+
+		case FIPS_POST_CORRUPT:
+		if (exp_fail)
+			{
+			printf("\t\t%s %s test failure induced\n", idstr, exstr);
+			return 0;
+			}
+		break;
+
+		}
+	return 1;
+	}
+
+typedef struct 
+	{
+	const char *name;
+	int id, subid, keyid;
+	} fail_list;
+
+static fail_list flist[] =
+	{
+	{"Integrity", FIPS_TEST_INTEGRITY, 1, -1},
+	{"Integrity", FIPS_TEST_INTEGRITY, 2, -1},	
+	{"AES", FIPS_TEST_CIPHER, NID_aes_128_ecb, -1},	
+	{"AES-GCM", FIPS_TEST_GCM, -1, -1},
+	{"AES-CCM", FIPS_TEST_CCM, -1, -1},
+	{"AES-XTS", FIPS_TEST_XTS, -1, -1},
+	{"Digest", FIPS_TEST_DIGEST, NID_sha1, -1},
+	//{"Digest", FIPS_TEST_DIGEST, NID_sha224, -1},
+	{"Digest", FIPS_TEST_DIGEST, NID_sha256, -1},
+	//{"Digest", FIPS_TEST_DIGEST, NID_sha384, -1},
+	{"Digest", FIPS_TEST_DIGEST, NID_sha512, -1},
+	{"Digest", FIPS_TEST_DIGEST, NID_sha3_256, -1},
+	{"Digest", FIPS_TEST_DIGEST, NID_sha3_512, -1},
+	{"Digest", FIPS_TEST_DIGEST, NID_shake128, -1},
+	{"Digest", FIPS_TEST_DIGEST, NID_shake256, -1},
+	{"HMAC", FIPS_TEST_HMAC, -1, -1},
+	//{"HMAC", FIPS_TEST_HMAC, NID_sha3_256, -1},
+	//{"HMAC", FIPS_TEST_HMAC, NID_sha3_512, -1},
+	{"CMAC", FIPS_TEST_CMAC, -1, -1},
+	{"DRBG", FIPS_TEST_DRBG, -1, -1},
+	{"DRBG", FIPS_TEST_DRBG, NID_aes_128_ctr, -1},
+	{"DRBG", FIPS_TEST_DRBG, NID_aes_192_ctr, -1},
+	{"RSA", FIPS_TEST_SIGNATURE, -1, EVP_PKEY_RSA},
+    {"RSA", FIPS_TEST_RSA_ENCRYPT, -1, -1},
+	{"RSA", FIPS_TEST_RSA_DECRYPT, -1, -1},	
+	{"DSA", FIPS_TEST_SIGNATURE, -1, EVP_PKEY_DSA},
+	{"DH", FIPS_TEST_DH, -1, -1},
+	{"ECDSA", FIPS_TEST_SIGNATURE, NID_secp256k1, EVP_PKEY_EC},
+	{"ECDH", FIPS_TEST_ECDH, NID_X9_62_prime256v1, -1},
+    {"TLS_PRF", FIPS_TEST_TLS1, -1, -1},
+    {"PBKDF", FIPS_TEST_PBKDF, -1, -1},
+    {"HKDF", FIPS_TEST_HKDF, -1, -1},
+    {"TLS13", FIPS_TEST_TLS13, -1, -1},
+	{"SSHKDF", FIPS_TEST_SSHKDF, -1, -1},
+	{"KBKDF", FIPS_TEST_KBKDF, -1, -1},
+	{NULL, -1, -1, -1}
+	};
+
+static int no_err;
+
 int main(int argc, char *argv[])
 {
     FUNCTION f, *fp;
@@ -126,6 +496,8 @@ int main(int argc, char *argv[])
     const char *prompt;
     ARGS arg;
     int first, n, i, ret = 0;
+    fail_list *ftmp;
+    int rv;
 
     arg.argv = NULL;
     arg.size = 0;
@@ -145,14 +517,49 @@ int main(int argc, char *argv[])
     win32_utf8argv(&argc, &argv);
 #endif
 
+    printf("\nFIPS version string\n");
+    printf("%s\n", FIPS_show_version());
+
     p = getenv("OPENSSL_DEBUG_MEMORY");
     if (p != NULL && strcmp(p, "on") == 0)
         CRYPTO_set_mem_debug(1);
     CRYPTO_mem_ctrl(CRYPTO_MEM_CHECK_ON);
-
-    if (getenv("OPENSSL_FIPS")) {
-        BIO_printf(bio_err, "FIPS mode not supported.\n");
-        return 1;
+    
+    prog = opt_init(argc, argv, list_options);
+    setvbuf(stdout,NULL,_IONBF,0);
+    FIPS_post_set_callback(post_cb);
+    
+    if (getenv("OPENSSL_FIPS_FAIL")) {
+        post_quiet = 1;
+        no_err = 1;
+        for (ftmp = flist; ftmp->name; ftmp++) {
+            printf("    Testing induced failure of %s test\n", ftmp->name);
+            fail_id = ftmp->id;
+            fail_sub = ftmp->subid;
+            fail_key = ftmp->keyid;
+            rv = FIPS_mode_set(1);
+            if (rv)	{
+                printf("\tFIPS mode incorrectly successful!!\n");
+                st_err++;
+            }
+        }
+        return rv;
+    } else if (getenv("OPENSSL_FIPS_KAT")) {
+    if (!FIPS_mode_set(1))
+		{
+		printf("\tError entering FIPS mode\n");
+		st_err++;
+		}
+    } else {
+        post_quiet = 1;	
+		no_err = 1;
+        if (!FIPS_mode_set(1))
+		{
+		printf("\tError entering FIPS mode\n");
+		st_err++;
+		}
+        post_quiet = 0;	
+		no_err = 0;
     }
 
     if (!apps_startup()) {
@@ -189,6 +596,23 @@ int main(int argc, char *argv[])
         ret = do_cmd(prog, argc, argv);
         if (ret < 0)
             ret = 0;
+        goto end;
+    }
+
+    if (getenv("OPENSSL_PCT_API_DH")) {
+        DH *a = NULL;
+        a=DH_new_by_nid(NID_ffdhe2048);
+        if (!DH_generate_key(a))
+            printf("DH Keygen failed");
+        goto end;          
+    } else if (getenv("OPENSSL_PCT_API_DH_FAIL")) {
+        DH *a = NULL;
+        fail_id = FIPS_TEST_PAIRWISE;
+        fail_key = -1;
+        fail_sub = EVP_PKEY_DH;
+        a=DH_new_by_nid(NID_ffdhe2048);
+        if (!DH_generate_key(a))
+            printf("DH Keygen failed");
         goto end;
     }
 
@@ -260,7 +684,8 @@ int main(int argc, char *argv[])
  end:
     OPENSSL_free(copied_argv);
     OPENSSL_free(default_config_file);
-    lh_FUNCTION_free(prog);
+    if ( prog )
+        lh_FUNCTION_free(prog);
     OPENSSL_free(arg.argv);
     app_RAND_write();
 
@@ -387,7 +812,6 @@ int list_main(int argc, char **argv)
     HELPLIST_CHOICE o;
     int one = 0, done = 0;
 
-    prog = opt_init(argc, argv, list_options);
     while ((o = opt_next()) != OPT_EOF) {
         switch (o) {
         case OPT_EOF:  /* Never hit, but suppresses warning */
@@ -553,6 +977,45 @@ static int do_cmd(LHASH_OF(FUNCTION) *prog, int argc, char *argv[])
 
     if (argc <= 0 || argv[0] == NULL)
         return 0;
+    /* NB POST will succeed with a pairwise test failures as
+	 * it is not used during POST.
+	 */
+    if (getenv("OPENSSL_PCT_RSA_FAIL")) {    
+        fail_id = FIPS_TEST_PAIRWISE;
+        fail_key = EVP_PKEY_RSA;
+        fail_sub = -1;
+    }
+
+    if (getenv("OPENSSL_PCT_DSA_FAIL")) {    
+        fail_id = FIPS_TEST_PAIRWISE;
+        fail_key = EVP_PKEY_DSA;
+        fail_sub = -1;
+    }
+
+    if (getenv("OPENSSL_PCT_ECDSA_FAIL")) {    
+        fail_id = FIPS_TEST_PAIRWISE;
+        fail_key = EVP_PKEY_EC;
+        fail_sub = -1;
+    }
+
+    if (getenv("OPENSSL_PCT_ECDH_FAIL")) {    
+        fail_id = FIPS_TEST_PAIRWISE;
+        fail_key = EVP_PKEY_ECDH;
+        fail_sub = -1;
+    }
+
+    if (getenv("OPENSSL_PCT_DH_FAIL")) {
+        fail_id = FIPS_TEST_PAIRWISE;
+        fail_key = -1;
+        fail_sub = EVP_PKEY_DH;
+    }
+
+    if (getenv("OPENSSL_DUP_XTS_FAIL")) {
+        fail_id = FIPS_TEST_DUP;
+        fail_key = -1;
+        fail_sub = -1;
+    }
+
     f.name = argv[0];
     fp = lh_FUNCTION_retrieve(prog, &f);
     if (fp == NULL) {

@@ -52,6 +52,7 @@
 #ifdef OPENSSL_FIPS
 # include <openssl/fips.h>
 # include "crypto/fips.h"
+# include "crypto/fips/fips_locl.h"
 #endif
 
 #ifdef OPENSSL_FIPS
@@ -83,7 +84,7 @@ int FIPS_selftest_aes()
         unsigned char key[16];
 
         memcpy(key, tests[n].key, sizeof(key));
-        if (fips_cipher_test(ctx, EVP_aes_128_ecb(),
+        if (fips_cipher_test(FIPS_TEST_CIPHER, ctx, EVP_aes_128_ecb(),
                              key, NULL,
                              tests[n].plaintext,
                              tests[n].ciphertext, 16) <= 0)
@@ -131,9 +132,17 @@ static const unsigned char ccm_tag[] = {
 
 int FIPS_selftest_aes_ccm(void)
 {
-    int ret = 0;
+    int ret = 0, do_corrupt = 0;
     unsigned char out[128], tag[16];
     EVP_CIPHER_CTX *ctx;
+    int subid = 0;
+
+    subid = EVP_CIPHER_type(EVP_aes_192_ccm());
+    if (!fips_post_started(FIPS_TEST_CCM, 0, NULL))
+		return 1;
+    if (!fips_post_corrupt(FIPS_TEST_CCM, 0, NULL)){
+		do_corrupt = 1;
+    }
 
     ctx = EVP_CIPHER_CTX_new();
     if (ctx == NULL)
@@ -165,6 +174,10 @@ int FIPS_selftest_aes_ccm(void)
 
     memset(out, 0, sizeof(out));
 
+    /* Modify expected tag value */
+	if (do_corrupt)
+		tag[0]++;
+
     if (!EVP_CipherInit_ex(ctx, EVP_aes_192_ccm(), NULL, NULL, NULL, 0))
         goto err;
     if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_CCM_SET_IVLEN,
@@ -191,10 +204,10 @@ int FIPS_selftest_aes_ccm(void)
 
     if (ret == 0) {
         FIPSerr(FIPS_F_FIPS_SELFTEST_AES_CCM, FIPS_R_SELFTEST_FAILED);
+        fips_post_failed(FIPS_TEST_CCM, 0, NULL);
         return 0;
     } else
-        return ret;
-
+        return fips_post_success(FIPS_TEST_CCM, 0, NULL);
 }
 
 /* AES-GCM test data from NIST public test vectors */
@@ -231,9 +244,18 @@ static const unsigned char gcm_tag[] = {
 
 int FIPS_selftest_aes_gcm(void)
 {
-    int ret = 0;
+    int ret = 0, do_corrupt = 0;
     unsigned char out[128], tag[16];
     EVP_CIPHER_CTX *ctx;
+    int subid = 0;
+
+    subid = EVP_CIPHER_type(EVP_aes_256_gcm());
+    if (!fips_post_started(FIPS_TEST_GCM, 0, NULL))
+		return 1;
+
+    if (!fips_post_corrupt(FIPS_TEST_GCM, 0, NULL)) {
+		do_corrupt = 1;
+    }
 
     ctx = EVP_CIPHER_CTX_new();
     if (ctx == NULL)
@@ -263,6 +285,10 @@ int FIPS_selftest_aes_gcm(void)
 
     memset(out, 0, sizeof(out));
 
+    /* Modify expected tag value */
+	if (do_corrupt)
+		tag[0]++;
+    
     if (!EVP_CipherInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL, 0))
         goto err;
     if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN,
@@ -289,9 +315,10 @@ int FIPS_selftest_aes_gcm(void)
 
     if (ret == 0) {
         FIPSerr(FIPS_F_FIPS_SELFTEST_AES_GCM, FIPS_R_SELFTEST_FAILED);
+        fips_post_failed(FIPS_TEST_GCM, 0, NULL);
         return 0;
     } else
-        return ret;
+        return fips_post_success(FIPS_TEST_GCM, 0, NULL);
 
 }
 
@@ -351,12 +378,12 @@ int FIPS_selftest_aes_xts()
     if (ctx == NULL)
         goto err;
 
-    if (fips_cipher_test(ctx, EVP_aes_128_xts(),
+    if (fips_cipher_test(FIPS_TEST_XTS, ctx, EVP_aes_128_xts(),
                          XTS_128_key, XTS_128_i, XTS_128_pt, XTS_128_ct,
                          sizeof(XTS_128_pt)) <= 0)
         ret = 0;
 
-    if (fips_cipher_test(ctx, EVP_aes_256_xts(),
+    if (fips_cipher_test(FIPS_TEST_XTS, ctx, EVP_aes_256_xts(),
                          XTS_256_key, XTS_256_i, XTS_256_pt, XTS_256_ct,
                          sizeof(XTS_256_pt)) <= 0)
         ret = 0;

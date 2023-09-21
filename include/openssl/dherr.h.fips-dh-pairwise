@@ -88,7 +88,6 @@ int ERR_load_DH_strings(void);
 #  define DH_R_PEER_KEY_ERROR                              111
 #  define DH_R_SHARED_INFO_ERROR                           113
 #  define DH_R_UNABLE_TO_CHECK_GENERATOR                   121
-#  define DH_R_INVALID_KEYPAIR                             203
 
 # endif
 #endif

@@ -58,70 +58,6 @@
 #include "fips_locl.h"
 
 #ifdef OPENSSL_FIPS
-#include <openssl/rand.h>
-#include "internal/nelem.h"
-
-/* functions to change the RAND_METHOD */
-static int fbytes(unsigned char *buf, int num);
-
-static RAND_METHOD fake_rand;
-static const RAND_METHOD *old_rand;
-static int use_fake = 0;
-static const unsigned char *numbers[2];
-static int numbers_len[2];
-
-static int change_rand(void)
-{
-  /* save old rand method */
-  old_rand = RAND_get_rand_method();
-  if (!old_rand)
-    return 0;
-  
-  fake_rand = *old_rand;
-  /* use own random function */
-  fake_rand.bytes = fbytes;
-  /* set new RAND_METHOD */
-  if (!RAND_set_rand_method(&fake_rand))
-    return 0;
-  
-  return 1;
-}
-
-static int restore_rand(void)
-{
-  if (!RAND_set_rand_method(old_rand))
-    return 0;
-  
-  return 1;
-}
-
-static int fbytes(unsigned char *buf, int num)
-{
-  int ret = 0;
-  static int fbytes_counter = 0;
-  
-  if (use_fake == 0)
-    return old_rand->bytes(buf, num);
-  
-  use_fake = 0;
-  
-  if (fbytes_counter >= OSSL_NELEM(numbers))
-    goto err;
-  
-  if (numbers_len[fbytes_counter] > num)
-    goto err;
-  
-  /* first zero out the buffer */
-  memset(buf, 0, num);
-  
-  /* Now set the "random" values */
-  memcpy(buf + (num - numbers_len[fbytes_counter]), numbers[fbytes_counter], numbers_len[fbytes_counter]);
-  
-  fbytes_counter = (fbytes_counter + 1) % OSSL_NELEM(numbers);
-  ret = 1;
-err:
-  return ret;
-}
 
 static const unsigned char dsa_test_2048_p[] = {
     0xa8, 0x53, 0x78, 0xd8, 0xfd, 0x3f, 0x8d, 0x72, 0xec, 0x74, 0x18, 0x08,
@@ -210,94 +146,6 @@ static const unsigned char dsa_test_2048_priv_key[] = {
     0xec, 0x55, 0xf6, 0xcc
 };
 
-static const unsigned char kat_tbs[] =
-    "OpenSSL FIPS 140-3 Public Key DSA KAT";
-
-static const unsigned char kat_DSA_SHA256[] = {
-0x30, 0x3e, 0x02, 0x1d, 0x00, 0x8e, 0x40, 0x36, 0xac, 0x3c,
-0x3c, 0xd1, 0x8b, 0x63, 0xb3, 0x79, 0x6e, 0x42, 0x66, 0xbf,
-0xb0, 0xeb, 0xec, 0xe2, 0xf2, 0x03, 0xa0, 0x9c, 0x34, 0x17,
-0x11, 0xca, 0x58, 0x02, 0x1d, 0x00, 0xb0, 0xaf, 0xb6, 0x55,
-0x19, 0x4b, 0x6b, 0xea, 0x7e, 0xe5, 0x86, 0x4d, 0xa8, 0x9f,
-0x13, 0x1d, 0xba, 0xa8, 0x73, 0x7b, 0x5a, 0x17, 0xe0, 0x8b,
-0x4d, 0xf3, 0x6d, 0x39
-};
-
-static const unsigned char data1_d[] = {
-  0x51, 0x9b, 0x42, 0x3d, 0x71, 0x5f, 0x8b, 0x58,
-  0x1f, 0x4f, 0xa8, 0xee, 0x59, 0xf4, 0x77, 0x1a,
-  0x5b, 0x44, 0xc8, 0x13, 0x0b, 0x4e, 0x3e, 0xac,
-  0xca, 0x54, 0xa5, 0x6d, 0xda, 0x72, 0xb4, 0x64
-};
-
-static const unsigned char data1_k[] = {
-  0x94, 0xa1, 0xbb, 0xb1, 0x4b, 0x90, 0x6a, 0x61,
-  0xa2, 0x80, 0xf2, 0x45, 0xf9, 0xe9, 0x3c, 0x7f,
-  0x3b, 0x4a, 0x62, 0x47, 0x82, 0x4f, 0x5d, 0x33,
-  0xb9, 0x67, 0x07, 0x87, 0x64, 0x2a, 0x68, 0xde
-};
-
-static int fips_pkey_signature_test2(EVP_PKEY *pkey,
-                             const unsigned char *tbs, int tbslen,
-                             const unsigned char *kat, unsigned int katlen,
-                             const EVP_MD *digest, unsigned int flags,
-                             const char *fail_str)
-{
-    int ret = 0;
-    unsigned char sigtmp[256], *sig = sigtmp;
-    size_t siglen = sizeof(sigtmp);
-    EVP_MD_CTX *mctx;
-    EVP_PKEY_CTX *pctx;
-
-    if (digest == NULL)
-        digest = EVP_sha256();
-
-    mctx = EVP_MD_CTX_new();
-    use_fake = 1;
-    
-    if (!sig || ! mctx) {
-        EVP_MD_CTX_free(mctx);
-        FIPSerr(FIPS_F_FIPS_PKEY_SIGNATURE_TEST, ERR_R_MALLOC_FAILURE);
-        return 0;
-    }
-
-    if (tbslen == -1)
-        tbslen = strlen((char *)tbs);
-
-    if (EVP_DigestSignInit(mctx, &pctx, digest, NULL, pkey) <= 0)
-        goto error;
-    
-    if (EVP_DigestSignUpdate(mctx, tbs, tbslen) <= 0)
-        goto error;
-    
-    use_fake = 1;
-    if (EVP_DigestSignFinal(mctx, sig, &siglen) <= 0)
-        goto error;
-        
-    if (kat && ((siglen != katlen) || memcmp(kat, sig, katlen)))
-        goto error;
-
-    if (EVP_DigestVerifyInit(mctx, &pctx, digest, NULL, pkey) <= 0)
-        goto error;
-    
-    if (EVP_DigestVerifyUpdate(mctx, tbs, tbslen) <= 0)
-        goto error;
-
-    ret = EVP_DigestVerifyFinal(mctx, sig, siglen);
-
- error:
-    if (sig != sigtmp)
-        OPENSSL_free(sig);
-    EVP_MD_CTX_free(mctx);
-    if (ret <= 0) {
-        FIPSerr(FIPS_F_FIPS_PKEY_SIGNATURE_TEST, FIPS_R_TEST_FAILURE);
-        if (fail_str)
-            ERR_add_error_data(2, "Type=", fail_str);
-        return 0;
-    }
-    return 1;
-}
-
 int FIPS_selftest_dsa()
 {
     DSA *dsa = NULL;
@@ -310,16 +158,6 @@ int FIPS_selftest_dsa()
     fips_load_key_component(g, dsa_test_2048);
     fips_load_key_component(pub_key, dsa_test_2048);
     fips_load_key_component(priv_key, dsa_test_2048);
-    
-    /* d[] will be used to generate a key. */
-    /* k[] will be used for signature generation. */
-    numbers[0] = data1_d;
-    numbers_len[0] = sizeof(data1_d);
-    numbers[1] = data1_k;
-    numbers_len[1] = sizeof(data1_k);
-    /* swap the RNG source */
-    if (!change_rand())
-      return ret;    
 
     dsa = DSA_new();
 
@@ -334,15 +172,13 @@ int FIPS_selftest_dsa()
         goto err;
 
     EVP_PKEY_assign_DSA(pk, dsa);
-    
-    if (!fips_pkey_signature_test2(pk, kat_tbs, sizeof(kat_tbs) -1,
-                                  kat_DSA_SHA256, sizeof(kat_DSA_SHA256), EVP_sha256(), 0, "DSA SHA256"))
+
+    if (!fips_pkey_signature_test(pk, NULL, 0,
+                                  NULL, 0, EVP_sha256(), 0, "DSA SHA256"))
         goto err;
     ret = 1;
 
  err:
-    restore_rand();
-
     if (pk)
         EVP_PKEY_free(pk);
     else if (dsa)

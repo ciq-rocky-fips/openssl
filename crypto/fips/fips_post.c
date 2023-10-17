@@ -72,7 +72,7 @@
 
 char* FIPS_show_version(void)
 {
-    return "CIQ Rocky Linux 8 OpenSSL Cryptographic Module Version 1.0";
+    return "Rocky Linux 8 OpenSSL Cryptographic Module Version Rocky8.20230810";
 }
 
 /* Run all selftests */

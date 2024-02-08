@@ -277,6 +277,7 @@ static int verify_integrity(OSSL_CORE_BIO *bio, OSSL_FUNC_BIO_read_ex_fn read_ex
         goto err;
     ret = 1;
 err:
+    OPENSSL_cleanse(out, sizeof(out));
     OSSL_SELF_TEST_onend(ev, ret);
     EVP_MAC_CTX_free(ctx);
     EVP_MAC_free(mac);

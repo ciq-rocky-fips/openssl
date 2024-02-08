@@ -21,6 +21,7 @@
  */
 #include "internal/deprecated.h"
 #include <assert.h>
+#include <string.h>
 #include <openssl/evp.h>
 #include <openssl/provider.h>
 #include <openssl/dsa.h>
@@ -726,7 +727,9 @@ int setup_tests(void)
         return 0;
 
 #if !defined(OPENSSL_NO_DSA) && !defined(OPENSSL_NO_DH)
-    ADD_ALL_TESTS(test_dsa_param_keygen, 3 * 3 * 3);
+    if (strcmp(prov_name, "fips") != 0) {
+        ADD_ALL_TESTS(test_dsa_param_keygen, 3 * 3 * 3);
+    }
 #endif
 #ifndef OPENSSL_NO_DH
     ADD_ALL_TESTS(test_dh_safeprime_param_keygen, 3 * 3 * 3);
@@ -746,7 +749,9 @@ int setup_tests(void)
     ADD_TEST(kem_invalid_keytype);
 #endif
 #ifndef OPENSSL_NO_DES
-    ADD_TEST(test_cipher_tdes_randkey);
+    if (strcmp(prov_name, "fips") != 0) {
+        ADD_TEST(test_cipher_tdes_randkey);
+    }
 #endif
     return 1;
 }

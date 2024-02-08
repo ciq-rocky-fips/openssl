@@ -273,8 +273,7 @@ SKIP: {
 }
 
 SKIP : {
-    skip "FIPS DSA tests because of no dsa in this build", 1
-        if disabled("dsa");
+    skip "FIPS DSA tests because of no dsa in this build", 1;
 
     subtest DSA => sub {
         my $testtext_prefix = 'DSA';

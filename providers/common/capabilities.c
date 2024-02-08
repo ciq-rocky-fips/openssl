@@ -186,9 +186,9 @@ static const OSSL_PARAM param_group_list[][10] = {
     TLS_GROUP_ENTRY("brainpoolP256r1", "brainpoolP256r1", "EC", 25),
     TLS_GROUP_ENTRY("brainpoolP384r1", "brainpoolP384r1", "EC", 26),
     TLS_GROUP_ENTRY("brainpoolP512r1", "brainpoolP512r1", "EC", 27),
-#  endif
     TLS_GROUP_ENTRY("x25519", "X25519", "X25519", 28),
     TLS_GROUP_ENTRY("x448", "X448", "X448", 29),
+#  endif
 # endif /* OPENSSL_NO_EC */
 # ifndef OPENSSL_NO_DH
     /* Security bit values for FFDHE groups are as per RFC 7919 */

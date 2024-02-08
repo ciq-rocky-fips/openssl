@@ -153,7 +153,8 @@ $ordinal_opts{filter} =
         return
             $item->exists()
             && platform_filter($item)
-            && feature_filter($item);
+            && feature_filter($item)
+            && fips_filter($item, $name);
     };
 my $ordinals = OpenSSL::Ordinals->new(from => $ordinals_file);
 
@@ -207,6 +208,28 @@ sub feature_filter {
     }
 
     return $verdict;
+}
+
+sub fips_filter {
+    my $item = shift;
+    my $name = uc(shift);
+    my @features = ( $item->features() );
+
+    # True if no features are defined
+    return 1 if scalar @features == 0;
+
+    my @matches = grep(/^ONLY_.*$/, @features);
+    if (@matches) {
+        # There is at least one only_* flag on this symbol, check if any of
+        # them match the name
+        for (@matches) {
+            if ($_ eq "ONLY_${name}") {
+                return 1;
+            }
+        }
+        return 0;
+    }
+    return 1;
 }
 
 sub sorter_unix {

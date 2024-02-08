@@ -224,6 +224,31 @@ int ossl_gcm_get_ctx_params(void *vctx, OSSL_PARAM params[])
             || !getivgen(ctx, p->data, p->data_size))
             return 0;
     }
+
+    /* We would usually hide this under #ifdef FIPS_MODULE, but
+     * ciphercommon_gcm.c is only compiled once into libcommon.a, so ifdefs do
+     * not work here. */
+    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_REDHAT_FIPS_INDICATOR);
+    if (p != NULL) {
+        int fips_indicator = EVP_CIPHER_REDHAT_FIPS_INDICATOR_APPROVED;
+
+        /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+         * Verification Program, Section C.H requires guarantees about the
+         * uniqueness of key/iv pairs, and proposes a few approaches to ensure
+         * this. This provides an indicator for option 2 "The IV may be
+         * generated internally at its entirety randomly." Note that one of the
+         * conditions of this option is that "The IV length shall be at least
+         * 96 bits (per SP 800-38D)." We do not specically check for this
+         * condition here, because gcm_iv_generate will fail in this case. */
+        if (ctx->enc && !ctx->iv_gen_rand)
+            fips_indicator = EVP_CIPHER_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+
+        if (!OSSL_PARAM_set_int(p, fips_indicator)) {
+            ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+            return 0;
+        }
+    }
+
     return 1;
 }
 

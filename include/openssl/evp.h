@@ -1192,6 +1192,9 @@ void EVP_MD_do_all_provided(OSSL_LIB_CTX *libctx,
                             void *arg);
 
 /* MAC stuff */
+# define EVP_MAC_REDHAT_FIPS_INDICATOR_UNDETERMINED 0
+# define EVP_MAC_REDHAT_FIPS_INDICATOR_APPROVED     1
+# define EVP_MAC_REDHAT_FIPS_INDICATOR_NOT_APPROVED 2
 
 EVP_MAC *EVP_MAC_fetch(OSSL_LIB_CTX *libctx, const char *algorithm,
                        const char *properties);

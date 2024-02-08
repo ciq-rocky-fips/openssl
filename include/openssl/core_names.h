@@ -173,6 +173,7 @@ extern "C" {
 #define OSSL_MAC_PARAM_SIZE             "size"                    /* size_t */
 #define OSSL_MAC_PARAM_BLOCK_SIZE       "block-size"              /* size_t */
 #define OSSL_MAC_PARAM_TLS_DATA_SIZE    "tls-data-size"           /* size_t */
+#define OSSL_MAC_PARAM_REDHAT_FIPS_INDICATOR "redhat-fips-indicator"
 
 /* Known MAC names */
 #define OSSL_MAC_NAME_BLAKE2BMAC    "BLAKE2BMAC"

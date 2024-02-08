@@ -29,7 +29,7 @@ sub verify {
     run(app([@args]));
 }
 
-plan tests => 163;
+plan tests => 162;
 
 # Canonical success
 ok(verify("ee-cert", "sslserver", ["root-cert"], ["ca-cert"]),
@@ -416,8 +416,9 @@ ok(verify("ee-pss-sha1-cert", "", ["root-cert"], ["ca-cert"], "-auth_level", "0"
 ok(verify("ee-pss-sha256-cert", "", ["root-cert"], ["ca-cert"], ),
     "CA with PSS signature using SHA256");
 
-ok(!verify("ee-pss-sha1-cert", "", ["root-cert"], ["ca-cert"], "-auth_level", "1"),
-    "Reject PSS signature using SHA1 and auth level 1");
+## rh-allow-sha1-signatures=yes allows this to pass despite -auth_level 1
+#ok(!verify("ee-pss-sha1-cert", "", ["root-cert"], ["ca-cert"], "-auth_level", "1"),
+#    "Reject PSS signature using SHA1 and auth level 1");
 
 ok(verify("ee-pss-sha256-cert", "", ["root-cert"], ["ca-cert"], "-auth_level", "2"),
     "PSS signature using SHA256 and auth level 2");

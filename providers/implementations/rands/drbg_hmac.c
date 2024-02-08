@@ -374,6 +374,18 @@ static int drbg_hmac_set_ctx_params(void *vctx, const OSSL_PARAM params[])
         return 0;
     }
 
+#ifdef FIPS_MODULE
+    if (!EVP_MD_is_a(md, SN_sha1)
+            && !EVP_MD_is_a(md, SN_sha256)
+            && !EVP_MD_is_a(md, SN_sha512)) {
+        ERR_raise_data(ERR_LIB_PROV, PROV_R_DIGEST_NOT_ALLOWED,
+                       "%s is not an acceptable hash function for an SP 800-90A"
+                       " DRBG according to FIPS 140-3 IG, section D.R",
+                       EVP_MD_get0_name(md));
+        return 0;
+    }
+#endif /* defined(FIPS_MODULE) */
+
     if (!ossl_prov_macctx_load_from_params(&hmac->ctx, params,
                                            NULL, NULL, NULL, libctx))
         return 0;

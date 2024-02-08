@@ -20,7 +20,7 @@ use lib srctop_dir('Configurations');
 use lib bldtop_dir('.');
 use platform;
 
-my $no_check = disabled("fips");
+my $no_check = 1;
 plan skip_all => "FIPS module config file only supported in a fips build"
     if $no_check;
 

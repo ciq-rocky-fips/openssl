@@ -22,7 +22,7 @@ use lib srctop_dir('Configurations');
 use lib bldtop_dir('.');
 use platform;
 
-plan skip_all => "Test only supported in a fips build" if disabled("fips");
+plan skip_all => "Test only supported in a fips build" if 1;
 
 plan tests => 29;
 

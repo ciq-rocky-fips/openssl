@@ -151,11 +151,38 @@ static int rsakem_decapsulate_init(void *vprsactx, void *vrsa,
 static int rsakem_get_ctx_params(void *vprsactx, OSSL_PARAM *params)
 {
     PROV_RSA_CTX *ctx = (PROV_RSA_CTX *)vprsactx;
+#ifdef FIPS_MODULE
+    OSSL_PARAM *p;
+#endif /* defined(FIPS_MODULE) */
 
-    return ctx != NULL;
+    if (ctx == NULL)
+        return 0;
+
+#ifdef FIPS_MODULE
+    p = OSSL_PARAM_locate(params, OSSL_KEM_PARAM_REDHAT_FIPS_INDICATOR);
+    if (p != NULL) {
+        /* NIST SP 800-56Br2 section 6.4.2.1 requires either explicit key
+         * confirmation (section 6.4.2.3.2), or assurance from a trusted third
+         * party (section 6.4.2.3.1) for key agreement or key transport, but
+         * explicit key confirmation is not implemented here and cannot be
+         * implemented without protocol changes, and the FIPS provider does not
+         * implement trusted third party validation, since it relies on its
+         * callers to do that. A request for guidance sent to NIST resulted in
+         * further clarification which allows OpenSSL to claim RSASVE. */
+        int fips_indicator = EVP_PKEY_REDHAT_FIPS_INDICATOR_APPROVED;
+
+        if (!OSSL_PARAM_set_int(p, fips_indicator))
+            return 0;
+    }
+#endif /* defined(FIPS_MODULE) */
+
+    return 1;
 }
 
 static const OSSL_PARAM known_gettable_rsakem_ctx_params[] = {
+#ifdef FIPS_MODULE
+    OSSL_PARAM_int(OSSL_KEM_PARAM_REDHAT_FIPS_INDICATOR, NULL),
+#endif /* defined(FIPS_MODULE) */
     OSSL_PARAM_END
 };
 

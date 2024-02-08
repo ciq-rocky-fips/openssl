@@ -237,7 +237,11 @@ static int ecdsa_setup_md(PROV_ECDSA_CTX *ctx, const char *mdname,
                        "%s could not be fetched", mdname);
         return 0;
     }
+#ifdef FIPS_MODULE
     sha1_allowed = (ctx->operation != EVP_PKEY_OP_SIGN);
+#else
+    sha1_allowed = 0;
+#endif
     md_nid = ossl_digest_get_approved_nid_with_sha1(ctx->libctx, md,
                                                     sha1_allowed);
     if (md_nid < 0) {

@@ -124,12 +124,17 @@ static int dsa_setup_md(PROV_DSA_CTX *ctx,
         mdprops = ctx->propq;
 
     if (mdname != NULL) {
-        int sha1_allowed = (ctx->operation != EVP_PKEY_OP_SIGN);
         WPACKET pkt;
         EVP_MD *md = EVP_MD_fetch(ctx->libctx, mdname, mdprops);
-        int md_nid = ossl_digest_get_approved_nid_with_sha1(ctx->libctx, md,
-                                                            sha1_allowed);
+        int md_nid;
         size_t mdname_len = strlen(mdname);
+#ifdef FIPS_MODULE
+        int sha1_allowed = (ctx->operation != EVP_PKEY_OP_SIGN);
+#else
+        int sha1_allowed = 0;
+#endif
+        md_nid = ossl_digest_get_approved_nid_with_sha1(ctx->libctx, md,
+                                                            sha1_allowed);
 
         if (md == NULL || md_nid < 0) {
             if (md == NULL)

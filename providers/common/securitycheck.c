@@ -19,6 +19,7 @@
 #include <openssl/core_names.h>
 #include <openssl/obj_mac.h>
 #include "prov/securitycheck.h"
+#include "internal/sslconf.h"
 
 /*
  * FIPS requires a minimum security strength of 112 bits (for encryption or
@@ -235,6 +236,15 @@ int ossl_digest_get_approved_nid_with_sha1(OSSL_LIB_CTX *ctx, const EVP_MD *md,
             mdnid = -1; /* disallowed by security checks */
     }
 # endif /* OPENSSL_NO_FIPS_SECURITYCHECKS */
+
+#ifndef FIPS_MODULE
+    if (!ossl_ctx_legacy_digest_signatures_allowed(ctx, 0))
+        /* SHA1 is globally disabled, check whether we want to locally allow
+         * it. */
+        if (mdnid == NID_sha1 && !sha1_allowed)
+            mdnid = -1;
+#endif
+
     return mdnid;
 }
 
@@ -244,5 +254,15 @@ int ossl_digest_is_allowed(OSSL_LIB_CTX *ctx, const EVP_MD *md)
     if (ossl_securitycheck_enabled(ctx))
         return ossl_digest_get_approved_nid(md) != NID_undef;
 # endif /* OPENSSL_NO_FIPS_SECURITYCHECKS */
+
+#ifndef FIPS_MODULE
+    {
+        int mdnid = EVP_MD_nid(md);
+        if ((mdnid == NID_sha1 || mdnid == NID_md5_sha1)
+                && !ossl_ctx_legacy_digest_signatures_allowed(ctx, 0))
+            return 0;
+    }
+#endif
+
     return 1;
 }

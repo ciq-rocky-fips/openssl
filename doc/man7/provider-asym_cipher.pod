@@ -237,6 +237,15 @@ B<RSA_PKCS1_WITH_TLS_PADDING> on the page L<EVP_PKEY_CTX_set_rsa_padding(3)>.
 The negotiated TLS protocol version. See
 B<RSA_PKCS1_WITH_TLS_PADDING> on the page L<EVP_PKEY_CTX_set_rsa_padding(3)>.
 
+=item "implicit-rejection" (B<OSSL_PKEY_PARAM_IMPLICIT_REJECTION>) <unsigned integer>
+
+Gets of sets the use of the implicit rejection mechanism for RSA PKCS#1 v1.5
+decryption. When set (non zero value), the decryption API will return
+a deterministically random value if the PKCS#1 v1.5 padding check fails.
+This makes explotation of the Bleichenbacher significantly harder, even
+if the code using the RSA decryption API is not implemented in side-channel
+free manner. Set by default.
+
 =back
 
 OSSL_FUNC_asym_cipher_gettable_ctx_params() and OSSL_FUNC_asym_cipher_settable_ctx_params()

@@ -1171,6 +1171,11 @@ static int execute_test_ktls(int cis_ktls, int sis_ktls,
         goto end;
     }
 
+    if (is_fips && strstr(cipher, "CHACHA") != NULL) {
+        testresult = TEST_skip("CHACHA is not supported in FIPS");
+        goto end;
+    }
+
     /* Create a session based on SHA-256 */
     if (!TEST_true(create_ssl_ctx_pair(libctx, TLS_server_method(),
                                        TLS_client_method(),
@@ -1302,6 +1307,11 @@ static int execute_test_ktls_sendfile(int tls_version, const char *cipher)
     /* Skip this test if the platform does not support ktls */
     if (!ktls_chk_platform(sfd)) {
         testresult = TEST_skip("Kernel does not support KTLS");
+        goto end;
+    }
+
+    if (is_fips && strstr(cipher, "CHACHA") != NULL) {
+        testresult = TEST_skip("CHACHA is not supported in FIPS");
         goto end;
     }
 

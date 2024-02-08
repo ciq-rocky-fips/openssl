@@ -48,6 +48,9 @@ typedef struct {
     char type; /* X */
     unsigned char *session_id;
     size_t session_id_len;
+#ifdef FIPS_MODULE
+    int fips_indicator;
+#endif /* defined(FIPS_MODULE) */
 } KDF_SSHKDF;
 
 static void *kdf_sshkdf_new(void *provctx)
@@ -126,6 +129,12 @@ static int kdf_sshkdf_derive(void *vctx, unsigned char *key, size_t keylen,
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_TYPE);
         return 0;
     }
+
+#ifdef FIPS_MODULE
+    if (keylen < EVP_KDF_FIPS_MIN_KEY_LEN)
+        ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+#endif /* defined(FIPS_MODULE) */
+
     return SSHKDF(md, ctx->key, ctx->key_len,
                   ctx->xcghash, ctx->xcghash_len,
                   ctx->session_id, ctx->session_id_len,
@@ -194,10 +203,67 @@ static const OSSL_PARAM *kdf_sshkdf_settable_ctx_params(ossl_unused void *ctx,
 static int kdf_sshkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
 {
     OSSL_PARAM *p;
+    int any_valid = 0; /* set to 1 when at least one parameter was valid */
 
-    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE)) != NULL)
-        return OSSL_PARAM_set_size_t(p, SIZE_MAX);
-    return -2;
+    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE)) != NULL) {
+        any_valid = 1;
+
+        if (!OSSL_PARAM_set_size_t(p, SIZE_MAX))
+            return 0;
+    }
+
+#ifdef FIPS_MODULE
+    p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR);
+    if (p != NULL) {
+        KDF_SSHKDF *ctx = vctx;
+        int fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_APPROVED;
+
+        any_valid = 1;
+
+        /* According to NIST Special Publication 800-131Ar2, Section 8:
+         * Deriving Additional Keys from a Cryptographic Key, "[t]he length of
+         * the key-derivation key [i.e., the input key] shall be at least 112
+         * bits". */
+        if (ctx->key_len < EVP_KDF_FIPS_MIN_KEY_LEN)
+            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+
+        /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+         * Verification Program, Section D.B and NIST Special Publication
+         * 800-131Ar2, Section 1.2.2 say that any algorithm at a security
+         * strength < 112 bits is legacy use only, so all derived keys should
+         * be longer than that. If a derived key has ever been shorter than
+         * that, ctx->output_keyelen_indicator will be NOT_APPROVED, and we
+         * should also set the returned FIPS indicator to unapproved. */
+        if (ctx->fips_indicator == EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED)
+            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+
+        /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+         * Validation Program, Section C.C: "The SHAKE128 and SHAKE256
+         * extendable-output functions may only be used as the standalone
+         * algorithms."
+         *
+         * Additionally, SP 800-135r1 section 5.2 specifies that the hash
+         * function used in SSHKDF "is one of the hash functions specified in
+         * FIPS 180-3.", which rules out SHA-3 and truncated variants of SHA-2.
+         * */
+        if (ctx->digest.md != NULL
+            && !EVP_MD_is_a(ctx->digest.md, "SHA-1")
+            && !EVP_MD_is_a(ctx->digest.md, "SHA2-224")
+            && !EVP_MD_is_a(ctx->digest.md, "SHA2-256")
+            && !EVP_MD_is_a(ctx->digest.md, "SHA2-384")
+            && !EVP_MD_is_a(ctx->digest.md, "SHA2-512")) {
+            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+        }
+
+        if (!OSSL_PARAM_set_int(p, fips_indicator))
+            return 0;
+    }
+#endif
+
+    if (!any_valid)
+        return -2;
+
+    return 1;
 }
 
 static const OSSL_PARAM *kdf_sshkdf_gettable_ctx_params(ossl_unused void *ctx,
@@ -205,6 +271,9 @@ static const OSSL_PARAM *kdf_sshkdf_gettable_ctx_params(ossl_unused void *ctx,
 {
     static const OSSL_PARAM known_gettable_ctx_params[] = {
         OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
+#ifdef FIPS_MODULE
+        OSSL_PARAM_int(OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR, NULL),
+#endif /* defined(FIPS_MODULE) */
         OSSL_PARAM_END
     };
     return known_gettable_ctx_params;

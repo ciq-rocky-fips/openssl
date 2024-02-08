@@ -93,6 +93,13 @@ typedef struct {
     /* Buffer of concatenated seed data */
     unsigned char seed[TLS1_PRF_MAXBUF];
     size_t seedlen;
+
+    /* MAC digest algorithm; used to compute FIPS indicator */
+    PROV_DIGEST digest;
+
+#ifdef FIPS_MODULE
+    int fips_indicator;
+#endif /* defined(FIPS_MODULE) */
 } TLS1_PRF;
 
 static void *kdf_tls1_prf_new(void *provctx)
@@ -129,6 +136,7 @@ static void kdf_tls1_prf_reset(void *vctx)
     EVP_MAC_CTX_free(ctx->P_sha1);
     OPENSSL_clear_free(ctx->sec, ctx->seclen);
     OPENSSL_cleanse(ctx->seed, ctx->seedlen);
+    ossl_prov_digest_reset(&ctx->digest);
     memset(ctx, 0, sizeof(*ctx));
     ctx->provctx = provctx;
 }
@@ -157,6 +165,10 @@ static int kdf_tls1_prf_derive(void *vctx, unsigned char *key, size_t keylen,
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
         return 0;
     }
+#ifdef FIPS_MODULE
+    if (keylen < EVP_KDF_FIPS_MIN_KEY_LEN)
+        ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+#endif /* defined(FIPS_MODULE) */
 
     return tls1_prf_alg(ctx->P_hash, ctx->P_sha1,
                         ctx->sec, ctx->seclen,
@@ -190,6 +202,9 @@ static int kdf_tls1_prf_set_ctx_params(void *vctx, const OSSL_PARAM params[])
                 return 0;
         }
     }
+
+    if (!ossl_prov_digest_load_from_params(&ctx->digest, params, libctx))
+        return 0;
 
     if ((p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_SECRET)) != NULL) {
         OPENSSL_clear_free(ctx->sec, ctx->seclen);
@@ -232,10 +247,60 @@ static const OSSL_PARAM *kdf_tls1_prf_settable_ctx_params(
 static int kdf_tls1_prf_get_ctx_params(void *vctx, OSSL_PARAM params[])
 {
     OSSL_PARAM *p;
+#ifdef FIPS_MODULE
+    TLS1_PRF *ctx = vctx;
+#endif /* defined(FIPS_MODULE) */
+    int any_valid = 0; /* set to 1 when at least one parameter was valid */
 
-    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE)) != NULL)
-        return OSSL_PARAM_set_size_t(p, SIZE_MAX);
-    return -2;
+    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE)) != NULL) {
+        any_valid = 1;
+
+        if (!OSSL_PARAM_set_size_t(p, SIZE_MAX))
+            return 0;
+    }
+
+#ifdef FIPS_MODULE
+    p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR);
+    if (p != NULL) {
+        int fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_APPROVED;
+
+        any_valid = 1;
+
+        /* According to NIST Special Publication 800-131Ar2, Section 8:
+         * Deriving Additional Keys from a Cryptographic Key, "[t]he length of
+         * the key-derivation key [i.e., the input key] shall be at least 112
+         * bits". */
+        if (ctx->seclen < EVP_KDF_FIPS_MIN_KEY_LEN)
+            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+
+        /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+         * Verification Program, Section D.B and NIST Special Publication
+         * 800-131Ar2, Section 1.2.2 say that any algorithm at a security
+         * strength < 112 bits is legacy use only, so all derived keys should
+         * be longer than that. If a derived key has ever been shorter than
+         * that, ctx->output_keyelen_indicator will be NOT_APPROVED, and we
+         * should also set the returned FIPS indicator to unapproved. */
+        if (ctx->fips_indicator == EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED)
+            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+
+        /* SP 800-135r1 section 4.2.2 says TLS 1.2 KDF is approved when "(3)
+         * P_HASH uses either SHA-256, SHA-384 or SHA-512." */
+        if (ctx->digest.md != NULL
+                && !EVP_MD_is_a(ctx->digest.md, "SHA2-256")
+                && !EVP_MD_is_a(ctx->digest.md, "SHA2-384")
+                && !EVP_MD_is_a(ctx->digest.md, "SHA2-512")) {
+            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+        }
+
+        if (!OSSL_PARAM_set_int(p, fips_indicator))
+            return 0;
+    }
+#endif
+
+    if (!any_valid)
+        return -2;
+
+    return 1;
 }
 
 static const OSSL_PARAM *kdf_tls1_prf_gettable_ctx_params(
@@ -243,6 +308,9 @@ static const OSSL_PARAM *kdf_tls1_prf_gettable_ctx_params(
 {
     static const OSSL_PARAM known_gettable_ctx_params[] = {
         OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
+#ifdef FIPS_MODULE
+        OSSL_PARAM_int(OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR, 0),
+#endif /* defined(FIPS_MODULE) */
         OSSL_PARAM_END
     };
     return known_gettable_ctx_params;

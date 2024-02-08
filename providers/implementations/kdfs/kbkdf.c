@@ -59,6 +59,9 @@ typedef struct {
     kbkdf_mode mode;
     EVP_MAC_CTX *ctx_init;
 
+    /* HMAC digest algorithm, if any; used to compute FIPS indicator */
+    PROV_DIGEST digest;
+
     /* Names are lowercased versions of those found in SP800-108. */
     int r;
     unsigned char *ki;
@@ -71,6 +74,9 @@ typedef struct {
     size_t iv_len;
     int use_l;
     int use_separator;
+#ifdef FIPS_MODULE
+    int fips_indicator;
+#endif /* defined(FIPS_MODULE) */
 } KBKDF;
 
 /* Definitions needed for typechecking. */
@@ -140,6 +146,7 @@ static void kbkdf_reset(void *vctx)
     void *provctx = ctx->provctx;
 
     EVP_MAC_CTX_free(ctx->ctx_init);
+    ossl_prov_digest_reset(&ctx->digest);
     OPENSSL_clear_free(ctx->context, ctx->context_len);
     OPENSSL_clear_free(ctx->label, ctx->label_len);
     OPENSSL_clear_free(ctx->ki, ctx->ki_len);
@@ -243,6 +250,11 @@ static int kbkdf_derive(void *vctx, unsigned char *key, size_t keylen,
         return 0;
     }
 
+#ifdef FIPS_MODULE
+    if (keylen < EVP_KDF_FIPS_MIN_KEY_LEN)
+        ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+#endif /* defined(FIPS_MODULE) */
+
     h = EVP_MAC_CTX_get_mac_size(ctx->ctx_init);
     if (h == 0)
         goto done;
@@ -308,6 +320,9 @@ static int kbkdf_set_ctx_params(void *vctx, const OSSL_PARAM params[])
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_MAC);
         return 0;
     }
+
+    if (!ossl_prov_digest_load_from_params(&ctx->digest, params, libctx))
+        return 0;
 
     p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_MODE);
     if (p != NULL
@@ -387,20 +402,77 @@ static const OSSL_PARAM *kbkdf_settable_ctx_params(ossl_unused void *ctx,
 static int kbkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
 {
     OSSL_PARAM *p;
+    int any_valid = 0; /* set to 1 when at least one parameter was valid */
 
     p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE);
-    if (p == NULL)
+    if (p != NULL) {
+        any_valid = 1;
+
+        /* KBKDF can produce results as large as you like. */
+        if (!OSSL_PARAM_set_size_t(p, SIZE_MAX))
+            return 0;
+    }
+
+#ifdef FIPS_MODULE
+    p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR);
+    if (p != NULL) {
+        KBKDF *ctx = (KBKDF *)vctx;
+        int fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_APPROVED;
+
+        any_valid = 1;
+
+        /* According to NIST Special Publication 800-131Ar2, Section 8:
+         * Deriving Additional Keys from a Cryptographic Key, "[t]he length of
+         * the key-derivation key [i.e., the input key] shall be at least 112
+         * bits". */
+        if (ctx->ki_len < EVP_KDF_FIPS_MIN_KEY_LEN)
+            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+
+        /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+         * Verification Program, Section D.B and NIST Special Publication
+         * 800-131Ar2, Section 1.2.2 say that any algorithm at a security
+         * strength < 112 bits is legacy use only, so all derived keys should
+         * be longer than that. If a derived key has ever been shorter than
+         * that, ctx->output_keyelen_indicator will be NOT_APPROVED, and we
+         * should also set the returned FIPS indicator to unapproved. */
+        if (ctx->fips_indicator == EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED)
+            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+
+        /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+         * Validation Program, Section C.C: "The SHAKE128 and SHAKE256
+         * extendable-output functions may only be used as the standalone
+         * algorithms." Note that the digest is only used when the MAC
+         * algorithm is HMAC. */
+        if (ctx->ctx_init != NULL
+                && EVP_MAC_is_a(EVP_MAC_CTX_get0_mac(ctx->ctx_init), OSSL_MAC_NAME_HMAC)) {
+            const EVP_MD *md = ossl_prov_digest_md(&ctx->digest);
+            if (md != NULL
+                    && (EVP_MD_is_a(md, "SHAKE-128") || EVP_MD_is_a(md, "SHAKE-256"))) {
+                fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+            }
+        }
+
+        if (!OSSL_PARAM_set_int(p, fips_indicator))
+            return 0;
+    }
+#endif
+
+    if (!any_valid)
         return -2;
 
-    /* KBKDF can produce results as large as you like. */
-    return OSSL_PARAM_set_size_t(p, SIZE_MAX);
+    return 1;
 }
 
 static const OSSL_PARAM *kbkdf_gettable_ctx_params(ossl_unused void *ctx,
                                                    ossl_unused void *provctx)
 {
-    static const OSSL_PARAM known_gettable_ctx_params[] =
-        { OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL), OSSL_PARAM_END };
+    static const OSSL_PARAM known_gettable_ctx_params[] = {
+        OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
+#ifdef FIPS_MODULE
+        OSSL_PARAM_int(OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR, NULL),
+#endif /* defined(FIPS_MODULE) */
+        OSSL_PARAM_END
+    };
     return known_gettable_ctx_params;
 }
 

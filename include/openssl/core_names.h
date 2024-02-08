@@ -224,6 +224,7 @@ extern "C" {
 #define OSSL_KDF_PARAM_X942_SUPP_PUBINFO    "supp-pubinfo"
 #define OSSL_KDF_PARAM_X942_SUPP_PRIVINFO   "supp-privinfo"
 #define OSSL_KDF_PARAM_X942_USE_KEYBITS     "use-keybits"
+#define OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR "redhat-fips-indicator"
 
 /* Known KDF names */
 #define OSSL_KDF_NAME_HKDF           "HKDF"

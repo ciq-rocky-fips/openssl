@@ -219,6 +219,13 @@ struct evp_mac_st {
     OSSL_FUNC_mac_set_ctx_params_fn *set_ctx_params;
 };
 
+#ifdef FIPS_MODULE
+/* According to NIST Special Publication 800-131Ar2, Section 8: Deriving
+ * Additional Keys from a Cryptographic Key, "[t]he length of the
+ * key-derivation key [i.e., the input key] shall be at least 112 bits". */
+# define EVP_KDF_FIPS_MIN_KEY_LEN (112 / 8)
+#endif
+
 struct evp_kdf_st {
     OSSL_PROVIDER *prov;
     int name_id;

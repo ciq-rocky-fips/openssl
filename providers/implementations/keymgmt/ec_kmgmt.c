@@ -981,7 +981,16 @@ struct ec_gen_ctx {
     int selection;
     int ecdh_mode;
     EC_GROUP *gen_group;
+#ifdef FIPS_MODULE
+    void *ecdsa_sig_ctx;
+#endif
 };
+
+#ifdef FIPS_MODULE
+void *ecdsa_newctx(void *provctx, const char *propq);
+void ecdsa_freectx(void *vctx);
+int do_ec_pct(void *, const char *, void *);
+#endif
 
 static void *ec_gen_init(void *provctx, int selection,
                          const OSSL_PARAM params[])
@@ -1001,6 +1010,10 @@ static void *ec_gen_init(void *provctx, int selection,
         OPENSSL_free(gctx);
         gctx = NULL;
     }
+#ifdef FIPS_MODULE
+    if (gctx != NULL)
+        gctx->ecdsa_sig_ctx = ecdsa_newctx(provctx, NULL);
+#endif
     return gctx;
 }
 
@@ -1271,6 +1284,12 @@ static void *ec_gen(void *genctx, OSSL_CALLBACK *osslcb, void *cbarg)
 
     if (gctx->ecdh_mode != -1)
         ret = ret && ossl_ec_set_ecdh_cofactor_mode(ec, gctx->ecdh_mode);
+#ifdef FIPS_MODULE
+    /* Pairwise consistency test */
+    if ((gctx->selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0
+        && do_ec_pct(gctx->ecdsa_sig_ctx, "sha256", ec) != 1)
+        abort();
+#endif
 
     if (gctx->group_check != NULL)
         ret = ret && ossl_ec_set_check_group_type_from_name(ec, gctx->group_check);
@@ -1340,7 +1359,10 @@ static void ec_gen_cleanup(void *genctx)
 
     if (gctx == NULL)
         return;
-
+#ifdef FIPS_MODULE
+    ecdsa_freectx(gctx->ecdsa_sig_ctx);
+    gctx->ecdsa_sig_ctx = NULL;
+#endif
     EC_GROUP_free(gctx->gen_group);
     BN_free(gctx->p);
     BN_free(gctx->a);

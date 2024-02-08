@@ -16,10 +16,45 @@
 #include "internal/provider.h"
 #include "crypto/ctype.h"
 
+# include <sys/types.h>
+# include <sys/stat.h>
+# include <fcntl.h>
+# include <unistd.h>
+# include <openssl/evp.h>
+
 struct ossl_lib_ctx_onfree_list_st {
     ossl_lib_ctx_onfree_fn *fn;
     struct ossl_lib_ctx_onfree_list_st *next;
 };
+
+# define FIPS_MODE_SWITCH_FILE "/proc/sys/crypto/fips_enabled"
+
+static int kernel_fips_flag;
+
+static void read_kernel_fips_flag(void)
+{
+	char buf[2] = "0";
+	int fd;
+
+	if (ossl_safe_getenv("OPENSSL_FORCE_FIPS_MODE") != NULL) {
+		buf[0] = '1';
+	} else if ((fd = open(FIPS_MODE_SWITCH_FILE, O_RDONLY)) >= 0) {
+		while (read(fd, buf, sizeof(buf)) < 0 && errno == EINTR) ;
+		close(fd);
+	}
+
+	if (buf[0] == '1') {
+		kernel_fips_flag = 1;
+	}
+
+		return;
+}
+
+int ossl_get_kernel_fips_flag()
+{
+	return kernel_fips_flag;
+}
+
 
 struct ossl_lib_ctx_st {
     CRYPTO_RWLOCK *lock;
@@ -150,6 +185,7 @@ static CRYPTO_THREAD_LOCAL default_context_thread_local;
 
 DEFINE_RUN_ONCE_STATIC(default_context_do_init)
 {
+	 read_kernel_fips_flag();
     return CRYPTO_THREAD_init_local(&default_context_thread_local, NULL)
         && context_init(&default_context_int);
 }

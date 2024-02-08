@@ -342,7 +342,12 @@ int openssl_strerror_r(int errnum, char *buf, size_t buflen)
 #endif
 }
 
-int OPENSSL_strcasecmp(const char *s1, const char *s2)
+int
+#ifndef FIPS_MODULE
+__attribute__ ((symver ("OPENSSL_strcasecmp@@OPENSSL_3.0.3"),
+                    symver ("OPENSSL_strcasecmp@OPENSSL_3.0.1")))
+#endif
+OPENSSL_strcasecmp(const char *s1, const char *s2)
 {
     int t;
 
@@ -352,7 +357,12 @@ int OPENSSL_strcasecmp(const char *s1, const char *s2)
     return t;
 }
 
-int OPENSSL_strncasecmp(const char *s1, const char *s2, size_t n)
+int
+#ifndef FIPS_MODULE
+__attribute__ ((symver ("OPENSSL_strncasecmp@@OPENSSL_3.0.3"),
+                    symver ("OPENSSL_strncasecmp@OPENSSL_3.0.1")))
+#endif
+OPENSSL_strncasecmp(const char *s1, const char *s2, size_t n)
 {
     int t;
     size_t i;

@@ -139,7 +139,11 @@ size_t ossl_crngt_get_entropy(PROV_DRBG *drbg,
      * to the nearest byte.  If the entropy is of less than full quality,
      * the amount required should be scaled up appropriately here.
      */
-    bytes_needed = (entropy + 7) / 8;
+    /*
+     * FIPS 140-3: the yet draft SP800-90C requires requested entropy
+     * + 128 bits during initial seeding
+     */
+    bytes_needed = (entropy + 128 + 7) / 8;
     if (bytes_needed < min_len)
         bytes_needed = min_len;
     if (bytes_needed > max_len)

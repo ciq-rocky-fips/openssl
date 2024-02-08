@@ -500,7 +500,7 @@ sub testssl {
             # the default choice if TLSv1.3 enabled
             my $flag = $protocol eq "-tls1_3" ? "" : $protocol;
             my $ciphersuites = "";
-            my %redhat_skip_cipher = map {$_ => 1} qw(
+            my %rocky_skip_cipher = map {$_ => 1} qw(
 AES256-GCM-SHA384:@SECLEVEL=0
 AES256-CCM8:@SECLEVEL=0
 AES256-CCM:@SECLEVEL=0
@@ -523,8 +523,8 @@ AES128-SHA:@SECLEVEL=0
                     } else {
                         $cipher = $cipher.':@SECLEVEL=0';
                     }
-                    if ($provider eq "fips" && exists $redhat_skip_cipher{$cipher}) {
-                        note "*****SKIPPING $cipher in Red Hat FIPS mode";
+                    if ($provider eq "fips" && exists $rocky_skip_cipher{$cipher}) {
+                        note "*****SKIPPING $cipher in Rocky FIPS mode";
                         ok(1);
                     } else {
                         ok(run(test([@ssltest, @exkeys, "-cipher",

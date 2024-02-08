@@ -1476,7 +1476,7 @@ int setup_tests(void)
                   OSSL_NELEM(dh_safe_prime_keyver_data));
 #endif /* OPENSSL_NO_DH */
 
-#if 0 /* Red Hat FIPS provider doesn't have fips=yes property on DSA */
+#if 0 /* Rocky FIPS provider doesn't have fips=yes property on DSA */
 #ifndef OPENSSL_NO_DSA
     ADD_ALL_TESTS(dsa_keygen_test, OSSL_NELEM(dsa_keygen_data));
     ADD_ALL_TESTS(dsa_paramgen_test, OSSL_NELEM(dsa_paramgen_data));

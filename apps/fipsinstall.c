@@ -311,7 +311,7 @@ int fipsinstall_main(int argc, char **argv)
     EVP_MAC *mac = NULL;
     CONF *conf = NULL;
 
-    BIO_printf(bio_err, "This command is not enabled in the Red Hat Enterprise Linux OpenSSL build, please consult Red Hat documentation to learn how to enable FIPS mode\n");
+    BIO_printf(bio_err, "This command is not enabled in the Rocky Enterprise Linux OpenSSL build, please consult Rocky documentation to learn how to enable FIPS mode\n");
     return 1;
 
     if ((opts = sk_OPENSSL_STRING_new_null()) == NULL)

@@ -1,2 +1,2 @@
 OSSL_provider_init                     1	*	EXIST::FUNCTION:
-redhat_ossl_query_fipsindicator        1	*	EXIST::FUNCTION:ONLY_PROVIDERS/FIPS
+rocky_ossl_query_fipsindicator        1	*	EXIST::FUNCTION:ONLY_PROVIDERS/FIPS

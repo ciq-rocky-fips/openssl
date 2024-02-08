@@ -17,7 +17,7 @@
 #include "self_test.h"
 #include "self_test_data.inc"
 
-int REDHAT_FIPS_signature_st = 0;
+int ROCKY_FIPS_signature_st = 0;
 
 static int self_test_digest(const ST_KAT_DIGEST *t, OSSL_SELF_TEST *st,
                             OSSL_LIB_CTX *libctx)
@@ -479,7 +479,7 @@ static int self_test_sign(const ST_KAT_SIGN *t,
     if (!add_params(bld, t->key, bnctx))
         goto err;
     /* set K for ECDSA KAT tests */
-    if (!OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_REDHAT_SIGN_KAT_K, K))
+    if (!OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_ROCKY_SIGN_KAT_K, K))
         goto err;
     params = OSSL_PARAM_BLD_to_param(bld);
 
@@ -656,20 +656,20 @@ static int self_test_ciphers(OSSL_SELF_TEST *st, OSSL_LIB_CTX *libctx)
     return ret;
 }
 
-int REDHAT_FIPS_asym_cipher_st = 0;
+int ROCKY_FIPS_asym_cipher_st = 0;
 
 static int self_test_asym_ciphers(OSSL_SELF_TEST *st, OSSL_LIB_CTX *libctx)
 {
     int i, ret = 1;
 
-    REDHAT_FIPS_asym_cipher_st = 1;
+    ROCKY_FIPS_asym_cipher_st = 1;
 
     for (i = 0; i < (int)OSSL_NELEM(st_kat_asym_cipher_tests); ++i) {
         if (!self_test_asym_cipher(&st_kat_asym_cipher_tests[i], st, libctx))
             ret = 0;
     }
 
-    REDHAT_FIPS_asym_cipher_st = 0;
+    ROCKY_FIPS_asym_cipher_st = 0;
 
     return ret;
 }
@@ -714,13 +714,13 @@ static int self_test_kas(OSSL_SELF_TEST *st, OSSL_LIB_CTX *libctx)
 static int self_test_signatures(OSSL_SELF_TEST *st, OSSL_LIB_CTX *libctx)
 {
     int i, ret = 1;
-    REDHAT_FIPS_signature_st = 1;
+    ROCKY_FIPS_signature_st = 1;
 
     for (i = 0; i < (int)OSSL_NELEM(st_kat_sign_tests); ++i) {
         if (!self_test_sign(&st_kat_sign_tests[i], st, libctx))
             ret = 0;
     }
-    REDHAT_FIPS_signature_st = 0;
+    ROCKY_FIPS_signature_st = 0;
     return ret;
 }
 

@@ -228,9 +228,9 @@ int ossl_gcm_get_ctx_params(void *vctx, OSSL_PARAM params[])
     /* We would usually hide this under #ifdef FIPS_MODULE, but
      * ciphercommon_gcm.c is only compiled once into libcommon.a, so ifdefs do
      * not work here. */
-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_REDHAT_FIPS_INDICATOR);
+    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_ROCKY_FIPS_INDICATOR);
     if (p != NULL) {
-        int fips_indicator = EVP_CIPHER_REDHAT_FIPS_INDICATOR_APPROVED;
+        int fips_indicator = EVP_CIPHER_ROCKY_FIPS_INDICATOR_APPROVED;
 
         /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
          * Verification Program, Section C.H requires guarantees about the
@@ -241,7 +241,7 @@ int ossl_gcm_get_ctx_params(void *vctx, OSSL_PARAM params[])
          * 96 bits (per SP 800-38D)." We do not specically check for this
          * condition here, because gcm_iv_generate will fail in this case. */
         if (ctx->enc && !ctx->iv_gen_rand)
-            fips_indicator = EVP_CIPHER_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+            fips_indicator = EVP_CIPHER_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
 
         if (!OSSL_PARAM_set_int(p, fips_indicator)) {
             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);

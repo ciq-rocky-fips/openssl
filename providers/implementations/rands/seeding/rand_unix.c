@@ -344,7 +344,7 @@ static ssize_t syscall_random(void *buf, size_t buflen)
      * which is way below the OSSL_SSIZE_MAX limit. Therefore sign conversion
      * between size_t and ssize_t is safe even without a range check.
      */
-    /* Red Hat uses downstream patch to always seed from getrandom() */
+    /* Rocky uses downstream patch to always seed from getrandom() */
     return EVP_default_properties_is_fips_enabled(NULL) ? getrandom(buf, buflen, GRND_RANDOM) : getrandom(buf, buflen, 0);
 }
 #  endif    /* defined(OPENSSL_RAND_SEED_GETRANDOM) */

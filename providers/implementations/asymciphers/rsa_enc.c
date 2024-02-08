@@ -81,7 +81,7 @@ typedef struct {
     /* PKCS#1 v1.5 decryption mode */
     unsigned int implicit_rejection;
 #ifdef FIPS_MODULE
-    char *redhat_st_oaep_seed;
+    char *rocky_st_oaep_seed;
 #endif /* FIPS_MODULE */
 } PROV_RSA_CTX;
 
@@ -211,7 +211,7 @@ static int rsa_encrypt(void *vprsactx, unsigned char *out, size_t *outlen,
                                                     prsactx->oaep_md,
                                                     prsactx->mgf1_md
 #ifdef FIPS_MODULE
-                                                    , prsactx->redhat_st_oaep_seed
+                                                    , prsactx->rocky_st_oaep_seed
 #endif
                                                     );
 
@@ -350,7 +350,7 @@ static void rsa_freectx(void *vprsactx)
     EVP_MD_free(prsactx->mgf1_md);
     OPENSSL_free(prsactx->oaep_label);
 #ifdef FIPS_MODULE
-    OPENSSL_free(prsactx->redhat_st_oaep_seed);
+    OPENSSL_free(prsactx->rocky_st_oaep_seed);
 #endif /* FIPS_MODULE */
 
     OPENSSL_free(prsactx);
@@ -461,7 +461,7 @@ static int rsa_get_ctx_params(void *vprsactx, OSSL_PARAM *params)
         return 0;
 
 #ifdef FIPS_MODULE
-    p = OSSL_PARAM_locate(params, OSSL_ASYM_CIPHER_PARAM_REDHAT_FIPS_INDICATOR);
+    p = OSSL_PARAM_locate(params, OSSL_ASYM_CIPHER_PARAM_ROCKY_FIPS_INDICATOR);
     if (p != NULL) {
         /* NIST SP 800-56Br2 section 6.4.2.1 requires either explicit key
          * confirmation (section 6.4.2.3.2), or assurance from a trusted third
@@ -471,7 +471,7 @@ static int rsa_get_ctx_params(void *vprsactx, OSSL_PARAM *params)
          * implement trusted third party validation, since it relies on its
          * callers to do that. A request for guidance sent to NIST resulted in
          * further clarification which allows OpenSSL to claim RSA-OAEP. */
-        int fips_indicator = EVP_PKEY_REDHAT_FIPS_INDICATOR_APPROVED;
+        int fips_indicator = EVP_PKEY_ROCKY_FIPS_INDICATOR_APPROVED;
 
         if (!OSSL_PARAM_set_int(p, fips_indicator))
             return 0;
@@ -495,8 +495,8 @@ static const OSSL_PARAM known_gettable_ctx_params[] = {
     OSSL_PARAM_uint(OSSL_ASYM_CIPHER_PARAM_TLS_NEGOTIATED_VERSION, NULL),
     OSSL_PARAM_uint(OSSL_ASYM_CIPHER_PARAM_IMPLICIT_REJECTION, NULL),
 #ifdef FIPS_MODULE
-    OSSL_PARAM_octet_string(OSSL_ASYM_CIPHER_PARAM_REDHAT_KAT_OEAP_SEED, NULL, 0),
-    OSSL_PARAM_int(OSSL_ASYM_CIPHER_PARAM_REDHAT_FIPS_INDICATOR, NULL),
+    OSSL_PARAM_octet_string(OSSL_ASYM_CIPHER_PARAM_ROCKY_KAT_OEAP_SEED, NULL, 0),
+    OSSL_PARAM_int(OSSL_ASYM_CIPHER_PARAM_ROCKY_FIPS_INDICATOR, NULL),
 #endif /* FIPS_MODULE */
     OSSL_PARAM_END
 };
@@ -508,7 +508,7 @@ static const OSSL_PARAM *rsa_gettable_ctx_params(ossl_unused void *vprsactx,
 }
 
 #ifdef FIPS_MODULE
-extern int REDHAT_FIPS_asym_cipher_st;
+extern int ROCKY_FIPS_asym_cipher_st;
 #endif /* FIPS_MODULE */
 
 static int rsa_set_ctx_params(void *vprsactx, const OSSL_PARAM params[])
@@ -623,14 +623,14 @@ static int rsa_set_ctx_params(void *vprsactx, const OSSL_PARAM params[])
     }
 
 #ifdef FIPS_MODULE
-    p = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_REDHAT_KAT_OEAP_SEED);
-    if (p != NULL && REDHAT_FIPS_asym_cipher_st) {
+    p = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_ROCKY_KAT_OEAP_SEED);
+    if (p != NULL && ROCKY_FIPS_asym_cipher_st) {
         void *tmp_oaep_seed = NULL;
 
         if (!OSSL_PARAM_get_octet_string(p, &tmp_oaep_seed, 0, NULL))
             return 0;
-        OPENSSL_free(prsactx->redhat_st_oaep_seed);
-        prsactx->redhat_st_oaep_seed = (char *)tmp_oaep_seed;
+        OPENSSL_free(prsactx->rocky_st_oaep_seed);
+        prsactx->rocky_st_oaep_seed = (char *)tmp_oaep_seed;
     }
 #endif /* FIPS_MODULE */
 

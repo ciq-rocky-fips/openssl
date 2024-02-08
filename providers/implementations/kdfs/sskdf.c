@@ -373,7 +373,7 @@ static int sskdf_derive(void *vctx, unsigned char *key, size_t keylen,
 
 #ifdef FIPS_MODULE
     if (keylen < EVP_KDF_FIPS_MIN_KEY_LEN)
-        ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+        ctx->fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
 #endif /* defined(FIPS_MODULE) */
 
     if (ctx->macctx != NULL) {
@@ -460,7 +460,7 @@ static int x963kdf_derive(void *vctx, unsigned char *key, size_t keylen,
 
 #ifdef FIPS_MODULE
     if (keylen < EVP_KDF_FIPS_MIN_KEY_LEN)
-        ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+        ctx->fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
 #endif /* defined(FIPS_MODULE) */
 
     return SSKDF_hash_kdm(md, ctx->secret, ctx->secret_len,
@@ -537,9 +537,9 @@ static int sskdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
     }
 
 #ifdef FIPS_MODULE
-    p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR);
+    p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR);
     if (p != NULL) {
-        int fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_APPROVED;
+        int fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_APPROVED;
 
         any_valid = 1;
 
@@ -548,7 +548,7 @@ static int sskdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
          * the key-derivation key [i.e., the input key] shall be at least 112
          * bits". */
         if (ctx->secret_len < EVP_KDF_FIPS_MIN_KEY_LEN)
-            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+            fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
 
         /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
          * Verification Program, Section D.B and NIST Special Publication
@@ -557,8 +557,8 @@ static int sskdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
          * be longer than that. If a derived key has ever been shorter than
          * that, ctx->output_keyelen_indicator will be NOT_APPROVED, and we
          * should also set the returned FIPS indicator to unapproved. */
-        if (ctx->fips_indicator == EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED)
-            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+        if (ctx->fips_indicator == EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED)
+            fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
 
         /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
          * Validation Program, Section C.C: "The SHAKE128 and SHAKE256
@@ -570,7 +570,7 @@ static int sskdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
             if (ctx->digest.md != NULL
                 && (EVP_MD_is_a(ctx->digest.md, "SHAKE-128") ||
                     EVP_MD_is_a(ctx->digest.md, "SHAKE-256"))) {
-                fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+                fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
             }
 
             /* Table H-3 in ANS X9.63-2001 says that 160-bit hash functions
@@ -582,7 +582,7 @@ static int sskdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
             if (ctx->is_x963kdf
                     && ctx->digest.md != NULL
                     && EVP_MD_is_a(ctx->digest.md, "SHA-1")) {
-                fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+                fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
             }
         }
 
@@ -603,7 +603,7 @@ static const OSSL_PARAM *sskdf_gettable_ctx_params(ossl_unused void *ctx,
     static const OSSL_PARAM known_gettable_ctx_params[] = {
         OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
 #ifdef FIPS_MODULE
-        OSSL_PARAM_int(OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR, 0),
+        OSSL_PARAM_int(OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR, 0),
 #endif /* defined(FIPS_MODULE) */
         OSSL_PARAM_END
     };

@@ -1554,7 +1554,7 @@ EXT_RETURN tls_construct_stoc_ems(SSL *s, WPACKET *pkt, unsigned int context,
                                   X509 *x, size_t chainidx)
 {
     if ((s->s3.flags & TLS1_FLAGS_RECEIVED_EXTMS) == 0) {
-        if (FIPS_mode() && !(SSL_get_options(s) & SSL_OP_RH_PERMIT_NOEMS_FIPS) ) {
+        if (FIPS_mode() && !(SSL_get_options(s) & SSL_OP_RL_PERMIT_NOEMS_FIPS) ) {
             SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE, ERR_R_UNSUPPORTED);
             return EXT_RETURN_FAIL;
         }

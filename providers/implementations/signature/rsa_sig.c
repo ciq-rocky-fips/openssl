@@ -1171,18 +1171,18 @@ static int rsa_get_ctx_params(void *vprsactx, OSSL_PARAM *params)
     }
 
 #ifdef FIPS_MODULE
-    p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_REDHAT_FIPS_INDICATOR);
+    p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_ROCKY_FIPS_INDICATOR);
     if (p != NULL) {
-        int fips_indicator = EVP_SIGNATURE_REDHAT_FIPS_INDICATOR_APPROVED;
+        int fips_indicator = EVP_SIGNATURE_ROCKY_FIPS_INDICATOR_APPROVED;
         if (prsactx->pad_mode == RSA_PKCS1_PSS_PADDING) {
             if (prsactx->md == NULL) {
-                fips_indicator = EVP_SIGNATURE_REDHAT_FIPS_INDICATOR_UNDETERMINED;
+                fips_indicator = EVP_SIGNATURE_ROCKY_FIPS_INDICATOR_UNDETERMINED;
             } else if (rsa_pss_compute_saltlen(prsactx) > EVP_MD_get_size(prsactx->md)) {
-                fips_indicator = EVP_SIGNATURE_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+                fips_indicator = EVP_SIGNATURE_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
             }
         } else if (prsactx->pad_mode == RSA_NO_PADDING) {
             if (prsactx->md == NULL) /* Should always be the case */
-                fips_indicator = EVP_SIGNATURE_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+                fips_indicator = EVP_SIGNATURE_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
         }
         return OSSL_PARAM_set_int(p, fips_indicator);
     }
@@ -1198,7 +1198,7 @@ static const OSSL_PARAM known_gettable_ctx_params[] = {
     OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_MGF1_DIGEST, NULL, 0),
     OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PSS_SALTLEN, NULL, 0),
 #ifdef FIPS_MODULE
-    OSSL_PARAM_int(OSSL_SIGNATURE_PARAM_REDHAT_FIPS_INDICATOR, NULL),
+    OSSL_PARAM_int(OSSL_SIGNATURE_PARAM_ROCKY_FIPS_INDICATOR, NULL),
 #endif
     OSSL_PARAM_END
 };

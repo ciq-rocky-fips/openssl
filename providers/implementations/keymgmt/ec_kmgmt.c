@@ -532,7 +532,7 @@ end:
     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_PUB_KEY, NULL, 0)
 # define EC_IMEXPORTABLE_PRIVATE_KEY                                           \
     OSSL_PARAM_BN(OSSL_PKEY_PARAM_PRIV_KEY, NULL, 0),                          \
-    OSSL_PARAM_BN(OSSL_PKEY_PARAM_REDHAT_SIGN_KAT_K, NULL, 0)
+    OSSL_PARAM_BN(OSSL_PKEY_PARAM_ROCKY_SIGN_KAT_K, NULL, 0)
 # define EC_IMEXPORTABLE_OTHER_PARAMETERS                                      \
     OSSL_PARAM_int(OSSL_PKEY_PARAM_USE_COFACTOR_ECDH, NULL),                   \
     OSSL_PARAM_int(OSSL_PKEY_PARAM_EC_INCLUDE_PUBLIC, NULL)

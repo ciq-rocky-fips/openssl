@@ -118,7 +118,7 @@ EVP_PKEY *get_dhx512(OSSL_LIB_CTX *libctx)
 
 EVP_PKEY *get_dhx_ffdhe2048(OSSL_LIB_CTX *libctx)
 {
-    /* This is RFC 7919 ffdhe2048, since Red Hat removes support for
+    /* This is RFC 7919 ffdhe2048, since Rocky removes support for
      * non-well-known groups in FIPS mode. */
     static unsigned char dhx_p[] = {
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xad, 0xf8, 0x54, 0x58,

@@ -1320,7 +1320,7 @@ static const char oaep_fixed_seed[] = {
 
 static const ST_KAT_PARAM rsa_enc_params[] = {
     ST_KAT_PARAM_UTF8STRING(OSSL_ASYM_CIPHER_PARAM_PAD_MODE, pad_mode_oaep),
-    ST_KAT_PARAM_OCTET(OSSL_ASYM_CIPHER_PARAM_REDHAT_KAT_OEAP_SEED,
+    ST_KAT_PARAM_OCTET(OSSL_ASYM_CIPHER_PARAM_ROCKY_KAT_OEAP_SEED,
                        oaep_fixed_seed),
     ST_KAT_PARAM_END()
 };

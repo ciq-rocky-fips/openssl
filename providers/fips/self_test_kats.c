@@ -17,6 +17,8 @@
 #include "self_test.h"
 #include "self_test_data.inc"
 
+int REDHAT_FIPS_signature_st = 0;
+
 static int self_test_digest(const ST_KAT_DIGEST *t, OSSL_SELF_TEST *st,
                             OSSL_LIB_CTX *libctx)
 {
@@ -446,6 +448,7 @@ static int self_test_sign(const ST_KAT_SIGN *t,
     EVP_PKEY *pkey = NULL;
     unsigned char sig[256];
     BN_CTX *bnctx = NULL;
+    BIGNUM *K = NULL;
     size_t siglen = sizeof(sig);
     static const unsigned char dgst[] = {
         0x7f, 0x83, 0xb1, 0x65, 0x7f, 0xf1, 0xfc, 0x53, 0xb9, 0x2d, 0xc1, 0x81,
@@ -462,12 +465,18 @@ static int self_test_sign(const ST_KAT_SIGN *t,
     bnctx = BN_CTX_new_ex(libctx);
     if (bnctx == NULL)
         goto err;
+    K = BN_CTX_get(bnctx);
+    if (K == NULL || BN_bin2bn(dgst, sizeof(dgst), K) == NULL)
+        goto err;
 
     bld = OSSL_PARAM_BLD_new();
     if (bld == NULL)
         goto err;
 
     if (!add_params(bld, t->key, bnctx))
+        goto err;
+    /* set K for ECDSA KAT tests */
+    if (!OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_REDHAT_SIGN_KAT_K, K))
         goto err;
     params = OSSL_PARAM_BLD_to_param(bld);
 
@@ -689,11 +698,13 @@ static int self_test_kas(OSSL_SELF_TEST *st, OSSL_LIB_CTX *libctx)
 static int self_test_signatures(OSSL_SELF_TEST *st, OSSL_LIB_CTX *libctx)
 {
     int i, ret = 1;
+    REDHAT_FIPS_signature_st = 1;
 
     for (i = 0; i < (int)OSSL_NELEM(st_kat_sign_tests); ++i) {
         if (!self_test_sign(&st_kat_sign_tests[i], st, libctx))
             ret = 0;
     }
+    REDHAT_FIPS_signature_st = 0;
     return ret;
 }
 

@@ -44,6 +44,10 @@
 #define S390X_OFF_RN(n)                 (4 * n)
 #define S390X_OFF_Y(n)                  (4 * n)
 
+#ifdef FIPS_MODULE
+extern int REDHAT_FIPS_signature_st;
+#endif
+
 static int ec_GFp_s390x_nistp_mul(const EC_GROUP *group, EC_POINT *r,
                                   const BIGNUM *scalar,
                                   size_t num, const EC_POINT *points[],
@@ -183,11 +187,21 @@ static ECDSA_SIG *ecdsa_s390x_nistp_sign_sig(const unsigned char *dgst,
          * because kdsa instruction constructs an in-range, invertible nonce
          * internally implementing counter-measures for RNG weakness.
          */
+#ifdef FIPS_MODULE
+       if (REDHAT_FIPS_signature_st && eckey->sign_kat_k != NULL) {
+           BN_bn2binpad(eckey->sign_kat_k, param + S390X_OFF_RN(len), len);
+           /* Turns KDSA internal nonce-generation off. */
+           fc |= S390X_KDSA_D;
+       } else {
+#endif
          if (RAND_priv_bytes_ex(eckey->libctx, param + S390X_OFF_RN(len),
                                 (size_t)len, 0) != 1) {
              ERR_raise(ERR_LIB_EC, EC_R_RANDOM_NUMBER_GENERATION_FAILED);
              goto ret;
          }
+#ifdef FIPS_MODULE
+        }
+#endif
     } else {
         /* Reconstruct k = (k^-1)^-1. */
         if (ossl_ec_group_do_inverse_ord(group, k, kinv, NULL) == 0

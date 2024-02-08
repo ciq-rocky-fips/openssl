@@ -232,7 +232,7 @@ my @smime_pkcs7_tests = (
       \&final_compare
     ],
 
-    [ "enveloped content test streaming S/MIME format, AES-256 cipher, 3 recipients",
+    [ "enveloped content test streaming S/MIME format, AES-256 cipher, 3 recipients, no Red Hat FIPS",
       [ "{cmd1}", @prov, "-encrypt", "-in", $smcont,
         "-aes256", "-stream", "-out", "{output}.cms",
         $smrsa1,
@@ -864,6 +864,9 @@ sub check_availability {
         if ($no_des && $tnam =~ /DES/);
     return "$tnam: skipped, DSA disabled\n"
         if ($no_dsa && $tnam =~ / DSA/);
+
+    return "$tnam: skipped, Red Hat FIPS\n"
+        if ($tnam =~ /no Red Hat FIPS/);
 
     return "";
 }

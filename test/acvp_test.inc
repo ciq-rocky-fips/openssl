@@ -1844,17 +1844,6 @@ static const struct rsa_sigver_st rsa_sigver_data[] = {
     {
         "x931",
         3072,
-        "SHA1",
-        ITM(rsa_sigverx931_0_msg),
-        ITM(rsa_sigverx931_0_n),
-        ITM(rsa_sigverx931_0_e),
-        ITM(rsa_sigverx931_0_sig),
-        NO_PSS_SALT_LEN,
-        PASS
-    },
-    {
-        "x931",
-        3072,
         "SHA256",
         ITM(rsa_sigverx931_1_msg),
         ITM(rsa_sigverx931_1_n),

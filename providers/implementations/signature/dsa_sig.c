@@ -128,11 +128,7 @@ static int dsa_setup_md(PROV_DSA_CTX *ctx,
         EVP_MD *md = EVP_MD_fetch(ctx->libctx, mdname, mdprops);
         int md_nid;
         size_t mdname_len = strlen(mdname);
-#ifdef FIPS_MODULE
-        int sha1_allowed = (ctx->operation != EVP_PKEY_OP_SIGN);
-#else
         int sha1_allowed = 0;
-#endif
         md_nid = ossl_digest_get_approved_nid_with_sha1(ctx->libctx, md,
                                                             sha1_allowed);
 

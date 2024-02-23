@@ -1,0 +1,12 @@
+openssl_conf = openssl_init
+
+.include ./fips.cnf
+[openssl_init]
+providers = provider_sect
+alg_section = algorithm_sect
+
+[provider_sect]
+fips = fips_sect
+
+[algorithm_sect]
+default_properties = fips=yes

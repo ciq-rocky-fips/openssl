@@ -21,14 +21,14 @@ export HASHBANGPERL=/usr/bin/perl
 # usable on all platforms.  The Configure script already knows to use -fPIC and
 # RPM_OPT_FLAGS, so we can skip specifiying them here.
 
-#./Configure \
-#	--prefix=$cwd --openssldir=/etc/pki/tls $sslflags \
-#	--system-ciphers-file=/etc/crypto-policies/back-ends/openssl.config \
-#	zlib enable-camellia enable-seed enable-rfc3779 enable-sctp \
-#	enable-cms enable-md2 enable-rc5 enable-ktls enable-fips \
-#	no-mdc2 no-ec2m no-sm2 no-sm4 enable-buildtest-c++\
-#	shared  $sslarch $RPM_OPT_FLAGS '-DDEVRANDOM="\"/dev/urandom\"" -DROCKY_FIPS_VERSION="\"$fips\""'\
-#	-Wl,-rpath=$cwd/lib64 -Wl,--allow-multiple-definition --debug --openssldir=$cwd no-hw shared
+./Configure \
+	--prefix=$cwd --openssldir=/etc/pki/tls $sslflags \
+	--system-ciphers-file=/etc/crypto-policies/back-ends/openssl.config \
+	zlib enable-camellia enable-seed enable-rfc3779 enable-sctp \
+	enable-cms enable-md2 enable-rc5 enable-ktls enable-fips \
+	no-mdc2 no-ec2m no-sm2 no-sm4 enable-buildtest-c++\
+	shared  $sslarch $RPM_OPT_FLAGS '-DDEVRANDOM="\"/dev/urandom\"" -DROCKY_FIPS_VERSION="\"$fips\""'\
+	-Wl,-rpath=$cwd/lib64 -Wl,--allow-multiple-definition --debug --openssldir=$cwd no-hw shared
 
 #if [ $? -eq 0 ]; then
 #    echo OK

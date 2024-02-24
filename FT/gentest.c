@@ -294,8 +294,11 @@ int main(int argc, char *argv[])
 
     libctx = OSSL_LIB_CTX_new();
 
-    OSSL_PROVIDER_set_default_search_path(NULL, "/home/jrodriguez/FIPS/92/o3/src-git/INSTALL/lib64/ossl-modules/");
-    if (!OSSL_LIB_CTX_load_config(NULL, "./gentest.cnf")) goto end;
+    OSSL_PROVIDER_set_default_search_path(NULL, PROVIDER_SEREACHPATH);
+    if (!OSSL_LIB_CTX_load_config(NULL, SSL_CONFIG)) {
+        printf("NO CONF!!!!!! %s\n", SSL_CONFIG);
+        goto end;
+    }
 
     ret = OSSL_PROVIDER_available(NULL, "default");
     printf("default provider available: %d\n", ret);

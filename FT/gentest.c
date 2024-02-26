@@ -7,9 +7,80 @@
 #include <openssl/params.h>
 #include <openssl/param_build.h>
 #include <openssl/core_names.h>
+#include <openssl/self_test.h>
 #include <stdio.h>
 
-OSSL_LIB_CTX *libctx = NULL;
+/* Configuration file values */
+#define VERSION_KEY  "version"
+#define VERSION_VAL  "1"
+#define INSTALL_STATUS_VAL "INSTALL_SELF_TEST_KATS_RUN"
+
+typedef struct st_args {
+    int enable;
+    int called;
+} SELF_TEST_ARGS;
+
+static OSSL_CALLBACK self_test_events;
+static char *self_test_corrupt_desc = NULL;
+static char *self_test_corrupt_type = NULL;
+static int self_test_log = 1;
+static int quiet = 0;
+
+static OSSL_PROVIDER *prov_null = NULL;
+static OSSL_LIB_CTX *libctx = NULL;
+static SELF_TEST_ARGS self_test_args = { 0 };
+
+
+static int self_test_events(const OSSL_PARAM params[], void *arg)
+{
+    const OSSL_PARAM *p = NULL;
+    const char *phase = NULL, *type = NULL, *desc = NULL;
+    int ret = 0;
+
+    p = OSSL_PARAM_locate_const(params, OSSL_PROV_PARAM_SELF_TEST_PHASE);
+    if (p == NULL || p->data_type != OSSL_PARAM_UTF8_STRING)
+        goto err;
+    phase = (const char *)p->data;
+
+    p = OSSL_PARAM_locate_const(params, OSSL_PROV_PARAM_SELF_TEST_DESC);
+    if (p == NULL || p->data_type != OSSL_PARAM_UTF8_STRING)
+        goto err;
+    desc = (const char *)p->data;
+
+    p = OSSL_PARAM_locate_const(params, OSSL_PROV_PARAM_SELF_TEST_TYPE);
+    if (p == NULL || p->data_type != OSSL_PARAM_UTF8_STRING)
+        goto err;
+    type = (const char *)p->data;
+
+    if (self_test_log) {
+        if (strcmp(phase, OSSL_SELF_TEST_PHASE_START) == 0)
+            fprintf(stderr, "%s : (%s) : ", desc, type);
+        else if (strcmp(phase, OSSL_SELF_TEST_PHASE_PASS) == 0
+                 || strcmp(phase, OSSL_SELF_TEST_PHASE_FAIL) == 0)
+            fprintf(stderr, "%s\n", phase);
+    }
+    /*
+     * The self test code will internally corrupt the KAT test result if an
+     * error is returned during the corrupt phase.
+     */
+    if (strcmp(phase, OSSL_SELF_TEST_PHASE_CORRUPT) == 0
+            && (self_test_corrupt_desc != NULL
+                || self_test_corrupt_type != NULL)) {
+        if (self_test_corrupt_desc != NULL
+                && strcmp(self_test_corrupt_desc, desc) != 0)
+            goto end;
+        if (self_test_corrupt_type != NULL
+                && strcmp(self_test_corrupt_type, type) != 0)
+            goto end;
+        fprintf(stderr, "%s ", phase);
+        goto err;
+    }
+end:
+    ret = 1;
+err:
+    return ret;
+}
+
 
 int RSA_genkey()
 {
@@ -290,20 +361,23 @@ printf("PCT complete\n");
 int main(int argc, char *argv[]) 
 {
     int ret = 0;
-    
 
     libctx = OSSL_LIB_CTX_new();
 
-    OSSL_PROVIDER_set_default_search_path(NULL, PROVIDER_SEREACHPATH);
-    if (!OSSL_LIB_CTX_load_config(NULL, SSL_CONFIG)) {
-        printf("NO CONF!!!!!! %s\n", SSL_CONFIG);
-        goto end;
-    }
+    
+    self_test_corrupt_desc = argv[1];
+
+    OSSL_SELF_TEST_set_callback(NULL, self_test_events, NULL);
 
     ret = OSSL_PROVIDER_available(NULL, "default");
     printf("default provider available: %d\n", ret);
+    printf("*************************************\n", ret);
     ret = OSSL_PROVIDER_available(NULL, "fips");
     printf("fips provider available: %d\n", ret);
+    if ( ret == 0)
+        goto end;
+
+    printf("*************************************\n", ret);
 
     pct_check();
 

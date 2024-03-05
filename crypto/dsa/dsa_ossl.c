@@ -81,6 +81,12 @@ static DSA_SIG *dsa_do_sign(const unsigned char *dgst, int dlen, DSA *dsa)
     }
 
 #ifdef OPENSSL_FIPS
+    
+    if (FIPS_mode()) {
+        DSAerr(DSA_F_DSA_DO_SIGN, DSA_R_NON_FIPS_DSA_METHOD);
+        return NULL;
+    }
+
     if (FIPS_selftest_failed()) {
         FIPSerr(FIPS_F_DSA_DO_SIGN, FIPS_R_FIPS_SELFTEST_FAILED);
         return NULL;

@@ -146,6 +146,10 @@ static int pkey_rsa_sign(EVP_PKEY_CTX *ctx, unsigned char *sig,
                 return ret;
             ret = sltmp;
         } else if (rctx->pad_mode == RSA_X931_PADDING) {
+            if (FIPS_mode()) {
+                RSAerr(RSA_F_PKEY_RSA_SIGN, RSA_R_OPERATION_NOT_ALLOWED_IN_FIPS_MODE);
+                return -1;
+            }
             if ((size_t)EVP_PKEY_size(ctx->pkey) < tbslen + 1) {
                 RSAerr(RSA_F_PKEY_RSA_SIGN, RSA_R_KEY_SIZE_TOO_SMALL);
                 return -1;

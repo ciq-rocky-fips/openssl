@@ -1,7 +1,8 @@
 #!/bin/sh
 version="3.0.7"
 cwd=`pwd`/INSTALL
-RPM_OPT_FLAGS="-O2 -flto=auto -ffat-lto-objects -fexceptions -g -grecord-gcc-switches -pipe -Wall -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -Wp,-D_GLIBCXX_ASSERTIONS -specs=/usr/lib/rpm/redhat/redhat-hardened-cc1 -fstack-protector-strong -specs=/usr/lib/rpm/redhat/redhat-annobin-cc1  -m64 -march=x86-64-v2 -mtune=generic -fasynchronous-unwind-tables -fstack-clash-protection -fcf-protection"
+#RPM_OPT_FLAGS="-O2 -flto=auto -ffat-lto-objects -fexceptions -g -grecord-gcc-switches -pipe -Wall -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -Wp,-D_GLIBCXX_ASSERTIONS -specs=/usr/lib/rpm/redhat/redhat-hardened-cc1 -fstack-protector-strong -specs=/usr/lib/rpm/redhat/redhat-annobin-cc1  -m64 -march=x86-64-v2 -mtune=generic -fasynchronous-unwind-tables -fstack-clash-protection -fcf-protection"
+RPM_OPT_FLAGS="-flto=auto -ffat-lto-objects -fexceptions -g -grecord-gcc-switches -pipe -Wall -Werror=format-security -Wp,-D_GLIBCXX_ASSERTIONS -specs=/usr/lib/rpm/redhat/redhat-hardened-cc1 -fstack-protector-strong -specs=/usr/lib/rpm/redhat/redhat-annobin-cc1  -m64 -march=x86-64-v2 -mtune=generic -fasynchronous-unwind-tables -fstack-clash-protection -fcf-protection"
 RPM_LD_FLAGS="-Wl,-z,relro -Wl,--as-needed  -Wl,-z,now -specs=/usr/lib/rpm/redhat/redhat-hardened-ld -specs=/usr/lib/rpm/redhat/redhat-annobin-cc1 "
 RPM_ARCH="x86_64"
 RPM_OS="linux"
@@ -38,9 +39,9 @@ export HASHBANGPERL=/usr/bin/perl
 
 make all
 make install
-echo "****************************"
-LD_LIBRARY_PATH=. $cwd/bin/openssl dgst -binary -sha256 -mac HMAC -macopt hexkey:f4556650ac31d35461610bac4ed81b1a181b2d8a43ea2854cbae22ca74560813 < providers/fips.so > providers/fips.so.hmac
-echo "****************************"
-objcopy --update-section .rodata1=providers/fips.so.hmac providers/fips.so providers/fips.so.mac
-echo "****************************"
-mv providers/fips.so.mac INSTALL/lib64/ossl-modules/fips.so
+#echo "****************************"
+#LD_LIBRARY_PATH=. $cwd/bin/openssl dgst -binary -sha256 -mac HMAC -macopt hexkey:f4556650ac31d35461610bac4ed81b1a181b2d8a43ea2854cbae22ca74560813 < providers/fips.so > providers/fips.so.hmac
+#echo "****************************"
+#objcopy --update-section .rodata1=providers/fips.so.hmac providers/fips.so providers/fips.so.mac
+#echo "****************************"
+#mv providers/fips.so.mac INSTALL/lib64/ossl-modules/fips.so

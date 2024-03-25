@@ -1,7 +1,7 @@
 default: gentest
 LIBS= -lm 
 
-INSTALLDIR=/home/jrodriguez/FIPS/92/o3/src-git/INSTALL
+INSTALLDIR=../INSTALL
 
 LIBCRYPTO=$(INSTALLDIR)/lib64/libcrypto.so.3
 LIBSSL=$(INSTALLDIR)/lib64/libssl.so.3

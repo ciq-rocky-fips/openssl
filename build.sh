@@ -26,7 +26,7 @@ export HASHBANGPERL=/usr/bin/perl
 	--system-ciphers-file=/etc/crypto-policies/back-ends/openssl.config \
 	zlib enable-camellia enable-seed enable-rfc3779 enable-sctp \
 	enable-cms enable-md2 enable-rc5 enable-ktls enable-fips \
-	no-mdc2 no-ec2m no-sm2 no-sm4 enable-buildtest-c++\
+	no-mdc2 no-ec2m no-sm2 no-sm4 no-des no-dsa enable-buildtest-c++\
 	shared  $sslarch $RPM_OPT_FLAGS '-DDEVRANDOM="\"/dev/urandom\"" -DROCKY_FIPS_VERSION="\"$fips\""'\
 	-Wl,-rpath=$cwd/lib64 -Wl,--allow-multiple-definition --debug --openssldir=$cwd no-hw shared
 

@@ -18,10 +18,6 @@
 #include <openssl/fipskey.h>
 #include "apps.h"
 #include "progs.h"
-#include <openssl/rsa.h>
-#include <openssl/ssl.h>
-
-#include <openssl/param_build.h>
 
 #define BUFSIZE 4096
 
@@ -30,20 +26,11 @@
 #define VERSION_VAL  "1"
 #define INSTALL_STATUS_VAL "INSTALL_SELF_TEST_KATS_RUN"
 
-typedef struct st_args {
-    int enable;
-    int called;
-} SELF_TEST_ARGS;
-
 static OSSL_CALLBACK self_test_events;
 static char *self_test_corrupt_desc = NULL;
 static char *self_test_corrupt_type = NULL;
 static int self_test_log = 1;
 static int quiet = 0;
-
-static OSSL_PROVIDER *prov_null = NULL;
-static OSSL_LIB_CTX *libctx = NULL;
-static SELF_TEST_ARGS self_test_args = { 0 };
 
 typedef enum OPTION_choice {
     OPT_COMMON,
@@ -120,9 +107,6 @@ static int load_fips_prov_and_run_self_test(const char *prov_name)
         BIO_printf(bio_err, "Failed to load FIPS module\n");
         goto end;
     }
-
-    pct_check();
-
     ret = 1;
 end:
     OSSL_PROVIDER_unload(prov);
@@ -305,265 +289,6 @@ end:
     return ret;
 }
 
-int RSA_genkey()
-{
-    int ret = 1;
-    unsigned int primes = 3;
-    unsigned int bits = 4096;
-    OSSL_PARAM params[3];
-    EVP_PKEY *pkey = NULL;
-    EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new_from_name(libctx, "RSA", NULL);
-
-    EVP_PKEY_keygen_init(pctx);
-
-    params[0] = OSSL_PARAM_construct_uint("bits", &bits);
-    params[1] = OSSL_PARAM_construct_uint("primes", &primes);
-    params[2] = OSSL_PARAM_construct_end();
-    EVP_PKEY_CTX_set_params(pctx, params);
-
-    EVP_PKEY_generate(pctx, &pkey);
-
-    
-    EVP_PKEY_print_private(bio_out, pkey, 0, NULL);
-    printf("\n*********************************\n");
-    EVP_PKEY_CTX_free(pctx);
-
-    return ret;
-}
-
-int do_ec_keygen(void)
-{
-    /*
-     * The libctx and propq can be set if required, they are included here
-     * to show how they are passed to EVP_PKEY_CTX_new_from_name().
-     */
-    int ret = 0;
-    OSSL_LIB_CTX *libctx = NULL;
-    const char *propq = NULL;
-    EVP_PKEY *key = NULL;
-    OSSL_PARAM params[3];
-    EVP_PKEY_CTX *genctx = NULL;
-    const char *curvename = "P-256";
-    int use_cofactordh = 1;
-
-    genctx = EVP_PKEY_CTX_new_from_name(libctx, "EC", propq);
-    if (genctx == NULL) {
-        fprintf(stderr, "EVP_PKEY_CTX_new_from_name() failed\n");
-        goto cleanup;
-    }
-
-    if (EVP_PKEY_keygen_init(genctx) <= 0) {
-        fprintf(stderr, "EVP_PKEY_keygen_init() failed\n");
-        goto cleanup;
-    }
-
-    params[0] = OSSL_PARAM_construct_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME,
-                                                 (char *)curvename, 0);
-    /*
-     * This is an optional parameter.
-     * For many curves where the cofactor is 1, setting this has no effect.
-     */
-    params[1] = OSSL_PARAM_construct_int(OSSL_PKEY_PARAM_USE_COFACTOR_ECDH,
-                                         &use_cofactordh);
-    params[2] = OSSL_PARAM_construct_end();
-    if (!EVP_PKEY_CTX_set_params(genctx, params)) {
-        fprintf(stderr, "EVP_PKEY_CTX_set_params() failed\n");
-        goto cleanup;
-    }
-
-    fprintf(stdout, "Generating EC key\n\n");
-    if (EVP_PKEY_generate(genctx, &key) <= 0) {
-        fprintf(stderr, "EVP_PKEY_generate() failed\n");
-        goto cleanup;
-    }
-
-    
-    EVP_PKEY_print_private(bio_out, key, 0, NULL);
-    
-    ret = 1;
-cleanup:
-    printf("\n*********************************\n");
-    EVP_PKEY_CTX_free(genctx);
-    EVP_PKEY_free(key);
-    return ret;
-}
-
-int ECDSA_genkey()
-{
-    int ret = 0;
-    EVP_PKEY_CTX *ctx = NULL;
-    OSSL_PARAM_BLD *bld = NULL;
-    OSSL_PARAM *params = NULL;
-    const unsigned char *pub;
-    size_t pub_len;
-    EVP_PKEY *pkey = NULL;
-    EVP_PKEY_CTX *key_ctx = NULL;
-    
-    bld = OSSL_PARAM_BLD_new();
-    if ( !bld ) {
-        printf("OSSL_PARAM_BLD_new\n");
-        goto err;
-    }
-
-    ret = OSSL_PARAM_BLD_push_utf8_string(bld, OSSL_PKEY_PARAM_GROUP_NAME, "P-256", 0);
-    if( ret == 0 ) {
-        printf("OSSL_PARAM_BLD_push_utf8_string\n");
-        goto err;
-    }
-    ret = OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY, pub, pub_len);
-    if( ret == 0 ) {
-        printf("OSSL_PARAM_BLD_push_octet_string\n");
-        goto err;
-    }
-    params = OSSL_PARAM_BLD_to_param(bld);
-    if ( !params ){
-        printf("OSSL_PARAM_BLD_to_param\n");
-        goto err;
-    }
-    
-    ctx = EVP_PKEY_CTX_new_from_name(libctx, "EC", NULL);
-    if ( !ctx ){
-        printf("EVP_PKEY_CTX_new_from_name\n");
-        goto err;
-    }
-    ret = EVP_PKEY_fromdata_init(ctx);
-    if ( ret < 1 ){
-        printf("EVP_PKEY_fromdata_init\n");
-        goto err;
-    }
-
-    ret = EVP_PKEY_fromdata(ctx, &pkey, EVP_PKEY_KEYPAIR, params);
-    if ( ret < 0 ){
-        printf("EVP_PKEY_fromdata\n");
-        goto err;
-    }
-    //key_ctx = EVP_PKEY_CTX_new_from_pkey(libctx, pkey);
-        
-    EVP_PKEY_print_private(bio_out, pkey, 0, NULL);
-    
-    
-    ret = 1;
-err:
-    printf("\n*********************************\n");
-    OSSL_PARAM_free(params);
-    OSSL_PARAM_BLD_free(bld);
-    EVP_PKEY_CTX_free(ctx);
-    EVP_PKEY_free(pkey);
-    return ret;
-}
-
-int ECDH_genkey()
-{
-    int ret = 1;
-    EVP_PKEY_CTX *kctx = NULL;
-    EVP_PKEY *pkey_temp = NULL;
- 
-    // Create the context for the key generation
-    kctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL);
-    if(!kctx)
-    {
-        printf("EVP_PKEY_CTX_new\n");
-        return 0;
-    }
-
-    // Generate the key
-    if(1 != EVP_PKEY_keygen_init(kctx))
-    {
-        printf("EVP_PKEY_keygen_init\n");
-        EVP_PKEY_CTX_free(kctx);
-        return 0;
-    }
-
-    //  We're going to use the ANSI X9.62 Prime 256v1 curve
-    if(1 != EVP_PKEY_CTX_set_ec_paramgen_curve_nid(kctx, NID_secp384r1)) 
-    {
-        printf("EVP_PKEY_CTX_set_ec_paramgen_curve_nid\n");
-        goto end;
-    }
-    
-    if (1 != EVP_PKEY_keygen(kctx, &pkey_temp))
-    {
-        printf("EVP_PKEY_keygen\n");
-        goto end;
-    }
-
-    
-    EVP_PKEY_print_private(bio_out, pkey_temp, 0, NULL);
-    
-
-end:
-    printf("\n*********************************\n");
-    EVP_PKEY_CTX_free(kctx);
-    EVP_PKEY_free(pkey_temp);
-
-    return ret;
-}
-
-int gen_dh_key(void)
-{
-    EVP_PKEY_CTX *gctx = NULL;
-    EVP_PKEY *pkey = NULL;
-    OSSL_PARAM params[2];
-
-    params[0] = OSSL_PARAM_construct_utf8_string("group", "ffdhe2048", 0);
-    params[1] = OSSL_PARAM_construct_end();
-
-    gctx = EVP_PKEY_CTX_new_from_name(libctx, "DH", NULL);
-    if (!gctx) {
-        printf("EVP_PKEY_CTX_new_from_name\n");
-        goto err;
-    }
-
-    if ( 1 != EVP_PKEY_keygen_init(gctx) ) {
-        printf("EVP_PKEY_keygen_init\n");
-        EVP_PKEY_CTX_free(gctx);
-        return 0;
-    }
-
-    EVP_PKEY_CTX_set_params(gctx, params);
-    if (1 != EVP_PKEY_keygen(gctx, &pkey) ){
-        printf("EVP_PKEY_keygen\n");
-        goto err;
-    }
-
-    
-    EVP_PKEY_print_private(bio_out, pkey, 0, NULL);
-    printf("\n*********************************\n");
-
-err:
-    EVP_PKEY_CTX_free(gctx);
-    EVP_PKEY_free(pkey);
-    return 1;
-}
-
-int pct_check()
-{
-    int ret = 1;
-    
-    libctx = app_get0_libctx();
-
-    OSSL_SELF_TEST_set_callback(libctx, self_test_events, &self_test_args);
-
-printf("RSA_genkey\n");
-    RSA_genkey();
-
-printf("ECDSA_genkey\n");
-    do_ec_keygen();
-    //ECDSA_genkey();
-
-printf("gen_dh_key\n");
-    gen_dh_key();
-
-printf("ECDH_genkey\n");
-    ECDH_genkey();
-
-printf("PCT complete\n");
-    
-    end:
-
-    return ret;
-}
-
 int fipsinstall_main(int argc, char **argv)
 {
     int ret = 1, verify = 0, gotkey = 0, gotdigest = 0, self_test_onload = 0;
@@ -586,8 +311,8 @@ int fipsinstall_main(int argc, char **argv)
     EVP_MAC *mac = NULL;
     CONF *conf = NULL;
 
-    //BIO_printf(bio_err, "This command is not enabled in the Rocky Enterprise Linux OpenSSL build, please consult Rocky documentation to learn how to enable FIPS mode\n");
-    //return 1;
+    BIO_printf(bio_err, "This command is not enabled in the Rocky Enterprise Linux OpenSSL build, please consult Rocky documentation to learn how to enable FIPS mode\n");
+    return 1;
 
     if ((opts = sk_OPENSSL_STRING_new_null()) == NULL)
         goto end;

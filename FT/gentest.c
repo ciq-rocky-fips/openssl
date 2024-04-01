@@ -358,6 +358,45 @@ printf("PCT complete\n");
     return ret;
 }
 
+int Query_MD(char *info)
+{
+    EVP_MD_CTX * mdctx;
+    EVP_MD * md;
+    mdctx = EVP_MD_CTX_new();
+    md = EVP_MD_fetch(NULL,info,"fips=yes");
+    if (md == NULL) {
+        printf("%s NOT APPROVED\n", info);
+        return 1;
+    }
+
+    printf("EVP_DigestInit_ex(mdctx,%s,NULL): %d\n", info, EVP_DigestInit_ex(mdctx,md,NULL));
+    printf("OSSL_PROVIDER_available: %d\n",OSSL_PROVIDER_available(NULL,"fips"));
+    printf(OSSL_PROVIDER_get0_name(EVP_MD_get0_provider(EVP_MD_CTX_get0_md(mdctx))));
+    printf("\n");
+
+    EVP_MD_free(md);
+    EVP_MD_CTX_free(mdctx);
+    return 0;
+}
+
+int Query_CIPHER(char *info)
+{
+    EVP_CIPHER_CTX * cctx;
+    EVP_CIPHER *cipher;
+    cctx = EVP_CIPHER_CTX_new();
+    cipher = EVP_CIPHER_fetch(NULL,info,"fips=yes");
+    if (cipher == NULL){
+        printf("%s NOT APPROVED\n", info);
+        return 1;
+    }
+    
+    printf("%s APPROVED\n", info);
+    
+    EVP_CIPHER_free(cipher);
+    EVP_CIPHER_CTX_free(cctx);
+    return 0;
+}
+
 int main(int argc, char *argv[]) 
 {
     int ret = 0;
@@ -375,9 +414,39 @@ int main(int argc, char *argv[])
     ret = OSSL_PROVIDER_available(NULL, "fips");
     printf("fips provider available: %d\n", ret);
     if ( ret == 0)
-        goto end;
+        goto end;        
+    
+    printf("*************************************\n", ret);
+
+    Query_MD("SHA-256");       
+    Query_MD("MD5");
+    Query_MD("sha1");
+    Query_MD("sha256");
+Query_MD("sha384"); 
+Query_MD("sha512");
+Query_MD("sha512-224");
+Query_MD("sha512-256");
+Query_MD("sha3-224");
+Query_MD("sha3-256");
+Query_MD("sha3-384");
+Query_MD("sha3-512");
+Query_MD("shake128");
+Query_MD("shake256");
+Query_MD("rmd160");
+Query_MD("blake2b512");
+Query_MD("blake2s256");
+Query_MD("sm3");
+    Query_CIPHER("AES-128-CBC-CTS");              
+    Query_CIPHER("genrsa");    
+    Query_CIPHER("DSA");
+    Query_CIPHER("des");
+    Query_CIPHER("des-cbc");
+    Query_CIPHER("des3");
+    Query_CIPHER("des-ede3-cbc");
 
     printf("*************************************\n", ret);
+
+exit(1);
 
     pct_check();
 

@@ -190,10 +190,10 @@ static int fips_get_params(void *provctx, OSSL_PARAM params[])
     if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, "Rocky Enterprise Linux 9 - OpenSSL FIPS Provider"))
         return 0;
     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_VERSION);
-    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, "1.0"))
+    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, ROCKY_FIPS_VERSION))
         return 0;
     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_BUILDINFO);
-    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, "1.0"))
+    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, ROCKY_FIPS_VERSION))
         return 0;
     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_STATUS);
     if (p != NULL && !OSSL_PARAM_set_int(p, ossl_prov_is_running()))

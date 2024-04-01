@@ -37,7 +37,7 @@ static void read_kernel_fips_flag(void)
 	char buf[2] = "0";
 	int fd;
 
-	if (secure_getenv("OPENSSL_FORCE_FIPS_MODE") != NULL) {
+	if (ossl_safe_getenv("OPENSSL_FORCE_FIPS_MODE") != NULL) {
 		buf[0] = '1';
 	} else if ((fd = open(FIPS_MODE_SWITCH_FILE, O_RDONLY)) >= 0) {
 		while (read(fd, buf, sizeof(buf)) < 0 && errno == EINTR) ;

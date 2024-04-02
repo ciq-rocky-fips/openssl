@@ -21,6 +21,7 @@ install:
 	cp FT.sh $(INSTALLDIR)
 	cp gentest.cnf $(INSTALLDIR)
 	cp fips.cnf $(INSTALLDIR)
+	cp 186-5.regression.sh $(INSTALLDIR)
 
 clean:
 	-rm -f gentest.o

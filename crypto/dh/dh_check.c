@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include "internal/cryptlib.h"
 #include <openssl/bn.h>
+#include <openssl/self_test.h>
 #include "dh_local.h"
 #include "crypto/dh.h"
 
@@ -309,6 +310,18 @@ int ossl_dh_check_pairwise(const DH *dh)
     int ret = 0;
     BN_CTX *ctx = NULL;
     BIGNUM *pub_key = NULL;
+    OSSL_SELF_TEST *st = NULL;
+    OSSL_CALLBACK *cb = NULL;
+    void *cbarg = NULL;
+        
+    OSSL_SELF_TEST_get_callback(dh->libctx, &cb, &cbarg);
+
+    st = OSSL_SELF_TEST_new(cb, cbarg);
+    if (st == NULL)
+        return 0;
+
+    OSSL_SELF_TEST_onbegin(st, OSSL_SELF_TEST_TYPE_PCT,
+                           OSSL_SELF_TEST_DESC_PCT_DH);
 
     if (dh->params.p == NULL
         || dh->params.g == NULL
@@ -326,9 +339,14 @@ int ossl_dh_check_pairwise(const DH *dh)
     /* recalculate the public key = (g ^ priv) mod p */
     if (!ossl_dh_generate_public_key(ctx, dh, dh->priv_key, pub_key))
         goto err;
+    
+    OSSL_SELF_TEST_oncorrupt_byte(st, pub_key);
+
     /* check it matches the existing pubic_key */
     ret = BN_cmp(pub_key, dh->pub_key) == 0;
 err:
+    OSSL_SELF_TEST_onend(st, ret);
+    OSSL_SELF_TEST_free(st);
     BN_free(pub_key);
     BN_CTX_free(ctx);
     return ret;

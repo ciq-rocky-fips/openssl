@@ -18,6 +18,8 @@
 #include <openssl/x509.h>
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
+#include <openssl/core_names.h>
+#include <openssl/self_test.h>
 #ifndef OPENSSL_NO_ENGINE
 # include <openssl/engine.h>
 #endif
@@ -231,6 +233,60 @@ static void setup_trace(const char *str)
 }
 #endif /* OPENSSL_NO_TRACE */
 
+static OSSL_CALLBACK self_test_events;
+static char *self_test_corrupt_desc = NULL;
+static char *self_test_corrupt_type = NULL;
+static int self_test_log = 1;
+
+static int self_test_events(const OSSL_PARAM params[], void *arg)
+{
+    const OSSL_PARAM *p = NULL;
+    const char *phase = NULL, *type = NULL, *desc = NULL;    
+
+    p = OSSL_PARAM_locate_const(params, OSSL_PROV_PARAM_SELF_TEST_PHASE);
+    if (p == NULL || p->data_type != OSSL_PARAM_UTF8_STRING)
+        goto err;
+    phase = (const char *)p->data;
+
+    p = OSSL_PARAM_locate_const(params, OSSL_PROV_PARAM_SELF_TEST_DESC);
+    if (p == NULL || p->data_type != OSSL_PARAM_UTF8_STRING)
+        goto err;
+    desc = (const char *)p->data;
+
+    p = OSSL_PARAM_locate_const(params, OSSL_PROV_PARAM_SELF_TEST_TYPE);
+    if (p == NULL || p->data_type != OSSL_PARAM_UTF8_STRING)
+        goto err;
+    type = (const char *)p->data;
+
+    if (self_test_log) {
+        if (strcmp(phase, OSSL_SELF_TEST_PHASE_START) == 0)
+            fprintf(stderr, "%s : (%s) : ", desc, type);
+        else if (strcmp(phase, OSSL_SELF_TEST_PHASE_PASS) == 0
+                 || strcmp(phase, OSSL_SELF_TEST_PHASE_FAIL) == 0)
+            fprintf(stderr, "%s\n", phase);
+    }
+    /*
+     * The self test code will internally corrupt the KAT test result if an
+     * error is returned during the corrupt phase.
+     */
+    if (strcmp(phase, OSSL_SELF_TEST_PHASE_CORRUPT) == 0
+            && (self_test_corrupt_desc != NULL
+                || self_test_corrupt_type != NULL)) {
+        if (self_test_corrupt_desc != NULL
+                && strcmp(self_test_corrupt_desc, desc) != 0)
+            goto end;
+        if (self_test_corrupt_type != NULL
+                && strcmp(self_test_corrupt_type, type) != 0)
+            goto end;
+        fprintf(stderr, "%s ", phase);
+        goto err;
+    }
+end:
+    return 1;
+err:
+    return 0;
+}
+
 static char *help_argv[] = { "help", NULL };
 
 int main(int argc, char *argv[])
@@ -261,6 +317,9 @@ int main(int argc, char *argv[])
 #ifndef OPENSSL_NO_TRACE
     setup_trace(getenv("OPENSSL_TRACE"));
 #endif
+
+    self_test_corrupt_desc = getenv("FT_INDUCE");
+    OSSL_SELF_TEST_set_callback(NULL, self_test_events, NULL);
 
     if ((fname = "apps_startup", !apps_startup())
             || (fname = "prog_init", (prog = prog_init()) == NULL)) {

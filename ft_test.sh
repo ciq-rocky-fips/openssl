@@ -102,4 +102,14 @@ echo "Non-approved crypto call (MD5) FAIL demo"
 echo "**************************************************"
 echo "TestText" | LD_PRELOAD="./libcrypto.so.1.1 ./libssl.so.1.1" ./apps/openssl md5
 
+echo "**************************************************"
+echo "Non-approved crypto call (x25519) FAIL demo"
+echo "**************************************************"
+echo "TestText" | LD_PRELOAD="./libcrypto.so.1.1 ./libssl.so.1.1" ./apps/openssl genpkey -algorithm x25519 -out x25519-priv.pem
+
+echo "**************************************************"
+echo "Non-approved crypto call (x448) FAIL demo"
+echo "**************************************************"
+echo "TestText" | LD_PRELOAD="./libcrypto.so.1.1 ./libssl.so.1.1" ./apps/openssl genpkey -algorithm x448 -out x448-priv.pem
+
 echo "Functional test script completed: " $(date)

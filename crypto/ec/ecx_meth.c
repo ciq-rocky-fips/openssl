@@ -50,6 +50,11 @@ static int ecx_key_op(EVP_PKEY *pkey, int id, const X509_ALGOR *palg,
     ECX_KEY *key = NULL;
     unsigned char *privkey, *pubkey;
 
+    if (FIPS_mode() && ((id == EVP_PKEY_X25519) || (id == EVP_PKEY_X448))) {
+        ECerr(EC_F_ECX_KEY_OP, ERR_R_DISABLED);
+	return 0;
+    }
+
     if (op != KEY_OP_KEYGEN) {
         if (palg != NULL) {
             int ptype;

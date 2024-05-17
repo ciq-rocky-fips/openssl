@@ -537,6 +537,7 @@ int main(int argc, char *argv[])
             fail_id = ftmp->id;
             fail_sub = ftmp->subid;
             fail_key = ftmp->keyid;
+            FIPS_mode_set(0);
             rv = FIPS_mode_set(1);
             if (rv)	{
                 printf("\tFIPS mode incorrectly successful!!\n");
@@ -545,6 +546,7 @@ int main(int argc, char *argv[])
         }
         return rv;
     } else if (getenv("OPENSSL_FIPS_KAT")) {
+    FIPS_mode_set(0);
     if (!FIPS_mode_set(1))
 		{
 		printf("\tError entering FIPS mode\n");

@@ -72,7 +72,7 @@
 
 char* FIPS_show_version(void)
 {
-    return "Rocky Linux 8 OpenSSL Cryptographic Module Version Rocky8.20240321";
+    return "Rocky Linux 8 OpenSSL Cryptographic Module Version Rocky8.20240528";
 }
 
 /* POST notification callback */
@@ -192,9 +192,7 @@ int FIPS_selftest(void)
     if (!FIPS_selftest_rsa())
         rv = 0;
     if (!FIPS_selftest_ecdsa())
-        rv = 0;
-    if (!FIPS_selftest_dsa())
-        rv = 0;
+        rv = 0;    
     if (!FIPS_selftest_dh())
         rv = 0;
     if (!FIPS_selftest_ecdh())

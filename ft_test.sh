@@ -37,20 +37,6 @@ LD_PRELOAD="./libcrypto.so.1.1 ./libssl.so.1.1" ./apps/openssl genrsa -out priva
 unset OPENSSL_PCT_RSA_FAIL
  
 echo "**************************************************"
-echo "DSA PCT SUCCESS demo"
-echo "**************************************************"
-LD_PRELOAD="./libcrypto.so.1.1 ./libssl.so.1.1" ./apps/openssl dsaparam -out dsaparam.pem 2048
-LD_PRELOAD="./libcrypto.so.1.1 ./libssl.so.1.1" ./apps/openssl gendsa -out dsaprivkey.pem dsaparam.pem
- 
-echo "**************************************************"
-echo "DSA PCT FAIL demo"
-echo "**************************************************"
-LD_PRELOAD="./libcrypto.so.1.1 ./libssl.so.1.1" ./apps/openssl dsaparam -out dsaparam.pem 2048
-export OPENSSL_PCT_DSA_FAIL="1"
-LD_PRELOAD="./libcrypto.so.1.1 ./libssl.so.1.1" ./apps/openssl gendsa -out dsaprivkey.pem dsaparam.pem
-unset OPENSSL_PCT_DSA_FAIL
- 
-echo "**************************************************"
 echo "ECDSA PCT SUCCESS demo"
 echo "**************************************************"
 LD_PRELOAD="./libcrypto.so.1.1 ./libssl.so.1.1" ./apps/openssl ecparam -name secp521r1 -genkey -noout -out my.key.pem
@@ -113,5 +99,11 @@ echo "**************************************************"
 echo "Non-approved crypto call (x448) FAIL demo"
 echo "**************************************************"
 echo "TestText" | LD_PRELOAD="./libcrypto.so.1.1 ./libssl.so.1.1" ./apps/openssl genpkey -algorithm x448 -out x448-priv.pem
+
+echo "**************************************************"
+echo "Non-approved crypto call DSA demo"
+echo "**************************************************"
+LD_PRELOAD="./libcrypto.so.1.1 ./libssl.so.1.1" ./apps/openssl dsaparam -out dsaparam.pem 2048
+LD_PRELOAD="./libcrypto.so.1.1 ./libssl.so.1.1" ./apps/openssl gendsa -out dsaprivkey.pem dsaparam-static.pem
 
 echo "Functional test script completed: " $(date)

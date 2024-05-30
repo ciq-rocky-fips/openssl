@@ -83,7 +83,7 @@ static DSA_SIG *dsa_do_sign(const unsigned char *dgst, int dlen, DSA *dsa)
 #ifdef OPENSSL_FIPS
     
     if (FIPS_mode()) {
-        DSAerr(DSA_F_DSA_DO_SIGN, DSA_R_NON_FIPS_DSA_METHOD);
+        FIPSerr(FIPS_F_DSA_DO_SIGN, DSA_R_NON_FIPS_DSA_METHOD);
         return NULL;
     }
 
@@ -338,6 +338,11 @@ static int dsa_do_verify(const unsigned char *dgst, int dgst_len,
         return -1;
     }
 #ifdef OPENSSL_FIPS
+    if (FIPS_mode()) {
+        FIPSerr(FIPS_F_DSA_DO_VERIFY, DSA_R_NON_FIPS_DSA_METHOD);
+        return NULL;
+    }
+
     if (FIPS_selftest_failed()) {
         FIPSerr(FIPS_F_DSA_DO_VERIFY, FIPS_R_FIPS_SELFTEST_FAILED);
         return -1;

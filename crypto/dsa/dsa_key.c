@@ -50,6 +50,11 @@ static int dsa_builtin_keygen(DSA *dsa);
 int DSA_generate_key(DSA *dsa)
 {
 #ifdef OPENSSL_FIPS
+    if (FIPS_mode()) {
+        DSAerr(DSA_F_DSA_GENERATE_KEY, DSA_R_NON_FIPS_DSA_METHOD);
+        return NULL;
+    }
+
     if (FIPS_mode() && !(dsa->meth->flags & DSA_FLAG_FIPS_METHOD)
         && !(dsa->flags & DSA_FLAG_NON_FIPS_ALLOW)) {
         DSAerr(DSA_F_DSA_GENERATE_KEY, DSA_R_NON_FIPS_DSA_METHOD);
@@ -68,6 +73,11 @@ static int dsa_builtin_keygen(DSA *dsa)
     BIGNUM *pub_key = NULL, *priv_key = NULL;
 
 #ifdef OPENSSL_FIPS
+    if (FIPS_mode()) {
+        DSAerr(DSA_F_DSA_BUILTIN_KEYGEN, DSA_R_NON_FIPS_DSA_METHOD);
+        return NULL;
+    }
+
     if (FIPS_mode() && !(dsa->flags & DSA_FLAG_NON_FIPS_ALLOW)
         && (BN_num_bits(dsa->p) < OPENSSL_DSA_FIPS_MIN_MODULUS_BITS_GEN)) {
         DSAerr(DSA_F_DSA_BUILTIN_KEYGEN, DSA_R_KEY_SIZE_TOO_SMALL);

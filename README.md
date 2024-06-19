@@ -21,6 +21,8 @@ The modules are maintained in separate branches:
 	   This branch is based on top of FIPS-3.0.7-25.
 
 # To run the functional test scripts from the 1.1.1k-FIPS-FT branch.
+Dependencies needed for build:
+yum install git zlib zlib-devel make gcc lksctp-tools-devel
 
 1). Build locally: 
 $ debug_fips.sh

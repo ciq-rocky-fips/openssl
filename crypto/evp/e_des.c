@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include "internal/cryptlib.h"
 #ifndef OPENSSL_NO_DES
+#define FIPS_CIPHER_DISABLE 1
 # include <openssl/evp.h>
 # include <openssl/objects.h>
 # include "crypto/evp.h"

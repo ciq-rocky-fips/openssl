@@ -137,6 +137,8 @@ static const EVP_MD md5_sha1_md = {
 
 const EVP_MD *EVP_md5_sha1(void)
 {
+    if (FIPS_mode())
+        return NULL;
     return &md5_sha1_md;
 }
 #endif

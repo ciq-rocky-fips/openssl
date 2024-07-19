@@ -12,6 +12,7 @@
 
 #ifndef OPENSSL_NO_RC2
 
+#define FIPS_CIPHER_DISABLE 1
 # include <openssl/evp.h>
 # include <openssl/objects.h>
 # include "crypto/evp.h"

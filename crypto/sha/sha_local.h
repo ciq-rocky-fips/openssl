@@ -10,7 +10,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <openssl/opensslconf.h>
+#include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include <openssl/sha.h>
 
 #define DATA_ORDER_IS_BIG_ENDIAN
@@ -42,6 +48,9 @@ static void sha1_block_data_order(SHA_CTX *c, const void *p, size_t num);
 void sha1_block_data_order(SHA_CTX *c, const void *p, size_t num);
 #endif
 
+/* Don't allow SHA1 in FIPS mode. */
+#define FIPS_HASH_DISABLE 1
+
 #include "crypto/md32_common.h"
 
 #define INIT_DATA_h0 0x67452301UL
@@ -52,6 +61,10 @@ void sha1_block_data_order(SHA_CTX *c, const void *p, size_t num);
 
 int HASH_INIT(SHA_CTX *c)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return 0;
+    }
 #if defined(OPENSSL_FIPS)
     FIPS_selftest_check();
 #endif

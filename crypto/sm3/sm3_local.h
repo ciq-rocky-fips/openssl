@@ -36,6 +36,9 @@
 
 void sm3_transform(SM3_CTX *c, const unsigned char *data);
 
+/* Don't allow SM3 in FIPS mode. */
+#define FIPS_HASH_DISABLE 1
+
 #include "crypto/md32_common.h"
 
 #define P0(X) (X ^ ROTATE(X, 9) ^ ROTATE(X, 17))

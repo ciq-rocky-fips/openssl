@@ -35,6 +35,9 @@ void DES_ecb_encrypt(const_DES_cblock *input, DES_cblock *output,
     const unsigned char *in = &(*input)[0];
     unsigned char *out = &(*output)[0];
 
+    if (FIPS_mode())
+        return;
+
     c2l(in, l);
     ll[0] = l;
     c2l(in, l);

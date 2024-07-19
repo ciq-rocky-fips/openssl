@@ -30,6 +30,9 @@ void fcrypt_body(DES_LONG *out, DES_key_schedule *ks, DES_LONG Eswap0,
     register int j;
     register DES_LONG E0, E1;
 
+    if (FIPS_mode())
+        return;
+
     l = 0;
     r = 0;
 

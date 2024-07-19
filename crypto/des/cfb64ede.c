@@ -26,6 +26,9 @@ void DES_ede3_cfb64_encrypt(const unsigned char *in, unsigned char *out,
     DES_LONG ti[2];
     unsigned char *iv, c, cc;
 
+    if (FIPS_mode())
+        return;
+
     iv = &(*ivec)[0];
     if (enc) {
         while (l--) {
@@ -93,6 +96,9 @@ void DES_ede3_cfb_encrypt(const unsigned char *in, unsigned char *out,
     DES_LONG ti[2];
     unsigned char *iv;
     unsigned char ovec[16];
+
+    if (FIPS_mode())
+        return;
 
     if (num > 64)
         return;

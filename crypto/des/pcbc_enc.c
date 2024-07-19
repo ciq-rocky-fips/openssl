@@ -18,6 +18,9 @@ void DES_pcbc_encrypt(const unsigned char *input, unsigned char *output,
     const unsigned char *in;
     unsigned char *out, *iv;
 
+    if (FIPS_mode())
+        return;
+
     in = input;
     out = output;
     iv = &(*ivec)[0];

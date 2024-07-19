@@ -16,6 +16,9 @@ void DES_encrypt1(DES_LONG *data, DES_key_schedule *ks, int enc)
     register DES_LONG l, r, t, u;
     register DES_LONG *s;
 
+    if (FIPS_mode())
+        return;
+
     r = data[0];
     l = data[1];
 
@@ -87,6 +90,9 @@ void DES_encrypt2(DES_LONG *data, DES_key_schedule *ks, int enc)
     register DES_LONG l, r, t, u;
     register DES_LONG *s;
 
+    if (FIPS_mode())
+        return;
+
     r = data[0];
     l = data[1];
 
@@ -151,6 +157,9 @@ void DES_encrypt3(DES_LONG *data, DES_key_schedule *ks1,
 {
     register DES_LONG l, r;
 
+    if (FIPS_mode())
+        return;
+
     l = data[0];
     r = data[1];
     IP(l, r);
@@ -170,6 +179,9 @@ void DES_decrypt3(DES_LONG *data, DES_key_schedule *ks1,
                   DES_key_schedule *ks2, DES_key_schedule *ks3)
 {
     register DES_LONG l, r;
+
+    if (FIPS_mode())
+        return;
 
     l = data[0];
     r = data[1];
@@ -203,6 +215,9 @@ void DES_ede3_cbc_encrypt(const unsigned char *input, unsigned char *output,
     register long l = length;
     DES_LONG tin[2];
     unsigned char *iv;
+
+    if (FIPS_mode())
+        return;
 
     in = input;
     out = output;

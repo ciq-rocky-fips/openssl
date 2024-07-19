@@ -30,6 +30,9 @@ void DES_ncbc_encrypt(const unsigned char *in, unsigned char *out,
     DES_LONG tin[2];
     unsigned char *iv;
 
+    if (FIPS_mode())
+        return;
+
     iv = &(*ivec)[0];
 
     if (enc) {

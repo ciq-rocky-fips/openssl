@@ -257,6 +257,10 @@ static EVP_CIPHER r4_hmac_md5_cipher = {
 
 const EVP_CIPHER *EVP_rc4_hmac_md5(void)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return NULL;
+    }
     return &r4_hmac_md5_cipher;
 }
 #endif

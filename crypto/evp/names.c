@@ -35,6 +35,9 @@ int EVP_add_digest(const EVP_MD *md)
     int r;
     const char *name;
 
+    if (md == NULL)
+        return 0;
+
     name = OBJ_nid2sn(md->type);
     r = OBJ_NAME_add(name, OBJ_NAME_TYPE_MD_METH, (const char *)md);
     if (r == 0)

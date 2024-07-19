@@ -59,6 +59,12 @@ char *DES_crypt(const char *buf, const char *salt)
 {
     static char buff[14];
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return NULL;
+    }
+
 #ifndef CHARSET_EBCDIC
     return DES_fcrypt(buf, salt, buff);
 #else
@@ -98,6 +104,12 @@ char *DES_fcrypt(const char *buf, const char *salt, char *ret)
     unsigned char bb[9];
     unsigned char *b = bb;
     unsigned char c, u;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return NULL;
+    }
 
     x = ret[0] = salt[0];
     if (x == 0 || x >= sizeof(con_salt))

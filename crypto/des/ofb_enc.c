@@ -26,6 +26,12 @@ void DES_ofb_encrypt(const unsigned char *in, unsigned char *out, int numbits,
     DES_LONG ti[2];
     unsigned char *iv;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
+
     if (num > 64)
         return;
     if (num > 32) {

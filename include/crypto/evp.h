@@ -7,6 +7,13 @@
  * https://www.openssl.org/source/license.html
  */
 
+#include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include <openssl/evp.h>
 #include "internal/refcount.h"
 
@@ -266,6 +273,35 @@ static int cname##_cfb##cbits##_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, 
         BLOCK_CIPHER_func_ecb(cname, cprefix, kstruct, ksched) \
         BLOCK_CIPHER_func_ofb(cname, cprefix, cbits, kstruct, ksched)
 
+#if FIPS_CIPHER_DISABLE
+
+/* Ensure this cipher definition can't be used in FIPS mode. */
+
+#define BLOCK_CIPHER_def1(cname, nmode, mode, MODE, kstruct, nid, block_size, \
+                          key_len, iv_len, flags, init_key, cleanup, \
+                          set_asn1, get_asn1, ctrl) \
+static const EVP_CIPHER cname##_##mode = { \
+        nid##_##nmode, block_size, key_len, iv_len, \
+        flags | EVP_CIPH_##MODE##_MODE, \
+        init_key, \
+        cname##_##mode##_cipher, \
+        cleanup, \
+        sizeof(kstruct), \
+        set_asn1, get_asn1,\
+        ctrl, \
+        NULL \
+}; \
+const EVP_CIPHER *EVP_##cname##_##mode(void) { \
+    if (FIPS_mode()) { \
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD); \
+        return NULL; \
+    } \
+    return &cname##_##mode; }
+
+#else /* FIPS_CIPHER_DISABLE */
+
+/* Normal cipher definition. */
+
 #define BLOCK_CIPHER_def1(cname, nmode, mode, MODE, kstruct, nid, block_size, \
                           key_len, iv_len, flags, init_key, cleanup, \
                           set_asn1, get_asn1, ctrl) \
@@ -281,6 +317,8 @@ static const EVP_CIPHER cname##_##mode = { \
         NULL \
 }; \
 const EVP_CIPHER *EVP_##cname##_##mode(void) { return &cname##_##mode; }
+
+#endif /* FIPS_CIPHER_DISABLE */
 
 #define BLOCK_CIPHER_def_cbc(cname, kstruct, nid, block_size, key_len, \
                              iv_len, flags, init_key, cleanup, set_asn1, \

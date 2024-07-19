@@ -182,7 +182,10 @@ static const EVP_CIPHER camellia_##keylen##_##mode = { \
         sizeof(EVP_CAMELLIA_KEY),       \
         NULL,NULL,NULL,NULL }; \
 const EVP_CIPHER *EVP_camellia_##keylen##_##mode(void) \
-{ return SPARC_CMLL_CAPABLE?&cmll_t4_##keylen##_##mode:&camellia_##keylen##_##mode; }
+{ \
+    if (FIPS_mode()) \
+        return NULL; \
+ return SPARC_CMLL_CAPABLE?&cmll_t4_##keylen##_##mode:&camellia_##keylen##_##mode; }
 
 # else
 
@@ -196,7 +199,10 @@ static const EVP_CIPHER camellia_##keylen##_##mode = { \
         sizeof(EVP_CAMELLIA_KEY),       \
         NULL,NULL,NULL,NULL }; \
 const EVP_CIPHER *EVP_camellia_##keylen##_##mode(void) \
-{ return &camellia_##keylen##_##mode; }
+{ \
+    if (FIPS_mode()) \
+        return NULL; \
+  return &camellia_##keylen##_##mode; }
 
 # endif
 

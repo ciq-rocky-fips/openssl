@@ -16,6 +16,13 @@
 # include <stdlib.h>
 # include <string.h>
 
+#include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 # include <openssl/des.h>
 
 # ifdef OPENSSL_BUILD_SHLIBCRYPTO

@@ -25,6 +25,12 @@ void DES_cfb64_encrypt(const unsigned char *in, unsigned char *out,
     DES_LONG ti[2];
     unsigned char *iv, c, cc;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
+
     iv = &(*ivec)[0];
     if (enc) {
         while (l--) {

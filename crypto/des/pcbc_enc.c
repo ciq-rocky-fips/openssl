@@ -18,6 +18,12 @@ void DES_pcbc_encrypt(const unsigned char *input, unsigned char *output,
     const unsigned char *in;
     unsigned char *out, *iv;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
+
     in = input;
     out = output;
     iv = &(*ivec)[0];

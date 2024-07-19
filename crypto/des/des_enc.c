@@ -16,6 +16,12 @@ void DES_encrypt1(DES_LONG *data, DES_key_schedule *ks, int enc)
     register DES_LONG l, r, t, u;
     register DES_LONG *s;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
+
     r = data[0];
     l = data[1];
 
@@ -87,6 +93,12 @@ void DES_encrypt2(DES_LONG *data, DES_key_schedule *ks, int enc)
     register DES_LONG l, r, t, u;
     register DES_LONG *s;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
+
     r = data[0];
     l = data[1];
 
@@ -151,6 +163,12 @@ void DES_encrypt3(DES_LONG *data, DES_key_schedule *ks1,
 {
     register DES_LONG l, r;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
+
     l = data[0];
     r = data[1];
     IP(l, r);
@@ -170,6 +188,12 @@ void DES_decrypt3(DES_LONG *data, DES_key_schedule *ks1,
                   DES_key_schedule *ks2, DES_key_schedule *ks3)
 {
     register DES_LONG l, r;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
 
     l = data[0];
     r = data[1];
@@ -203,6 +227,12 @@ void DES_ede3_cbc_encrypt(const unsigned char *input, unsigned char *output,
     register long l = length;
     DES_LONG tin[2];
     unsigned char *iv;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
 
     in = input;
     out = output;

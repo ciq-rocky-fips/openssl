@@ -475,6 +475,10 @@ void aria_encrypt(const unsigned char *in, unsigned char *out,
     int Nr;
     const ARIA_u128 *rk;
 
+    if (FIPS_mode()) {
+        return;
+    }
+
     if (in == NULL || out == NULL || key == NULL) {
         return;
     }
@@ -544,6 +548,10 @@ int aria_set_encrypt_key(const unsigned char *userKey, const int bits,
 
     ARIA_u128 *rk;
     int Nr = (bits + 256) / 32;
+
+    if (FIPS_mode()) {
+        return -1;
+    }
 
     if (userKey == NULL || key == NULL) {
         return -1;
@@ -677,6 +685,10 @@ int aria_set_decrypt_key(const unsigned char *userKey, const int bits,
     uint32_t s0, s1, s2, s3;
 
     const int r = aria_set_encrypt_key(userKey, bits, key);
+
+    if (FIPS_mode()) {
+        return -1;
+    }
 
     if (r != 0) {
         return r;
@@ -1110,6 +1122,11 @@ void aria_encrypt(const unsigned char *in, unsigned char *out,
                   const ARIA_KEY *key)
 {
     assert(in != NULL && out != NULL && key != NULL);
+
+    if (FIPS_mode()) {
+        return;
+    }
+
     do_encrypt(out, in, key->rounds, key->rd_key);
 }
 
@@ -1124,6 +1141,10 @@ int aria_set_encrypt_key(const unsigned char *userKey, const int bits,
 {
     const ARIA_u128 *ck1, *ck2, *ck3;
     ARIA_u128 kr, w0, w1, w2, w3;
+
+    if (FIPS_mode()) {
+        return -1;
+    }
 
     if (!userKey || !key)
         return -1;
@@ -1198,6 +1219,10 @@ int aria_set_decrypt_key(const unsigned char *userKey, const int bits,
     ARIA_KEY ek;
     const int r = aria_set_encrypt_key(userKey, bits, &ek);
     unsigned int i, rounds = ek.rounds;
+
+    if (FIPS_mode()) {
+        return -1;
+    }
 
     if (r == 0) {
         key->rounds = rounds;

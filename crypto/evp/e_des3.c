@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include "internal/cryptlib.h"
 #ifndef OPENSSL_NO_DES
+#define FIPS_CIPHER_DISABLE 1
 # include <openssl/evp.h>
 # include <openssl/objects.h>
 # include "crypto/evp.h"
@@ -302,11 +303,17 @@ static int des3_ctrl(EVP_CIPHER_CTX *ctx, int type, int arg, void *ptr)
 
 const EVP_CIPHER *EVP_des_ede(void)
 {
+    if (FIPS_mode())
+        return NULL;
+
     return &des_ede_ecb;
 }
 
 const EVP_CIPHER *EVP_des_ede3(void)
 {
+    if (FIPS_mode())
+        return NULL;
+
     return &des_ede3_ecb;
 }
 
@@ -421,6 +428,8 @@ static const EVP_CIPHER des3_wrap = {
 
 const EVP_CIPHER *EVP_des_ede3_wrap(void)
 {
+    if (FIPS_mode())
+        return NULL;
     return &des3_wrap;
 }
 

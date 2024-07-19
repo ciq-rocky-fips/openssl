@@ -58,11 +58,19 @@ static const EVP_CIPHER r4_40_cipher = {
 
 const EVP_CIPHER *EVP_rc4(void)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return NULL;
+    }
     return &r4_cipher;
 }
 
 const EVP_CIPHER *EVP_rc4_40(void)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return NULL;
+    }
     return &r4_40_cipher;
 }
 

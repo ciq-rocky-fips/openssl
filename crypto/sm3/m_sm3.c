@@ -10,8 +10,16 @@
 
 #include "internal/cryptlib.h"
 
+#include "openssl/opensslconf.h"
+
 #ifndef OPENSSL_NO_SM3
 # include <openssl/evp.h>
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 # include "crypto/evp.h"
 # include "crypto/sm3.h"
 
@@ -46,6 +54,10 @@ static const EVP_MD sm3_md = {
 
 const EVP_MD *EVP_sm3(void)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return NULL;
+    }
     return &sm3_md;
 }
 

@@ -132,6 +132,13 @@ int HASH_UPDATE(HASH_CTX *c, const void *data_, size_t len)
     HASH_LONG l;
     size_t n;
 
+#if defined(FIPS_HASH_DISABLE)
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return 0;
+    }
+#endif
+
     if (len == 0)
         return 1;
 
@@ -185,6 +192,12 @@ int HASH_UPDATE(HASH_CTX *c, const void *data_, size_t len)
 
 void HASH_TRANSFORM(HASH_CTX *c, const unsigned char *data)
 {
+#if defined(FIPS_HASH_DISABLE)
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
+#endif
     HASH_BLOCK_DATA_ORDER(c, data, 1);
 }
 
@@ -192,6 +205,13 @@ int HASH_FINAL(unsigned char *md, HASH_CTX *c)
 {
     unsigned char *p = (unsigned char *)c->data;
     size_t n = c->num;
+
+#if defined(FIPS_HASH_DISABLE)
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return 0;
+    }
+#endif
 
     p[n] = 0x80;                /* there is always room for one */
     n++;

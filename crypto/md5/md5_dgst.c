@@ -22,6 +22,8 @@
 
 int MD5_Init(MD5_CTX *c)
 {
+    if (FIPS_mode())
+      return 0;
     memset(c, 0, sizeof(*c));
     c->A = INIT_DATA_A;
     c->B = INIT_DATA_B;

@@ -14,6 +14,8 @@
 
 int sm3_init(SM3_CTX *c)
 {
+    if (FIPS_mode())
+        return 0;
     memset(c, 0, sizeof(*c));
     c->A = SM3_A;
     c->B = SM3_B;

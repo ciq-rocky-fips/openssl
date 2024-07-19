@@ -46,6 +46,8 @@ static const EVP_MD sm3_md = {
 
 const EVP_MD *EVP_sm3(void)
 {
+    if (FIPS_mode())
+        return NULL;
     return &sm3_md;
 }
 

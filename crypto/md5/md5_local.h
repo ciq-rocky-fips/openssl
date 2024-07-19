@@ -42,6 +42,9 @@ void md5_block_data_order(MD5_CTX *c, const void *p, size_t num);
         } while (0)
 #define HASH_BLOCK_DATA_ORDER   md5_block_data_order
 
+/* Don't allow MD5 in FIPS mode. */
+#define FIPS_HASH_DISABLE 1
+
 #include "crypto/md32_common.h"
 
 /*-

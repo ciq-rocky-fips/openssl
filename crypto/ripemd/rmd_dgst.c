@@ -20,6 +20,8 @@ void ripemd160_block(RIPEMD160_CTX *c, unsigned long *p, size_t num);
 
 int RIPEMD160_Init(RIPEMD160_CTX *c)
 {
+    if (FIPS_mode())
+        return 0;
     memset(c, 0, sizeof(*c));
     c->A = RIPEMD160_A;
     c->B = RIPEMD160_B;

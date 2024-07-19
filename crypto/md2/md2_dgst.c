@@ -70,6 +70,8 @@ const char *MD2_options(void)
 
 int MD2_Init(MD2_CTX *c)
 {
+    if (FIPS_mode())
+        return 0;
     c->num = 0;
     memset(c->state, 0, sizeof(c->state));
     memset(c->cksm, 0, sizeof(c->cksm));
@@ -80,6 +82,9 @@ int MD2_Init(MD2_CTX *c)
 int MD2_Update(MD2_CTX *c, const unsigned char *data, size_t len)
 {
     register UCHAR *p;
+
+    if (FIPS_mode())
+        return 0;
 
     if (len == 0)
         return 1;
@@ -152,6 +157,9 @@ int MD2_Final(unsigned char *md, MD2_CTX *c)
     int i, v;
     register UCHAR *cp;
     register MD2_INT *p1, *p2;
+
+    if (FIPS_mode())
+        return 0;
 
     cp = c->data;
     p1 = c->state;

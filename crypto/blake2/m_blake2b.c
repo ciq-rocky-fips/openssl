@@ -54,6 +54,8 @@ static const EVP_MD blake2b_md = {
 
 const EVP_MD *EVP_blake2b512(void)
 {
+    if (FIPS_mode())
+        return NULL;
     return &blake2b_md;
 }
 #endif

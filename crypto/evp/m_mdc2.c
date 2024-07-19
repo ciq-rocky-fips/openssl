@@ -50,6 +50,8 @@ static const EVP_MD mdc2_md = {
 
 const EVP_MD *EVP_mdc2(void)
 {
+    if (FIPS_mode())
+        return NULL;
     return &mdc2_md;
 }
 #endif

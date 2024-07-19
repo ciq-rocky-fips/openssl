@@ -10,6 +10,8 @@
 #include <stdio.h>
 #include "internal/cryptlib.h"
 
+#include "openssl/opensslconf.h"
+
 #ifndef OPENSSL_NO_MD2
 
 # include <openssl/evp.h>
@@ -17,6 +19,11 @@
 # include <openssl/x509.h>
 # include <openssl/md2.h>
 # include <openssl/rsa.h>
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
 
 #include "crypto/evp.h"
 
@@ -51,6 +58,10 @@ static const EVP_MD md2_md = {
 
 const EVP_MD *EVP_md2(void)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return NULL;
+    }
     return &md2_md;
 }
 #endif

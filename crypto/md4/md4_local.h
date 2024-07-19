@@ -31,6 +31,9 @@ void md4_block_data_order(MD4_CTX *c, const void *p, size_t num);
         } while (0)
 #define HASH_BLOCK_DATA_ORDER   md4_block_data_order
 
+/* Don't allow MD4 in FIPS mode. */
+#define FIPS_HASH_DISABLE 1
+
 #include "crypto/md32_common.h"
 
 /*-

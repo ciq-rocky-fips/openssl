@@ -10,6 +10,13 @@
 #include <stdio.h>
 #include "internal/cryptlib.h"
 
+#include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include <openssl/evp.h>
 #include <openssl/objects.h>
 #include <openssl/sha.h>
@@ -108,6 +115,10 @@ static const EVP_MD sha1_md = {
 
 const EVP_MD *EVP_sha1(void)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return NULL;
+    }
     return &sha1_md;
 }
 

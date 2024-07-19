@@ -11,6 +11,7 @@
 #include "internal/cryptlib.h"
 
 #ifndef OPENSSL_NO_CAST
+#define FIPS_CIPHER_DISABLE 1
 # include <openssl/evp.h>
 # include <openssl/objects.h>
 # include "crypto/evp.h"

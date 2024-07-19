@@ -37,6 +37,11 @@ void DES_cfb_encrypt(const unsigned char *in, unsigned char *out, int numbits,
     unsigned int sh[4];
     unsigned char *ovec = (unsigned char *)sh;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
+
     /* I kind of count that compiler optimizes away this assertion, */
     assert(sizeof(sh[0]) == 4); /* as this holds true for all, */
     /* but 16-bit platforms...      */

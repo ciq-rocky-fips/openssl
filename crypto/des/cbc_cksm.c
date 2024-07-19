@@ -19,6 +19,11 @@ DES_LONG DES_cbc_cksum(const unsigned char *in, DES_cblock *output,
     unsigned char *out = &(*output)[0];
     const unsigned char *iv = &(*ivec)[0];
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return 0;
+    }
+
     c2l(iv, tout0);
     c2l(iv, tout1);
     for (; l > 0; l -= 8) {

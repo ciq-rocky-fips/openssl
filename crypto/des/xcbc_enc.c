@@ -24,6 +24,11 @@ void DES_xcbc_encrypt(const unsigned char *in, unsigned char *out,
     DES_LONG tin[2];
     unsigned char *iv;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
+
     in2 = &(*inw)[0];
     c2l(in2, inW0);
     c2l(in2, inW1);

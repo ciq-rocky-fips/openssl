@@ -28,6 +28,11 @@ void DES_ede3_ofb64_encrypt(register const unsigned char *in,
     unsigned char *iv;
     int save = 0;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
+
     iv = &(*ivec)[0];
     c2l(iv, v0);
     c2l(iv, v1);

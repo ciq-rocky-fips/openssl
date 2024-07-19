@@ -46,6 +46,8 @@ static const EVP_CIPHER d_xcbc_cipher = {
 
 const EVP_CIPHER *EVP_desx_cbc(void)
 {
+    if (FIPS_mode())
+        return NULL;
     return &d_xcbc_cipher;
 }
 

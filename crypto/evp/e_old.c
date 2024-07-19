@@ -26,6 +26,8 @@ NON_EMPTY_TRANSLATION_UNIT
 const EVP_CIPHER *EVP_bf_cfb(void);
 const EVP_CIPHER *EVP_bf_cfb(void)
 {
+    if (FIPS_mode())
+        return NULL;
     return EVP_bf_cfb64();
 }
 # endif
@@ -35,6 +37,8 @@ const EVP_CIPHER *EVP_bf_cfb(void)
 const EVP_CIPHER *EVP_des_cfb(void);
 const EVP_CIPHER *EVP_des_cfb(void)
 {
+    if (FIPS_mode())
+        return NULL;
     return EVP_des_cfb64();
 }
 
@@ -42,6 +46,8 @@ const EVP_CIPHER *EVP_des_cfb(void)
 const EVP_CIPHER *EVP_des_ede3_cfb(void);
 const EVP_CIPHER *EVP_des_ede3_cfb(void)
 {
+    if (FIPS_mode())
+        return NULL;
     return EVP_des_ede3_cfb64();
 }
 
@@ -49,6 +55,8 @@ const EVP_CIPHER *EVP_des_ede3_cfb(void)
 const EVP_CIPHER *EVP_des_ede_cfb(void);
 const EVP_CIPHER *EVP_des_ede_cfb(void)
 {
+    if (FIPS_mode())
+        return NULL;
     return EVP_des_ede_cfb64();
 }
 # endif
@@ -58,6 +66,8 @@ const EVP_CIPHER *EVP_des_ede_cfb(void)
 const EVP_CIPHER *EVP_idea_cfb(void);
 const EVP_CIPHER *EVP_idea_cfb(void)
 {
+    if (FIPS_mode())
+        return NULL;
     return EVP_idea_cfb64();
 }
 # endif
@@ -67,6 +77,8 @@ const EVP_CIPHER *EVP_idea_cfb(void)
 const EVP_CIPHER *EVP_rc2_cfb(void);
 const EVP_CIPHER *EVP_rc2_cfb(void)
 {
+    if (FIPS_mode())
+        return NULL;
     return EVP_rc2_cfb64();
 }
 # endif
@@ -76,6 +88,8 @@ const EVP_CIPHER *EVP_rc2_cfb(void)
 const EVP_CIPHER *EVP_cast5_cfb(void);
 const EVP_CIPHER *EVP_cast5_cfb(void)
 {
+    if (FIPS_mode())
+        return NULL;
     return EVP_cast5_cfb64();
 }
 # endif
@@ -85,6 +99,8 @@ const EVP_CIPHER *EVP_cast5_cfb(void)
 const EVP_CIPHER *EVP_rc5_32_12_16_cfb(void);
 const EVP_CIPHER *EVP_rc5_32_12_16_cfb(void)
 {
+    if (FIPS_mode())
+        return NULL;
     return EVP_rc5_32_12_16_cfb64();
 }
 # endif

@@ -11,6 +11,7 @@
 #ifdef OPENSSL_NO_SEED
 NON_EMPTY_TRANSLATION_UNIT
 #else
+#define FIPS_CIPHER_DISABLE 1
 # include <openssl/evp.h>
 # include <openssl/err.h>
 # include <string.h>

@@ -277,6 +277,11 @@ static const DES_LONG des_skb[8][64] = {
 
 int DES_set_key(const_DES_cblock *key, DES_key_schedule *schedule)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return -2;
+    }
+
     if (DES_check_key) {
         return DES_set_key_checked(key, schedule);
     } else {
@@ -292,6 +297,11 @@ int DES_set_key(const_DES_cblock *key, DES_key_schedule *schedule)
  */
 int DES_set_key_checked(const_DES_cblock *key, DES_key_schedule *schedule)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return -2;
+    }
+
     if (!DES_check_key_parity(key))
         return -1;
     if (DES_is_weak_key(key))
@@ -308,6 +318,12 @@ void DES_set_key_unchecked(const_DES_cblock *key, DES_key_schedule *schedule)
     register const unsigned char *in;
     register DES_LONG *k;
     register int i;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
 
 #ifdef OPENBSD_DEV_CRYPTO
     memcpy(schedule->key, key, sizeof(schedule->key));

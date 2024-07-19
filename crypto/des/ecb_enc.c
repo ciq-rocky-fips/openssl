@@ -35,6 +35,12 @@ void DES_ecb_encrypt(const_DES_cblock *input, DES_cblock *output,
     const unsigned char *in = &(*input)[0];
     unsigned char *out = &(*output)[0];
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
+
     c2l(in, l);
     ll[0] = l;
     c2l(in, l);

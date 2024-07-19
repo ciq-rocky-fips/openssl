@@ -26,6 +26,9 @@ void BF_cfb64_encrypt(const unsigned char *in, unsigned char *out,
     BF_LONG ti[2];
     unsigned char *iv, c, cc;
 
+    if (FIPS_mode())
+        return;
+
     iv = (unsigned char *)ivec;
     if (encrypt) {
         while (l--) {

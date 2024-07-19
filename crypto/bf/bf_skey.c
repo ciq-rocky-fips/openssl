@@ -19,6 +19,9 @@ void BF_set_key(BF_KEY *key, int len, const unsigned char *data)
     BF_LONG *p, ri, in[2];
     const unsigned char *d, *end;
 
+    if (FIPS_mode())
+        return;
+
     memcpy(key, &bf_init, sizeof(BF_KEY));
     p = key->P;
 

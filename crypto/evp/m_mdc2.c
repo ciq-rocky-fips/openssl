@@ -50,6 +50,10 @@ static const EVP_MD mdc2_md = {
 
 const EVP_MD *EVP_mdc2(void)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return NULL;
+    }
     return &mdc2_md;
 }
 #endif

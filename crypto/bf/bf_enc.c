@@ -26,6 +26,11 @@ void BF_encrypt(BF_LONG *data, const BF_KEY *key)
     register BF_LONG l, r;
     register const BF_LONG *p, *s;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
+
     p = key->P;
     s = &(key->S[0]);
     l = data[0];
@@ -64,6 +69,11 @@ void BF_decrypt(BF_LONG *data, const BF_KEY *key)
 {
     register BF_LONG l, r;
     register const BF_LONG *p, *s;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
 
     p = key->P;
     s = &(key->S[0]);
@@ -106,6 +116,11 @@ void BF_cbc_encrypt(const unsigned char *in, unsigned char *out, long length,
     register BF_LONG tout0, tout1, xor0, xor1;
     register long l = length;
     BF_LONG tin[2];
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
 
     if (encrypt) {
         n2l(ivec, tout0);

@@ -28,6 +28,11 @@ void BF_ofb64_encrypt(const unsigned char *in, unsigned char *out,
     unsigned char *iv;
     int save = 0;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
+
     iv = (unsigned char *)ivec;
     n2l(iv, v0);
     n2l(iv, v1);

@@ -49,6 +49,8 @@ static const EVP_MD whirlpool_md = {
 
 const EVP_MD *EVP_whirlpool(void)
 {
+    if (FIPS_mode())
+        return NULL;
     return &whirlpool_md;
 }
 #endif

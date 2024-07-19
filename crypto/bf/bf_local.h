@@ -9,7 +9,12 @@
 
 #ifndef OSSL_CRYPTO_BF_LOCAL_H
 # define OSSL_CRYPTO_BF_LOCAL_H
-# include <openssl/opensslconf.h>
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
 
 /* NOTE - c is not incremented as per n2l */
 # define n2ln(c,l1,l2,n) { \

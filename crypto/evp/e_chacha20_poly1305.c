@@ -142,6 +142,10 @@ static const EVP_CIPHER chacha20 = {
 
 const EVP_CIPHER *EVP_chacha20(void)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return NULL;
+    }
     return &chacha20;
 }
 
@@ -631,6 +635,10 @@ static EVP_CIPHER chacha20_poly1305 = {
 
 const EVP_CIPHER *EVP_chacha20_poly1305(void)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return NULL;
+    }
     return(&chacha20_poly1305);
 }
 # endif

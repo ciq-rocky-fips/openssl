@@ -8,6 +8,14 @@
  */
 
 #include <stdio.h>
+
+#include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include "md5_local.h"
 #include <openssl/opensslv.h>
 
@@ -22,6 +30,10 @@
 
 int MD5_Init(MD5_CTX *c)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return 0;
+    }
     memset(c, 0, sizeof(*c));
     c->A = INIT_DATA_A;
     c->B = INIT_DATA_B;

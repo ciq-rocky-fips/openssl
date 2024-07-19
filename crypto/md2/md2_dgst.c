@@ -14,6 +14,13 @@
 #include <openssl/opensslv.h>
 #include <openssl/crypto.h>
 
+#include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 /*
  * Implemented from RFC1319 The MD2 Message-Digest Algorithm
  */
@@ -70,6 +77,10 @@ const char *MD2_options(void)
 
 int MD2_Init(MD2_CTX *c)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return 0;
+    }
     c->num = 0;
     memset(c->state, 0, sizeof(c->state));
     memset(c->cksm, 0, sizeof(c->cksm));
@@ -80,6 +91,12 @@ int MD2_Init(MD2_CTX *c)
 int MD2_Update(MD2_CTX *c, const unsigned char *data, size_t len)
 {
     register UCHAR *p;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return 0;
+    }
 
     if (len == 0)
         return 1;
@@ -152,6 +169,12 @@ int MD2_Final(unsigned char *md, MD2_CTX *c)
     int i, v;
     register UCHAR *cp;
     register MD2_INT *p1, *p2;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return 0;
+    }
 
     cp = c->data;
     p1 = c->state;

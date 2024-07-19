@@ -19,6 +19,14 @@
  */
 
 #include <openssl/e_os2.h>
+
+#include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include "crypto/aria.h"
 
 #include <assert.h>
@@ -475,6 +483,12 @@ void aria_encrypt(const unsigned char *in, unsigned char *out,
     int Nr;
     const ARIA_u128 *rk;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
+
     if (in == NULL || out == NULL || key == NULL) {
         return;
     }
@@ -544,6 +558,11 @@ int aria_set_encrypt_key(const unsigned char *userKey, const int bits,
 
     ARIA_u128 *rk;
     int Nr = (bits + 256) / 32;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return -1;
+    }
 
     if (userKey == NULL || key == NULL) {
         return -1;
@@ -677,6 +696,11 @@ int aria_set_decrypt_key(const unsigned char *userKey, const int bits,
     uint32_t s0, s1, s2, s3;
 
     const int r = aria_set_encrypt_key(userKey, bits, key);
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return -1;
+    }
 
     if (r != 0) {
         return r;
@@ -1110,6 +1134,13 @@ void aria_encrypt(const unsigned char *in, unsigned char *out,
                   const ARIA_KEY *key)
 {
     assert(in != NULL && out != NULL && key != NULL);
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
+
     do_encrypt(out, in, key->rounds, key->rd_key);
 }
 
@@ -1124,6 +1155,11 @@ int aria_set_encrypt_key(const unsigned char *userKey, const int bits,
 {
     const ARIA_u128 *ck1, *ck2, *ck3;
     ARIA_u128 kr, w0, w1, w2, w3;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return -1;
+    }
 
     if (!userKey || !key)
         return -1;
@@ -1198,6 +1234,11 @@ int aria_set_decrypt_key(const unsigned char *userKey, const int bits,
     ARIA_KEY ek;
     const int r = aria_set_encrypt_key(userKey, bits, &ek);
     unsigned int i, rounds = ek.rounds;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return -1;
+    }
 
     if (r == 0) {
         key->rounds = rounds;

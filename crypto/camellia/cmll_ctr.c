@@ -7,6 +7,13 @@
  * https://www.openssl.org/source/license.html
  */
 
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include <openssl/camellia.h>
 #include <openssl/modes.h>
 
@@ -16,6 +23,11 @@ void Camellia_ctr128_encrypt(const unsigned char *in, unsigned char *out,
                              unsigned char ecount_buf[CAMELLIA_BLOCK_SIZE],
                              unsigned int *num)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
 
     CRYPTO_ctr128_encrypt(in, out, length, key, ivec, ecount_buf, num,
                           (block128_f) Camellia_encrypt);

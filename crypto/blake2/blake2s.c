@@ -79,6 +79,9 @@ int BLAKE2s_Init(BLAKE2S_CTX *c)
 {
     BLAKE2S_PARAM P[1];
 
+    if (FIPS_mode())
+        return 0;
+
     P->digest_length = BLAKE2S_DIGEST_LENGTH;
     P->key_length    = 0;
     P->fanout        = 1;
@@ -201,6 +204,9 @@ int BLAKE2s_Update(BLAKE2S_CTX *c, const void *data, size_t datalen)
     const uint8_t *in = data;
     size_t fill;
 
+    if (FIPS_mode())
+        return 0;
+
     /*
      * Intuitively one would expect intermediate buffer, c->buf, to
      * store incomplete blocks. But in this case we are interested to
@@ -247,6 +253,9 @@ int BLAKE2s_Update(BLAKE2S_CTX *c, const void *data, size_t datalen)
 int BLAKE2s_Final(unsigned char *md, BLAKE2S_CTX *c)
 {
     int i;
+
+    if (FIPS_mode())
+        return 0;
 
     blake2s_set_lastblock(c);
     /* Padding */

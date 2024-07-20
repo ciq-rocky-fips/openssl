@@ -7,6 +7,13 @@
  * https://www.openssl.org/source/license.html
  */
 
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include <openssl/camellia.h>
 #include <openssl/modes.h>
 
@@ -21,6 +28,12 @@ void Camellia_cfb128_encrypt(const unsigned char *in, unsigned char *out,
                              unsigned char *ivec, int *num, const int enc)
 {
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
+
     CRYPTO_cfb128_encrypt(in, out, length, key, ivec, num, enc,
                           (block128_f) Camellia_encrypt);
 }
@@ -30,6 +43,12 @@ void Camellia_cfb1_encrypt(const unsigned char *in, unsigned char *out,
                            size_t length, const CAMELLIA_KEY *key,
                            unsigned char *ivec, int *num, const int enc)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
+
     CRYPTO_cfb128_1_encrypt(in, out, length, key, ivec, num, enc,
                             (block128_f) Camellia_encrypt);
 }
@@ -38,6 +57,12 @@ void Camellia_cfb8_encrypt(const unsigned char *in, unsigned char *out,
                            size_t length, const CAMELLIA_KEY *key,
                            unsigned char *ivec, int *num, const int enc)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
+
     CRYPTO_cfb128_8_encrypt(in, out, length, key, ivec, num, enc,
                             (block128_f) Camellia_encrypt);
 }

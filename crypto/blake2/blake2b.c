@@ -16,6 +16,14 @@
 
 #include <assert.h>
 #include <string.h>
+
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include <openssl/crypto.h>
 
 #include "blake2_local.h"
@@ -81,6 +89,11 @@ static void blake2b_init_param(BLAKE2B_CTX *S, const BLAKE2B_PARAM *P)
 /* Initialize the hashing context.  Always returns 1. */
 int BLAKE2b_Init(BLAKE2B_CTX *c)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return 0;
+    }
+
     BLAKE2B_PARAM P[1];
     P->digest_length = BLAKE2B_DIGEST_LENGTH;
     P->key_length    = 0;
@@ -207,6 +220,11 @@ int BLAKE2b_Update(BLAKE2B_CTX *c, const void *data, size_t datalen)
     const uint8_t *in = data;
     size_t fill;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return 0;
+    }
+
     /*
      * Intuitively one would expect intermediate buffer, c->buf, to
      * store incomplete blocks. But in this case we are interested to
@@ -253,6 +271,11 @@ int BLAKE2b_Update(BLAKE2B_CTX *c, const void *data, size_t datalen)
 int BLAKE2b_Final(unsigned char *md, BLAKE2B_CTX *c)
 {
     int i;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return 0;
+    }
 
     blake2b_set_lastblock(c);
     /* Padding */

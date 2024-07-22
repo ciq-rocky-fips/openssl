@@ -7,6 +7,13 @@
  * https://www.openssl.org/source/license.html
  */
 
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include <openssl/rc5.h>
 #include "rc5_local.h"
 #include <openssl/opensslv.h>
@@ -15,6 +22,11 @@ void RC5_32_ecb_encrypt(const unsigned char *in, unsigned char *out,
                         RC5_32_KEY *ks, int encrypt)
 {
     unsigned long l, d[2];
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
 
     c2l(in, l);
     d[0] = l;

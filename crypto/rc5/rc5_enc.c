@@ -20,6 +20,9 @@ void RC5_32_cbc_encrypt(const unsigned char *in, unsigned char *out,
     register long l = length;
     unsigned long tin[2];
 
+    if (FIPS_mode())
+        return;
+
     if (encrypt) {
         c2l(iv, tout0);
         c2l(iv, tout1);
@@ -91,6 +94,9 @@ void RC5_32_encrypt(unsigned long *d, RC5_32_KEY *key)
 {
     RC5_32_INT a, b, *s;
 
+    if (FIPS_mode())
+        return;
+
     s = key->data;
 
     a = d[0] + s[0];
@@ -126,6 +132,9 @@ void RC5_32_encrypt(unsigned long *d, RC5_32_KEY *key)
 void RC5_32_decrypt(unsigned long *d, RC5_32_KEY *key)
 {
     RC5_32_INT a, b, *s;
+
+    if (FIPS_mode())
+        return;
 
     s = key->data;
 

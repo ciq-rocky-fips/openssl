@@ -26,6 +26,9 @@ void RC5_32_cfb64_encrypt(const unsigned char *in, unsigned char *out,
     unsigned long ti[2];
     unsigned char *iv, c, cc;
 
+    if (FIPS_mode())
+        return;
+
     iv = (unsigned char *)ivec;
     if (encrypt) {
         while (l--) {

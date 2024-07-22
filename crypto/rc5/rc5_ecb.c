@@ -16,6 +16,9 @@ void RC5_32_ecb_encrypt(const unsigned char *in, unsigned char *out,
 {
     unsigned long l, d[2];
 
+    if (FIPS_mode())
+        return;
+
     c2l(in, l);
     d[0] = l;
     c2l(in, l);

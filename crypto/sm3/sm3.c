@@ -46,6 +46,12 @@ void sm3_block_data_order(SM3_CTX *ctx, const void *p, size_t num)
     unsigned MD32_REG_T W00, W01, W02, W03, W04, W05, W06, W07,
         W08, W09, W10, W11, W12, W13, W14, W15;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
+
     for (; num--;) {
 
         A = ctx->A;

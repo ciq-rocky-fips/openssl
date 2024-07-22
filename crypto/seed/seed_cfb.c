@@ -15,6 +15,9 @@ void SEED_cfb128_encrypt(const unsigned char *in, unsigned char *out,
                          unsigned char ivec[SEED_BLOCK_SIZE], int *num,
                          int enc)
 {
+    if (FIPS_mode())
+        return;
+
     CRYPTO_cfb128_encrypt(in, out, len, ks, ivec, num, enc,
                           (block128_f) SEED_encrypt);
 }

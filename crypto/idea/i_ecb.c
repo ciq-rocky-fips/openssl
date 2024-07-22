@@ -7,6 +7,13 @@
  * https://www.openssl.org/source/license.html
  */
 
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include <openssl/idea.h>
 #include "idea_local.h"
 #include <openssl/opensslv.h>
@@ -20,6 +27,11 @@ void IDEA_ecb_encrypt(const unsigned char *in, unsigned char *out,
                       IDEA_KEY_SCHEDULE *ks)
 {
     unsigned long l0, l1, d[2];
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
 
     n2l(in, l0);
     d[0] = l0;

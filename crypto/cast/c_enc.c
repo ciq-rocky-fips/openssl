@@ -15,6 +15,12 @@ void CAST_encrypt(CAST_LONG *data, const CAST_KEY *key)
     CAST_LONG l, r, t;
     const CAST_LONG *k;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
+
     k = &(key->data[0]);
     l = data[0];
     r = data[1];
@@ -46,6 +52,12 @@ void CAST_decrypt(CAST_LONG *data, const CAST_KEY *key)
 {
     CAST_LONG l, r, t;
     const CAST_LONG *k;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
 
     k = &(key->data[0]);
     l = data[0];
@@ -82,6 +94,12 @@ void CAST_cbc_encrypt(const unsigned char *in, unsigned char *out,
     register CAST_LONG tout0, tout1, xor0, xor1;
     register long l = length;
     CAST_LONG tin[2];
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
 
     if (enc) {
         n2l(iv, tout0);

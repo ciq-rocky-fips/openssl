@@ -25,6 +25,9 @@ void RC4(RC4_KEY *key, size_t len, const unsigned char *indata,
     register RC4_INT x, y, tx, ty;
     size_t i;
 
+    if (FIPS_mode())
+        return;
+
     x = key->x;
     y = key->y;
     d = key->data;

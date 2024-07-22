@@ -34,6 +34,9 @@ void RC4_set_key(RC4_KEY *key, int len, const unsigned char *data)
     register RC4_INT *d;
     unsigned int i;
 
+    if (FIPS_mode())
+        return;
+
     d = &(key->data[0]);
     key->x = 0;
     key->y = 0;

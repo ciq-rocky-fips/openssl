@@ -7,6 +7,13 @@
  * https://www.openssl.org/source/license.html
  */
 
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #ifdef OPENSSL_SYS_WIN32
 # include <stdlib.h>
 #endif

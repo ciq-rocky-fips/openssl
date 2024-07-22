@@ -9,6 +9,13 @@
  * https://www.openssl.org/source/license.html
  */
 
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include "crypto/sm2.h"
 #include "crypto/sm2err.h"
 #include "crypto/ec.h" /* ecdh_KDF_X9_63() */
@@ -136,6 +143,11 @@ int sm2_encrypt(const EC_KEY *key,
     /* NULL these before any "goto done" */
     ctext_struct.C2 = NULL;
     ctext_struct.C3 = NULL;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        goto done;
+    }
 
     if (hash == NULL || C3_size <= 0) {
         SM2err(SM2_F_SM2_ENCRYPT, ERR_R_INTERNAL_ERROR);
@@ -282,6 +294,11 @@ int sm2_decrypt(const EC_KEY *key,
     const uint8_t *C3 = NULL;
     int msg_len = 0;
     EVP_MD_CTX *hash = NULL;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        goto done;
+    }
 
     if (field_size == 0 || hash_size <= 0)
        goto done;

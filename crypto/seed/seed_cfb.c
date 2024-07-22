@@ -7,6 +7,13 @@
  * https://www.openssl.org/source/license.html
  */
 
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include <openssl/seed.h>
 #include <openssl/modes.h>
 
@@ -15,6 +22,11 @@ void SEED_cfb128_encrypt(const unsigned char *in, unsigned char *out,
                          unsigned char ivec[SEED_BLOCK_SIZE], int *num,
                          int enc)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
+
     CRYPTO_cfb128_encrypt(in, out, len, ks, ivec, num, enc,
                           (block128_f) SEED_encrypt);
 }

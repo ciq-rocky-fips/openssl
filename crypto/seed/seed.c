@@ -32,6 +32,14 @@
  * SUCH DAMAGE.
  *
  */
+
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #ifndef OPENSSL_NO_SEED
 
 # include <stdio.h>
@@ -443,6 +451,11 @@ void SEED_set_key(const unsigned char rawkey[SEED_KEY_LENGTH],
     seed_word x1, x2, x3, x4;
     seed_word t0, t1;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
+
     char2word(rawkey, x1);
     char2word(rawkey + 4, x2);
     char2word(rawkey + 8, x3);
@@ -503,6 +516,11 @@ void SEED_encrypt(const unsigned char s[SEED_BLOCK_SIZE],
     seed_word x1, x2, x3, x4;
     seed_word t0, t1;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
+
     char2word(s, x1);
     char2word(s + 4, x2);
     char2word(s + 8, x3);
@@ -547,6 +565,11 @@ void SEED_decrypt(const unsigned char s[SEED_BLOCK_SIZE],
 {
     seed_word x1, x2, x3, x4;
     seed_word t0, t1;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
 
     char2word(s, x1);
     char2word(s + 4, x2);

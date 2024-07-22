@@ -195,5 +195,8 @@ const EVP_PKEY_METHOD poly1305_pkey_meth = {
 
 const EVP_PKEY_METHOD *poly1305_pkey_method(void)
 {
+    if (FIPS_mode())
+        return NULL;
+
     return &poly1305_pkey_meth;
 }

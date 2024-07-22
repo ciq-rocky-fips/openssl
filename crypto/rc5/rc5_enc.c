@@ -8,6 +8,14 @@
  */
 
 #include <stdio.h>
+
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include <openssl/rc5.h>
 #include "rc5_local.h"
 
@@ -19,6 +27,12 @@ void RC5_32_cbc_encrypt(const unsigned char *in, unsigned char *out,
     register unsigned long tout0, tout1, xor0, xor1;
     register long l = length;
     unsigned long tin[2];
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
 
     if (encrypt) {
         c2l(iv, tout0);
@@ -91,6 +105,12 @@ void RC5_32_encrypt(unsigned long *d, RC5_32_KEY *key)
 {
     RC5_32_INT a, b, *s;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
+
     s = key->data;
 
     a = d[0] + s[0];
@@ -126,6 +146,12 @@ void RC5_32_encrypt(unsigned long *d, RC5_32_KEY *key)
 void RC5_32_decrypt(unsigned long *d, RC5_32_KEY *key)
 {
     RC5_32_INT a, b, *s;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
 
     s = key->data;
 

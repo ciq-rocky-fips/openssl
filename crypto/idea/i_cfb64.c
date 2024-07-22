@@ -7,6 +7,13 @@
  * https://www.openssl.org/source/license.html
  */
 
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include <openssl/idea.h>
 #include "idea_local.h"
 
@@ -25,6 +32,12 @@ void IDEA_cfb64_encrypt(const unsigned char *in, unsigned char *out,
     register long l = length;
     unsigned long ti[2];
     unsigned char *iv, c, cc;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
 
     iv = (unsigned char *)ivec;
     if (encrypt) {

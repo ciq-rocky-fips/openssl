@@ -19,6 +19,9 @@ void IDEA_cbc_encrypt(const unsigned char *in, unsigned char *out,
     register long l = length;
     unsigned long tin[2];
 
+    if (FIPS_mode())
+        return;
+
     if (encrypt) {
         n2l(iv, tout0);
         n2l(iv, tout1);
@@ -90,6 +93,9 @@ void IDEA_encrypt(unsigned long *d, IDEA_KEY_SCHEDULE *key)
 {
     register IDEA_INT *p;
     register unsigned long x1, x2, x3, x4, t0, t1, ul;
+
+    if (FIPS_mode())
+        return;
 
     x2 = d[0];
     x1 = (x2 >> 16);

@@ -16,6 +16,9 @@ void IDEA_set_encrypt_key(const unsigned char *key, IDEA_KEY_SCHEDULE *ks)
     int i;
     register IDEA_INT *kt, *kf, r0, r1, r2;
 
+    if (FIPS_mode())
+        return;
+
     kt = &(ks->data[0][0]);
     n2s(key, kt[0]);
     n2s(key, kt[1]);
@@ -55,6 +58,9 @@ void IDEA_set_decrypt_key(IDEA_KEY_SCHEDULE *ek, IDEA_KEY_SCHEDULE *dk)
 {
     int r;
     register IDEA_INT *fp, *tp, t;
+
+    if (FIPS_mode())
+        return;
 
     tp = &(dk->data[0][0]);
     fp = &(ek->data[8][0]);

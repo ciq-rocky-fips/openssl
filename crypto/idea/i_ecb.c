@@ -21,6 +21,9 @@ void IDEA_ecb_encrypt(const unsigned char *in, unsigned char *out,
 {
     unsigned long l0, l1, d[2];
 
+    if (FIPS_mode())
+        return;
+
     n2l(in, l0);
     d[0] = l0;
     n2l(in, l1);

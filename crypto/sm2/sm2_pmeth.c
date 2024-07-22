@@ -7,6 +7,13 @@
  * https://www.openssl.org/source/license.html
  */
 
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include "internal/cryptlib.h"
 #include <openssl/asn1t.h>
 #include <openssl/ec.h>
@@ -330,5 +337,10 @@ const EVP_PKEY_METHOD sm2_pkey_meth = {
 
 const EVP_PKEY_METHOD *sm2_pkey_method(void)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return NULL;
+    }
+
     return &sm2_pkey_meth;
 }

@@ -330,5 +330,8 @@ const EVP_PKEY_METHOD sm2_pkey_meth = {
 
 const EVP_PKEY_METHOD *sm2_pkey_method(void)
 {
+    if (FIPS_mode())
+        return NULL;
+
     return &sm2_pkey_meth;
 }

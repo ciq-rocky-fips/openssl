@@ -137,6 +137,9 @@ int sm2_encrypt(const EC_KEY *key,
     ctext_struct.C2 = NULL;
     ctext_struct.C3 = NULL;
 
+    if (FIPS_mode())
+        goto done;
+
     if (hash == NULL || C3_size <= 0) {
         SM2err(SM2_F_SM2_ENCRYPT, ERR_R_INTERNAL_ERROR);
         goto done;
@@ -282,6 +285,9 @@ int sm2_decrypt(const EC_KEY *key,
     const uint8_t *C3 = NULL;
     int msg_len = 0;
     EVP_MD_CTX *hash = NULL;
+
+    if (FIPS_mode())
+        goto done;
 
     if (field_size == 0 || hash_size <= 0)
        goto done;

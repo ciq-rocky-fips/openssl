@@ -48,6 +48,9 @@ int sm2_compute_z_digest(uint8_t *out,
         goto done;
     }
 
+    if (FIPS_mode())
+        goto done;
+
     p = BN_CTX_get(ctx);
     a = BN_CTX_get(ctx);
     b = BN_CTX_get(ctx);
@@ -370,6 +373,9 @@ ECDSA_SIG *sm2_do_sign(const EC_KEY *key,
     BIGNUM *e = NULL;
     ECDSA_SIG *sig = NULL;
 
+    if (FIPS_mode())
+        goto done;
+
     e = sm2_compute_msg_hash(digest, key, id, id_len, msg, msg_len);
     if (e == NULL) {
         /* SM2err already called */
@@ -393,6 +399,9 @@ int sm2_do_verify(const EC_KEY *key,
     BIGNUM *e = NULL;
     int ret = 0;
 
+    if (FIPS_mode())
+        goto done;
+
     e = sm2_compute_msg_hash(digest, key, id, id_len, msg, msg_len);
     if (e == NULL) {
         /* SM2err already called */
@@ -413,6 +422,9 @@ int sm2_sign(const unsigned char *dgst, int dgstlen,
     ECDSA_SIG *s = NULL;
     int sigleni;
     int ret = -1;
+
+    if (FIPS_mode())
+        goto done;
 
     e = BN_bin2bn(dgst, dgstlen, NULL);
     if (e == NULL) {
@@ -446,6 +458,9 @@ int sm2_verify(const unsigned char *dgst, int dgstlen,
     unsigned char *der = NULL;
     int derlen = -1;
     int ret = -1;
+
+    if (FIPS_mode())
+        goto done;
 
     s = ECDSA_SIG_new();
     if (s == NULL) {

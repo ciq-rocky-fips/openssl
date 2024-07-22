@@ -53,6 +53,9 @@ void RC2_set_key(RC2_KEY *key, int len, const unsigned char *data, int bits)
     RC2_INT *ki;
     unsigned int c, d;
 
+    if (FIPS_mode())
+        return;
+
     k = (unsigned char *)&(key->data[0]);
     *k = 0;                     /* for if there is a zero length key */
 

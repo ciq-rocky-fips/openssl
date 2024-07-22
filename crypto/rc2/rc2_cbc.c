@@ -18,6 +18,9 @@ void RC2_cbc_encrypt(const unsigned char *in, unsigned char *out, long length,
     register long l = length;
     unsigned long tin[2];
 
+    if (FIPS_mode())
+        return;
+
     if (encrypt) {
         c2l(iv, tout0);
         c2l(iv, tout1);
@@ -92,6 +95,9 @@ void RC2_encrypt(unsigned long *d, RC2_KEY *key)
     register RC2_INT x0, x1, x2, x3, t;
     unsigned long l;
 
+    if (FIPS_mode())
+        return;
+
     l = d[0];
     x0 = (RC2_INT) l & 0xffff;
     x1 = (RC2_INT) (l >> 16L);
@@ -137,6 +143,9 @@ void RC2_decrypt(unsigned long *d, RC2_KEY *key)
     register RC2_INT *p0, *p1;
     register RC2_INT x0, x1, x2, x3, t;
     unsigned long l;
+
+    if (FIPS_mode())
+        return;
 
     l = d[0];
     x0 = (RC2_INT) l & 0xffff;

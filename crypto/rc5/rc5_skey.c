@@ -7,6 +7,13 @@
  * https://www.openssl.org/source/license.html
  */
 
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include <openssl/rc5.h>
 #include "rc5_local.h"
 
@@ -15,6 +22,12 @@ void RC5_32_set_key(RC5_32_KEY *key, int len, const unsigned char *data,
 {
     RC5_32_INT L[64], l, ll, A, B, *S, k;
     int i, j, m, c, t, ii, jj;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
 
     if ((rounds != RC5_16_ROUNDS) &&
         (rounds != RC5_12_ROUNDS) && (rounds != RC5_8_ROUNDS))

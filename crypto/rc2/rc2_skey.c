@@ -7,6 +7,13 @@
  * https://www.openssl.org/source/license.html
  */
 
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include <openssl/rc2.h>
 #include "rc2_local.h"
 
@@ -52,6 +59,11 @@ void RC2_set_key(RC2_KEY *key, int len, const unsigned char *data, int bits)
     unsigned char *k;
     RC2_INT *ki;
     unsigned int c, d;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
 
     k = (unsigned char *)&(key->data[0]);
     *k = 0;                     /* for if there is a zero length key */

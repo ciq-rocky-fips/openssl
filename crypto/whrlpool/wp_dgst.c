@@ -58,6 +58,8 @@
 
 int WHIRLPOOL_Init(WHIRLPOOL_CTX *c)
 {
+    if (FIPS_mode())
+        return 0;
     memset(c, 0, sizeof(*c));
     return 1;
 }
@@ -71,6 +73,9 @@ int WHIRLPOOL_Update(WHIRLPOOL_CTX *c, const void *_inp, size_t bytes)
      */
     size_t chunk = ((size_t)1) << (sizeof(size_t) * 8 - 4);
     const unsigned char *inp = _inp;
+
+    if (FIPS_mode())
+        return 0;
 
     while (bytes >= chunk) {
         WHIRLPOOL_BitUpdate(c, inp, chunk * 8);
@@ -89,6 +94,9 @@ void WHIRLPOOL_BitUpdate(WHIRLPOOL_CTX *c, const void *_inp, size_t bits)
     unsigned int bitoff = c->bitoff,
         bitrem = bitoff % 8, inpgap = (8 - (unsigned int)bits % 8) & 7;
     const unsigned char *inp = _inp;
+
+    if (FIPS_mode())
+        return;
 
     /*
      * This 256-bit increment procedure relies on the size_t being natural
@@ -211,6 +219,9 @@ int WHIRLPOOL_Final(unsigned char *md, WHIRLPOOL_CTX *c)
     size_t i, j, v;
     unsigned char *p;
 
+    if (FIPS_mode())
+        return 1;
+
     bitoff %= 8;
     if (bitoff)
         c->data[byteoff] |= 0x80 >> bitoff;
@@ -248,6 +259,9 @@ unsigned char *WHIRLPOOL(const void *inp, size_t bytes, unsigned char *md)
 {
     WHIRLPOOL_CTX ctx;
     static unsigned char m[WHIRLPOOL_DIGEST_LENGTH];
+
+    if (FIPS_mode())
+        return NULL;
 
     if (md == NULL)
         md = m;

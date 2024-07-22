@@ -78,6 +78,9 @@ void ChaCha20_ctr32(unsigned char *out, const unsigned char *inp,
     chacha_buf buf;
     size_t todo, i;
 
+    if (FIPS_mode())
+        return;
+
     /* sigma constant "expand 32-byte k" in little-endian encoding */
     input[0] = ((u32)ossl_toascii('e')) | ((u32)ossl_toascii('x') << 8)
                | ((u32)ossl_toascii('p') << 16)

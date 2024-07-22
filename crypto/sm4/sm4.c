@@ -10,6 +10,14 @@
  */
 
 #include <openssl/e_os2.h>
+
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include "crypto/sm4.h"
 
 static const uint8_t SM4_S[256] = {
@@ -154,6 +162,11 @@ int SM4_set_key(const uint8_t *key, SM4_KEY *ks)
     uint32_t K[4];
     int i;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return 0;
+    }
+
     K[0] = load_u32_be(key, 0) ^ FK[0];
     K[1] = load_u32_be(key, 1) ^ FK[1];
     K[2] = load_u32_be(key, 2) ^ FK[2];
@@ -191,6 +204,11 @@ void SM4_encrypt(const uint8_t *in, uint8_t *out, const SM4_KEY *ks)
     uint32_t B2 = load_u32_be(in, 2);
     uint32_t B3 = load_u32_be(in, 3);
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
+
     /*
      * Uses byte-wise sbox in the first and last rounds to provide some
      * protection from cache based side channels.
@@ -216,6 +234,11 @@ void SM4_decrypt(const uint8_t *in, uint8_t *out, const SM4_KEY *ks)
     uint32_t B1 = load_u32_be(in, 1);
     uint32_t B2 = load_u32_be(in, 2);
     uint32_t B3 = load_u32_be(in, 3);
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
 
     SM4_RNDS(31, 30, 29, 28, SM4_T_slow);
     SM4_RNDS(27, 26, 25, 24, SM4_T);

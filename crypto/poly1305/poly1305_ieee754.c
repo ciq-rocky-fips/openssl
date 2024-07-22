@@ -52,6 +52,13 @@
 
 #include <stdlib.h>
 
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 typedef unsigned char u8;
 typedef unsigned int u32;
 typedef unsigned long long u64;
@@ -111,6 +118,11 @@ int poly1305_init(void *ctx, const unsigned char key[16])
 {
     poly1305_internal *st = (poly1305_internal *) ctx;
     elem64 r0, r1, r2, r3;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return 1;
+    }
 
     /* h = 0, biased */
 #if 0
@@ -227,6 +239,11 @@ void poly1305_blocks(void *ctx, const unsigned char *inp, size_t len,
     poly1305_internal *st = (poly1305_internal *)ctx;
     elem64 in0, in1, in2, in3;
     u64 pad = (u64)padbit<<32;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
 
     double x0, x1, x2, x3;
     double h0lo, h0hi, h1lo, h1hi, h2lo, h2hi, h3lo, h3hi;
@@ -434,6 +451,11 @@ void poly1305_emit(void *ctx, unsigned char mac[16], const u32 nonce[4])
     u32 g0, g1, g2, g3, g4;
     u64 t;
     u32 mask;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
 
     /*
      * thanks to bias masking exponent gives integer result

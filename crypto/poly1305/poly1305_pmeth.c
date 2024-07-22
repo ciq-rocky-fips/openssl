@@ -8,6 +8,14 @@
  */
 
 #include <stdio.h>
+
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include "internal/cryptlib.h"
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
@@ -195,5 +203,10 @@ const EVP_PKEY_METHOD poly1305_pkey_meth = {
 
 const EVP_PKEY_METHOD *poly1305_pkey_method(void)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return NULL;
+    }
+
     return &poly1305_pkey_meth;
 }

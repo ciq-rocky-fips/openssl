@@ -16,6 +16,11 @@ void CAST_ecb_encrypt(const unsigned char *in, unsigned char *out,
 {
     CAST_LONG l, d[2];
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
+
     n2l(in, l);
     d[0] = l;
     n2l(in, l);

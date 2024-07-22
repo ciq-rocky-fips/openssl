@@ -32,6 +32,11 @@ void CAST_set_key(CAST_KEY *key, int len, const unsigned char *data)
     CAST_LONG l, *K;
     int i;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
+
     for (i = 0; i < 16; i++)
         x[i] = 0;
     if (len > 16)

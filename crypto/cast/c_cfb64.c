@@ -26,6 +26,11 @@ void CAST_cfb64_encrypt(const unsigned char *in, unsigned char *out,
     CAST_LONG ti[2];
     unsigned char *iv, c, cc;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return;
+    }
+
     iv = ivec;
     if (enc) {
         while (l--) {

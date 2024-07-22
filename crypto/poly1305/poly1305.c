@@ -9,6 +9,14 @@
 
 #include <stdlib.h>
 #include <string.h>
+
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include <openssl/crypto.h>
 
 #include "crypto/poly1305.h"
@@ -434,6 +442,12 @@ void poly1305_emit(void *ctx, unsigned char mac[16],
 
 void Poly1305_Init(POLY1305 *ctx, const unsigned char key[32])
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
+
     ctx->nonce[0] = U8TOU32(&key[16]);
     ctx->nonce[1] = U8TOU32(&key[20]);
     ctx->nonce[2] = U8TOU32(&key[24]);
@@ -480,6 +494,12 @@ void Poly1305_Update(POLY1305 *ctx, const unsigned char *inp, size_t len)
 #endif
     size_t rem, num;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
+
     if ((num = ctx->num)) {
         rem = POLY1305_BLOCK_SIZE - num;
         if (len >= rem) {
@@ -516,6 +536,12 @@ void Poly1305_Final(POLY1305 *ctx, unsigned char mac[16])
     poly1305_emit_f poly1305_emit_p = ctx->func.emit;
 #endif
     size_t num;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
 
     if ((num = ctx->num)) {
         ctx->data[num++] = 1;   /* pad bit */

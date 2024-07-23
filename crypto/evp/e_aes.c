@@ -2527,6 +2527,21 @@ static const EVP_CIPHER aes_##keylen##_##mode = { \
 const EVP_CIPHER *EVP_aes_##keylen##_##mode(void) \
 { return &aes_##keylen##_##mode; }
 
+/* Version of BLOCK_CIPHER_custom the disables algorithm in FIPS mode. */
+# define BLOCK_CIPHER_custom_fips(nid,keylen,blocksize,ivlen,mode,MODE,flags) \
+static const EVP_CIPHER aes_##keylen##_##mode = { \
+        nid##_##keylen##_##mode,blocksize, \
+        (EVP_CIPH_##MODE##_MODE==EVP_CIPH_XTS_MODE?2:1)*keylen/8, ivlen, \
+        flags|EVP_CIPH_##MODE##_MODE,   \
+        aes_##mode##_init_key,          \
+        aes_##mode##_cipher,            \
+        aes_##mode##_cleanup,           \
+        sizeof(EVP_AES_##MODE##_CTX),   \
+        NULL,NULL,aes_##mode##_ctrl,NULL }; \
+const EVP_CIPHER *EVP_aes_##keylen##_##mode(void) \
+{ if (FIPS_mode()) { return NULL; } return &aes_##keylen##_##mode; }
+
+
 #endif
 
 #if defined(OPENSSL_CPUID_OBJ) && (defined(__arm__) || defined(__arm) || defined(__aarch64__))
@@ -4285,10 +4300,10 @@ static int aes_ocb_cleanup(EVP_CIPHER_CTX *c)
     return 1;
 }
 
-BLOCK_CIPHER_custom(NID_aes, 128, 16, 12, ocb, OCB,
+BLOCK_CIPHER_custom_fips(NID_aes, 128, 16, 12, ocb, OCB,
                     EVP_CIPH_FLAG_AEAD_CIPHER | CUSTOM_FLAGS)
-BLOCK_CIPHER_custom(NID_aes, 192, 16, 12, ocb, OCB,
+BLOCK_CIPHER_custom_fips(NID_aes, 192, 16, 12, ocb, OCB,
                     EVP_CIPH_FLAG_AEAD_CIPHER | CUSTOM_FLAGS)
-BLOCK_CIPHER_custom(NID_aes, 256, 16, 12, ocb, OCB,
+BLOCK_CIPHER_custom_fips(NID_aes, 256, 16, 12, ocb, OCB,
                     EVP_CIPH_FLAG_AEAD_CIPHER | CUSTOM_FLAGS)
 #endif                         /* OPENSSL_NO_OCB */

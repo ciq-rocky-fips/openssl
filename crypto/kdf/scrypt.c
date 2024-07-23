@@ -506,6 +506,8 @@ static int scrypt_alg(const char *pass, size_t passlen,
 
 const EVP_PKEY_METHOD *scrypt_pkey_method(void)
 {
+    if (FIPS_mode())
+        return NULL;
     return &scrypt_pkey_meth;
 }
 

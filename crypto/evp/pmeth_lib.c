@@ -70,6 +70,69 @@ static pmeth_fn standard_methods[] = {
 #endif
 };
 
+/* This must be in the same order as standard_methods. */
+/* It's the same array with non-FIPS methods removed. */
+static pmeth_fn standard_methods_fips[] = {
+#ifndef OPENSSL_NO_RSA
+    rsa_pkey_method,
+#endif
+#ifndef OPENSSL_NO_DH
+    dh_pkey_method,
+#endif
+#ifndef OPENSSL_NO_DSA
+#ifndef OPENSSL_FIPS
+    dsa_pkey_method,
+#endif
+#endif
+#ifndef OPENSSL_NO_EC
+    ec_pkey_method,
+#endif
+    hmac_pkey_method,
+#ifndef OPENSSL_NO_CMAC
+    cmac_pkey_method,
+#endif
+#ifndef OPENSSL_NO_RSA
+    rsa_pss_pkey_method,
+#endif
+#ifndef OPENSSL_NO_DH
+    dhx_pkey_method,
+#endif
+#ifndef OPENSSL_NO_SCRYPT
+#ifndef OPENSSL_FIPS
+    scrypt_pkey_method,
+#endif
+#endif
+    tls1_prf_pkey_method,
+#ifndef OPENSSL_NO_EC
+#ifndef OPENSSL_FIPS
+    ecx25519_pkey_method,
+    ecx448_pkey_method,
+#endif
+#endif
+    hkdf_pkey_method,
+#ifndef OPENSSL_NO_POLY1305
+#ifndef OPENSSL_FIPS
+    poly1305_pkey_method,
+#endif
+#endif
+#ifndef OPENSSL_NO_SIPHASH
+#ifndef OPENSSL_FIPS
+    siphash_pkey_method,
+#endif
+#endif
+#ifndef OPENSSL_NO_EC
+#ifndef OPENSSL_FIPS
+    ed25519_pkey_method,
+    ed448_pkey_method,
+#endif
+#endif
+#ifndef OPENSSL_NO_SM2
+#ifndef OPENSSL_FIPS
+    sm2_pkey_method,
+#endif
+#endif
+};
+
 DECLARE_OBJ_BSEARCH_CMP_FN(const EVP_PKEY_METHOD *, pmeth_fn, pmeth_func);
 
 static int pmeth_func_cmp(const EVP_PKEY_METHOD *const *a, pmeth_fn const *b)
@@ -97,7 +160,12 @@ const EVP_PKEY_METHOD *EVP_PKEY_meth_find(int type)
         if (idx >= 0)
             return sk_EVP_PKEY_METHOD_value(app_pkey_methods, idx);
     }
-    ret = OBJ_bsearch_pmeth_func(&t, standard_methods,
+    if (FIPS_mode())
+        ret = OBJ_bsearch_pmeth_func(&t, standard_methods_fips,
+                                 sizeof(standard_methods_fips) /
+                                 sizeof(pmeth_fn));
+    else
+        ret = OBJ_bsearch_pmeth_func(&t, standard_methods,
                                  sizeof(standard_methods) /
                                  sizeof(pmeth_fn));
     if (!ret || !*ret)
@@ -343,7 +411,12 @@ int EVP_PKEY_meth_remove(const EVP_PKEY_METHOD *pmeth)
 
 size_t EVP_PKEY_meth_get_count(void)
 {
-    size_t rv = OSSL_NELEM(standard_methods);
+    size_t rv = 0;
+
+    if (FIPS_mode())
+        rv = OSSL_NELEM(standard_methods_fips);
+    else
+        rv = OSSL_NELEM(standard_methods);
 
     if (app_pkey_methods)
         rv += sk_EVP_PKEY_METHOD_num(app_pkey_methods);
@@ -352,11 +425,22 @@ size_t EVP_PKEY_meth_get_count(void)
 
 const EVP_PKEY_METHOD *EVP_PKEY_meth_get0(size_t idx)
 {
-    if (idx < OSSL_NELEM(standard_methods))
-        return (standard_methods[idx])();
+    int is_fips = FIPS_mode();
+    if (is_fips) {
+        if (idx < OSSL_NELEM(standard_methods_fips)) {
+            return (standard_methods_fips[idx])();
+        }
+    } else {
+        if (idx < OSSL_NELEM(standard_methods)) {
+            return (standard_methods[idx])();
+        }
+    }
     if (app_pkey_methods == NULL)
         return NULL;
-    idx -= OSSL_NELEM(standard_methods);
+    if (is_fips)
+        idx -= OSSL_NELEM(standard_methods_fips);
+    else
+        idx -= OSSL_NELEM(standard_methods);
     if (idx >= (size_t)sk_EVP_PKEY_METHOD_num(app_pkey_methods))
         return NULL;
     return sk_EVP_PKEY_METHOD_value(app_pkey_methods, idx);

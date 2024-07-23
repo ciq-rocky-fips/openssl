@@ -274,5 +274,7 @@ const EVP_PKEY_METHOD dsa_pkey_meth = {
 
 const EVP_PKEY_METHOD *dsa_pkey_method(void)
 {
+    if (FIPS_mode())
+        return NULL;
     return &dsa_pkey_meth;
 }

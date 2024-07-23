@@ -206,5 +206,7 @@ const EVP_PKEY_METHOD siphash_pkey_meth = {
 
 const EVP_PKEY_METHOD *siphash_pkey_method(void)
 {
+    if (FIPS_mode())
+        return NULL;
     return &siphash_pkey_meth;
 }

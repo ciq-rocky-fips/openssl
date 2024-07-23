@@ -42,6 +42,9 @@ static void sha1_block_data_order(SHA_CTX *c, const void *p, size_t num);
 void sha1_block_data_order(SHA_CTX *c, const void *p, size_t num);
 #endif
 
+/* Don't allow SHA1 in FIPS mode. */
+#define FIPS_HASH_DISABLE 1
+
 #include "crypto/md32_common.h"
 
 #define INIT_DATA_h0 0x67452301UL
@@ -52,6 +55,8 @@ void sha1_block_data_order(SHA_CTX *c, const void *p, size_t num);
 
 int HASH_INIT(SHA_CTX *c)
 {
+    if (FIPS_mode())
+        return 0;
 #if defined(OPENSSL_FIPS)
     FIPS_selftest_check();
 #endif

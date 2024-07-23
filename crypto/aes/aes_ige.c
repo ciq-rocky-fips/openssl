@@ -45,6 +45,9 @@ void AES_ige_encrypt(const unsigned char *in, unsigned char *out,
     size_t n;
     size_t len = length;
 
+    if (FIPS_mode())
+        return;
+
     if (length == 0)
         return;
 
@@ -183,6 +186,9 @@ void AES_bi_ige_encrypt(const unsigned char *in, unsigned char *out,
     unsigned char prev[AES_BLOCK_SIZE];
     const unsigned char *iv;
     const unsigned char *iv2;
+
+    if (FIPS_mode())
+        return;
 
     OPENSSL_assert(in && out && key && ivec);
     OPENSSL_assert((AES_ENCRYPT == enc) || (AES_DECRYPT == enc));

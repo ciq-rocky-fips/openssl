@@ -1804,9 +1804,11 @@ int speed_main(int argc, char **argv)
     }
 #endif
 #ifndef OPENSSL_NO_DES
-    DES_set_key_unchecked(&key, &sch);
-    DES_set_key_unchecked(&key2, &sch2);
-    DES_set_key_unchecked(&key3, &sch3);
+    if (!FIPS_mode()) {
+        DES_set_key_unchecked(&key, &sch);
+        DES_set_key_unchecked(&key2, &sch2);
+        DES_set_key_unchecked(&key3, &sch3);
+    }
 #endif
     AES_set_encrypt_key(key16, 128, &aes_ks1);
     AES_set_encrypt_key(key24, 192, &aes_ks2);
@@ -1820,37 +1822,51 @@ int speed_main(int argc, char **argv)
 #endif
 #ifndef OPENSSL_NO_IDEA
     if (doit[D_CBC_IDEA]) {
-        IDEA_set_encrypt_key(key16, &idea_ks);
+        if (!FIPS_mode()) {
+            IDEA_set_encrypt_key(key16, &idea_ks);
+        }
     }
 #endif
 #ifndef OPENSSL_NO_SEED
     if (doit[D_CBC_SEED]) {
-        SEED_set_key(key16, &seed_ks);
+        if (!FIPS_mode()) {
+            SEED_set_key(key16, &seed_ks);
+        }
     }
 #endif
 #ifndef OPENSSL_NO_RC4
    if (doit[D_RC4]) {
-        RC4_set_key(&rc4_ks, 16, key16);
+        if (!FIPS_mode()) {
+            RC4_set_key(&rc4_ks, 16, key16);
+        }
     }
 #endif
 #ifndef OPENSSL_NO_RC2
     if (doit[D_CBC_RC2]) {
-        RC2_set_key(&rc2_ks, 16, key16, 128);
+        if (!FIPS_mode()) {
+            RC2_set_key(&rc2_ks, 16, key16, 128);
+        }
     }
 #endif
 #ifndef OPENSSL_NO_RC5
     if (doit[D_CBC_RC5]) {
-        RC5_32_set_key(&rc5_ks, 16, key16, 12);
+        if (!FIPS_mode()) {
+            RC5_32_set_key(&rc5_ks, 16, key16, 12);
+        }
     }
 #endif
 #ifndef OPENSSL_NO_BF
     if (doit[D_CBC_BF]) {
-        BF_set_key(&bf_ks, 16, key16);
+        if (!FIPS_mode()) {
+            BF_set_key(&bf_ks, 16, key16);
+        }
     }
 #endif
 #ifndef OPENSSL_NO_CAST
     if (doit[D_CBC_CAST]) {
-        CAST_set_key(&cast_ks, 16, key16);
+        if (!FIPS_mode()) {
+            CAST_set_key(&cast_ks, 16, key16);
+        }
     }
 #endif
 #ifndef SIGALRM
@@ -2096,6 +2112,8 @@ int speed_main(int argc, char **argv)
 #ifndef OPENSSL_NO_MD2
     if (doit[D_MD2]) {
         for (testnum = 0; testnum < size_num; testnum++) {
+            if (EVP_md2()==NULL)
+                break;
             print_message(names[D_MD2], c[D_MD2][testnum], lengths[testnum],
                           seconds.sym);
             Time_F(START);
@@ -2108,6 +2126,8 @@ int speed_main(int argc, char **argv)
 #ifndef OPENSSL_NO_MDC2
     if (doit[D_MDC2]) {
         for (testnum = 0; testnum < size_num; testnum++) {
+            if (EVP_mdc2()==NULL)
+                break;
             print_message(names[D_MDC2], c[D_MDC2][testnum], lengths[testnum],
                           seconds.sym);
             Time_F(START);
@@ -2121,6 +2141,8 @@ int speed_main(int argc, char **argv)
 #ifndef OPENSSL_NO_MD4
     if (doit[D_MD4]) {
         for (testnum = 0; testnum < size_num; testnum++) {
+            if (EVP_md4()==NULL)
+                break;
             print_message(names[D_MD4], c[D_MD4][testnum], lengths[testnum],
                           seconds.sym);
             Time_F(START);
@@ -2134,6 +2156,8 @@ int speed_main(int argc, char **argv)
 #ifndef OPENSSL_NO_MD5
     if (doit[D_MD5]) {
         for (testnum = 0; testnum < size_num; testnum++) {
+            if (EVP_md5()==NULL)
+                break;
             print_message(names[D_MD5], c[D_MD5][testnum], lengths[testnum],
                           seconds.sym);
             Time_F(START);
@@ -2148,6 +2172,8 @@ int speed_main(int argc, char **argv)
         int len = strlen(hmac_key);
 
         for (i = 0; i < loopargs_len; i++) {
+            if (EVP_md5()==NULL)
+                break;
             loopargs[i].hctx = HMAC_CTX_new();
             HMAC_CTX_set_flags(loopargs[i].hctx, EVP_MD_CTX_FLAG_NON_FIPS_ALLOW);
             if (loopargs[i].hctx == NULL) {
@@ -2158,6 +2184,8 @@ int speed_main(int argc, char **argv)
             HMAC_Init_ex(loopargs[i].hctx, hmac_key, len, EVP_md5(), NULL);
         }
         for (testnum = 0; testnum < size_num; testnum++) {
+            if (EVP_md5()==NULL)
+                break;
             print_message(names[D_HMAC], c[D_HMAC][testnum], lengths[testnum],
                           seconds.sym);
             Time_F(START);
@@ -2166,12 +2194,16 @@ int speed_main(int argc, char **argv)
             print_result(D_HMAC, testnum, count, d);
         }
         for (i = 0; i < loopargs_len; i++) {
+            if (EVP_md5()==NULL)
+                break;
             HMAC_CTX_free(loopargs[i].hctx);
         }
     }
 #endif
     if (doit[D_SHA1]) {
         for (testnum = 0; testnum < size_num; testnum++) {
+            if (EVP_sha1()==NULL)
+                break;
             print_message(names[D_SHA1], c[D_SHA1][testnum], lengths[testnum],
                           seconds.sym);
             Time_F(START);
@@ -2203,6 +2235,8 @@ int speed_main(int argc, char **argv)
 #ifndef OPENSSL_NO_WHIRLPOOL
     if (doit[D_WHIRLPOOL]) {
         for (testnum = 0; testnum < size_num; testnum++) {
+            if (FIPS_mode())
+                break;
             print_message(names[D_WHIRLPOOL], c[D_WHIRLPOOL][testnum],
                           lengths[testnum], seconds.sym);
             Time_F(START);
@@ -2216,6 +2250,8 @@ int speed_main(int argc, char **argv)
 #ifndef OPENSSL_NO_RMD160
     if (doit[D_RMD160]) {
         for (testnum = 0; testnum < size_num; testnum++) {
+            if (EVP_ripemd160()==NULL)
+                break;
             print_message(names[D_RMD160], c[D_RMD160][testnum],
                           lengths[testnum], seconds.sym);
             Time_F(START);
@@ -2228,6 +2264,8 @@ int speed_main(int argc, char **argv)
 #ifndef OPENSSL_NO_RC4
     if (doit[D_RC4]) {
         for (testnum = 0; testnum < size_num; testnum++) {
+            if (EVP_rc4()==NULL)
+                break;
             print_message(names[D_RC4], c[D_RC4][testnum], lengths[testnum],
                           seconds.sym);
             Time_F(START);
@@ -2240,6 +2278,8 @@ int speed_main(int argc, char **argv)
 #ifndef OPENSSL_NO_DES
     if (doit[D_CBC_DES]) {
         for (testnum = 0; testnum < size_num; testnum++) {
+            if (FIPS_mode())
+                break;
             print_message(names[D_CBC_DES], c[D_CBC_DES][testnum],
                           lengths[testnum], seconds.sym);
             Time_F(START);
@@ -2251,6 +2291,8 @@ int speed_main(int argc, char **argv)
 
     if (doit[D_EDE3_DES]) {
         for (testnum = 0; testnum < size_num; testnum++) {
+            if (FIPS_mode())
+                break;
             print_message(names[D_EDE3_DES], c[D_EDE3_DES][testnum],
                           lengths[testnum], seconds.sym);
             Time_F(START);
@@ -2298,6 +2340,8 @@ int speed_main(int argc, char **argv)
 
     if (doit[D_IGE_128_AES]) {
         for (testnum = 0; testnum < size_num; testnum++) {
+            if (FIPS_mode())
+                break;
             print_message(names[D_IGE_128_AES], c[D_IGE_128_AES][testnum],
                           lengths[testnum], seconds.sym);
             Time_F(START);
@@ -2309,6 +2353,8 @@ int speed_main(int argc, char **argv)
     }
     if (doit[D_IGE_192_AES]) {
         for (testnum = 0; testnum < size_num; testnum++) {
+            if (FIPS_mode())
+                break;
             print_message(names[D_IGE_192_AES], c[D_IGE_192_AES][testnum],
                           lengths[testnum], seconds.sym);
             Time_F(START);
@@ -2320,6 +2366,8 @@ int speed_main(int argc, char **argv)
     }
     if (doit[D_IGE_256_AES]) {
         for (testnum = 0; testnum < size_num; testnum++) {
+            if (FIPS_mode())
+                break;
             print_message(names[D_IGE_256_AES], c[D_IGE_256_AES][testnum],
                           lengths[testnum], seconds.sym);
             Time_F(START);
@@ -2356,6 +2404,8 @@ int speed_main(int argc, char **argv)
             doit[D_CBC_128_CML] = 0;
         }
         for (testnum = 0; testnum < size_num && async_init == 0; testnum++) {
+            if (FIPS_mode())
+                break;
             print_message(names[D_CBC_128_CML], c[D_CBC_128_CML][testnum],
                           lengths[testnum], seconds.sym);
             Time_F(START);
@@ -2374,6 +2424,8 @@ int speed_main(int argc, char **argv)
             doit[D_CBC_192_CML] = 0;
         }
         for (testnum = 0; testnum < size_num && async_init == 0; testnum++) {
+            if (FIPS_mode())
+                break;
             print_message(names[D_CBC_192_CML], c[D_CBC_192_CML][testnum],
                           lengths[testnum], seconds.sym);
             if (async_jobs > 0) {
@@ -2396,6 +2448,8 @@ int speed_main(int argc, char **argv)
             doit[D_CBC_256_CML] = 0;
         }
         for (testnum = 0; testnum < size_num && async_init == 0; testnum++) {
+            if (FIPS_mode())
+                break;
             print_message(names[D_CBC_256_CML], c[D_CBC_256_CML][testnum],
                           lengths[testnum], seconds.sym);
             Time_F(START);
@@ -2416,6 +2470,8 @@ int speed_main(int argc, char **argv)
             doit[D_CBC_IDEA] = 0;
         }
         for (testnum = 0; testnum < size_num && async_init == 0; testnum++) {
+            if (FIPS_mode())
+                break;
             print_message(names[D_CBC_IDEA], c[D_CBC_IDEA][testnum],
                           lengths[testnum], seconds.sym);
             Time_F(START);
@@ -2436,6 +2492,8 @@ int speed_main(int argc, char **argv)
             doit[D_CBC_SEED] = 0;
         }
         for (testnum = 0; testnum < size_num && async_init == 0; testnum++) {
+            if (FIPS_mode())
+                break;
             print_message(names[D_CBC_SEED], c[D_CBC_SEED][testnum],
                           lengths[testnum], seconds.sym);
             Time_F(START);
@@ -2455,6 +2513,8 @@ int speed_main(int argc, char **argv)
             doit[D_CBC_RC2] = 0;
         }
         for (testnum = 0; testnum < size_num && async_init == 0; testnum++) {
+            if (FIPS_mode())
+                break;
             print_message(names[D_CBC_RC2], c[D_CBC_RC2][testnum],
                           lengths[testnum], seconds.sym);
             if (async_jobs > 0) {
@@ -2479,6 +2539,8 @@ int speed_main(int argc, char **argv)
             doit[D_CBC_RC5] = 0;
         }
         for (testnum = 0; testnum < size_num && async_init == 0; testnum++) {
+            if (FIPS_mode())
+                break;
             print_message(names[D_CBC_RC5], c[D_CBC_RC5][testnum],
                           lengths[testnum], seconds.sym);
             if (async_jobs > 0) {
@@ -2503,6 +2565,8 @@ int speed_main(int argc, char **argv)
             doit[D_CBC_BF] = 0;
         }
         for (testnum = 0; testnum < size_num && async_init == 0; testnum++) {
+            if (FIPS_mode())
+                break;
             print_message(names[D_CBC_BF], c[D_CBC_BF][testnum],
                           lengths[testnum], seconds.sym);
             Time_F(START);
@@ -2523,6 +2587,8 @@ int speed_main(int argc, char **argv)
             doit[D_CBC_CAST] = 0;
         }
         for (testnum = 0; testnum < size_num && async_init == 0; testnum++) {
+            if (FIPS_mode())
+                break;
             print_message(names[D_CBC_CAST], c[D_CBC_CAST][testnum],
                           lengths[testnum], seconds.sym);
             Time_F(START);
@@ -2727,6 +2793,8 @@ int speed_main(int argc, char **argv)
 #ifndef OPENSSL_NO_DSA
     for (testnum = 0; testnum < DSA_NUM; testnum++) {
         int st = 0;
+        if (FIPS_mode())
+            break;
         if (!dsa_doit[testnum])
             continue;
 
@@ -3183,7 +3251,16 @@ int speed_main(int argc, char **argv)
     }
 
     for (k = 0; k < ALGOR_NUM; k++) {
+        int allzeros = 1;
         if (!doit[k])
+            continue;
+        for (testnum = 0; testnum < size_num; testnum++) {
+            if (results[k][testnum] != 0) {
+                allzeros = 0;
+                break;
+            }
+        }
+        if (allzeros)
             continue;
         if (mr)
             printf("+F:%u:%s", k, names[k]);
@@ -3218,6 +3295,8 @@ int speed_main(int argc, char **argv)
 #ifndef OPENSSL_NO_DSA
     testnum = 1;
     for (k = 0; k < DSA_NUM; k++) {
+        if (FIPS_mode())
+            break;
         if (!dsa_doit[k])
             continue;
         if (testnum && !mr) {

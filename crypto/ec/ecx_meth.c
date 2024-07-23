@@ -8,6 +8,14 @@
  */
 
 #include <stdio.h>
+
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include "internal/cryptlib.h"
 #include <openssl/x509.h>
 #include <openssl/ec.h>
@@ -1465,6 +1473,10 @@ static const EVP_PKEY_METHOD ed448_s390x_pkey_meth = {
 
 const EVP_PKEY_METHOD *ecx25519_pkey_method(void)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return NULL;
+    }
 #ifdef S390X_EC_ASM
     if (OPENSSL_s390xcap_P.pcc[1] & S390X_CAPBIT(S390X_SCALAR_MULTIPLY_X25519))
         return &ecx25519_s390x_pkey_meth;
@@ -1474,6 +1486,10 @@ const EVP_PKEY_METHOD *ecx25519_pkey_method(void)
 
 const EVP_PKEY_METHOD *ecx448_pkey_method(void)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return NULL;
+    }
 #ifdef S390X_EC_ASM
     if (OPENSSL_s390xcap_P.pcc[1] & S390X_CAPBIT(S390X_SCALAR_MULTIPLY_X448))
         return &ecx448_s390x_pkey_meth;
@@ -1483,6 +1499,10 @@ const EVP_PKEY_METHOD *ecx448_pkey_method(void)
 
 const EVP_PKEY_METHOD *ed25519_pkey_method(void)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return NULL;
+    }
 #ifdef S390X_EC_ASM
     if (OPENSSL_s390xcap_P.pcc[1] & S390X_CAPBIT(S390X_SCALAR_MULTIPLY_ED25519)
         && OPENSSL_s390xcap_P.kdsa[0] & S390X_CAPBIT(S390X_EDDSA_SIGN_ED25519)
@@ -1495,6 +1515,10 @@ const EVP_PKEY_METHOD *ed25519_pkey_method(void)
 
 const EVP_PKEY_METHOD *ed448_pkey_method(void)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return NULL;
+    }
 #ifdef S390X_EC_ASM
     if (OPENSSL_s390xcap_P.pcc[1] & S390X_CAPBIT(S390X_SCALAR_MULTIPLY_ED448)
         && OPENSSL_s390xcap_P.kdsa[0] & S390X_CAPBIT(S390X_EDDSA_SIGN_ED448)

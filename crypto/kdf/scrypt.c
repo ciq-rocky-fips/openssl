@@ -10,6 +10,14 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include <openssl/hmac.h>
 #include <openssl/kdf.h>
 #include <openssl/evp.h>
@@ -506,6 +514,10 @@ static int scrypt_alg(const char *pass, size_t passlen,
 
 const EVP_PKEY_METHOD *scrypt_pkey_method(void)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return NULL;
+    }
     return &scrypt_pkey_meth;
 }
 

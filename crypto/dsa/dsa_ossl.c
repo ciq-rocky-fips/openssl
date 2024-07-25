@@ -340,7 +340,7 @@ static int dsa_do_verify(const unsigned char *dgst, int dgst_len,
 #ifdef OPENSSL_FIPS
     if (FIPS_mode()) {
         FIPSerr(FIPS_F_DSA_DO_VERIFY, DSA_R_NON_FIPS_DSA_METHOD);
-        return NULL;
+        return -1;
     }
 
     if (FIPS_selftest_failed()) {

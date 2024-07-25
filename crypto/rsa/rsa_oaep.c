@@ -30,14 +30,6 @@
 #include <openssl/sha.h>
 #include "rsa_local.h"
 
-int RSA_padding_add_PKCS1_OAEP(unsigned char *to, int tlen,
-                               const unsigned char *from, int flen,
-                               const unsigned char *param, int plen)
-{
-    return ossl_rsa_padding_add_PKCS1_OAEP_mgf1_ex(to, tlen, from, flen,
-                                                   param, plen, NULL, NULL);
-}
-
 /*
  * Perform the padding as per NIST 800-56B 7.2.2.3
  *      from (K) is the key material.
@@ -128,6 +120,15 @@ int ossl_rsa_padding_add_PKCS1_OAEP_mgf1_ex(unsigned char *to, int tlen,
     OPENSSL_clear_free(dbmask, dbmask_len);
     return rv;
 }
+
+int RSA_padding_add_PKCS1_OAEP(unsigned char *to, int tlen,
+                               const unsigned char *from, int flen,
+                               const unsigned char *param, int plen)
+{
+    return ossl_rsa_padding_add_PKCS1_OAEP_mgf1_ex(to, tlen, from, flen,
+                                                   param, plen, NULL, NULL);
+}
+
 
 int RSA_padding_add_PKCS1_OAEP_mgf1(unsigned char *to, int tlen,
                                     const unsigned char *from, int flen,

@@ -16,6 +16,8 @@
 #include <openssl/evp.h>
 #include <openssl/kdf.h>
 
+#include "crypto/fips/fips_locl.h"
+
 #ifdef OPENSSL_FIPS
 
 static int FIPS_selftest_tls13(void)
@@ -395,6 +397,7 @@ err:
     return ret;
 }
 
+#if 0
 static int FIPS_selftest_krb5kdf(void)
 {
     int ret = 0;
@@ -435,7 +438,9 @@ err:
     EVP_KDF_CTX_free(kctx);
     return ret;
 }
+#endif
 
+#if 0
 static int FIPS_selftest_sskdf(void)
 {
     int ret = 0;
@@ -483,6 +488,7 @@ err:
     EVP_KDF_CTX_free(kctx);
     return ret;
 }
+#endif
 
 int FIPS_selftest_kdf(void)
 {

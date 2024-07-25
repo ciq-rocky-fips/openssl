@@ -34,7 +34,7 @@ int DSA_generate_parameters_ex(DSA *ret, int bits,
 # ifdef OPENSSL_FIPS
     if (FIPS_mode()) {
         DSAerr(DSA_F_DSA_GENERATE_PARAMETERS_EX, DSA_R_NON_FIPS_DSA_METHOD);
-        return NULL;
+        return 0;
     }
 
     if (FIPS_mode() && !(ret->meth->flags & DSA_FLAG_FIPS_METHOD)
@@ -662,7 +662,7 @@ int FIPS_dsa_builtin_paramgen2(DSA *ret, size_t L, size_t N,
 {
     if (FIPS_mode()) {
         DSAerr(DSA_F_DSA_BUILTIN_PARAMGEN2, DSA_R_NON_FIPS_DSA_METHOD);
-        return NULL;
+        return 0;
     }
     return dsa_builtin_paramgen2(ret, L, N, evpmd, seed_in, seed_len,
         idx, seed_out, counter_ret, h_ret, cb);

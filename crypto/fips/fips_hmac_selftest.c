@@ -53,6 +53,7 @@
 # include <openssl/fips.h>
 #endif
 #include <openssl/hmac.h>
+#include "crypto/fips/fips_locl.h"
 
 #ifdef OPENSSL_FIPS
 typedef struct {

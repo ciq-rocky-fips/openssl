@@ -15,6 +15,7 @@
 #include <openssl/err.h>
 #include <openssl/engine.h>
 #include "crypto/bn.h"
+#include "crypto/fips/fips_locl.h"
 
 EC_KEY *EC_KEY_new(void)
 {
@@ -347,7 +348,7 @@ int ec_key_simple_check_key(const EC_KEY *eckey)
     const BIGNUM *order = NULL;
     EC_POINT *point = NULL;
 
-    if (!fips_post_started(FIPS_TEST_PAIRWISE, EVP_PKEY_EC, eckey))
+    if (!fips_post_started(FIPS_TEST_PAIRWISE, EVP_PKEY_EC, (void *)eckey))
 		return 1;
 
     if (eckey == NULL || eckey->group == NULL || eckey->pub_key == NULL) {
@@ -372,7 +373,7 @@ int ec_key_simple_check_key(const EC_KEY *eckey)
     }
     /* testing whether pub_key * order is the point at infinity */
     order = eckey->group->order;
-    if (!fips_post_corrupt(FIPS_TEST_PAIRWISE, -1, eckey)){
+    if (!fips_post_corrupt(FIPS_TEST_PAIRWISE, -1, (void *)eckey)){
         BN_zero_ex(order);
     }
     if (BN_is_zero(order)) {
@@ -411,10 +412,10 @@ int ec_key_simple_check_key(const EC_KEY *eckey)
     BN_CTX_free(ctx);
     EC_POINT_free(point);
     if (!ok) {
-        fips_post_failed(FIPS_TEST_PAIRWISE, EVP_PKEY_EC, eckey);
+        fips_post_failed(FIPS_TEST_PAIRWISE, EVP_PKEY_EC, (void *)eckey);
         return ok;
     }
-    return fips_post_success(FIPS_TEST_PAIRWISE, EVP_PKEY_EC, eckey);
+    return fips_post_success(FIPS_TEST_PAIRWISE, EVP_PKEY_EC, (void *)eckey);
 }
 
 int EC_KEY_set_public_key_affine_coordinates(EC_KEY *key, BIGNUM *x,

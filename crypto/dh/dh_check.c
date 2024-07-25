@@ -13,6 +13,7 @@
 #include <openssl/obj_mac.h>
 #include "dh_local.h"
 #include "openssl/fips.h"
+#include "crypto/fips/fips_locl.h"
 
 # define DH_NUMBER_ITERATIONS_FOR_PRIME 64
 
@@ -254,7 +255,7 @@ int dh_check_pairwise(const DH *dh)
     BN_CTX *ctx = NULL;
     BIGNUM *pub_key = NULL;
 
-    if (!fips_post_started(FIPS_TEST_PAIRWISE, EVP_PKEY_DH, dh))
+    if (!fips_post_started(FIPS_TEST_PAIRWISE, EVP_PKEY_DH, (void *)dh))
         return 1;
 
     if (dh->p == NULL
@@ -274,7 +275,7 @@ int dh_check_pairwise(const DH *dh)
     if (!dh_generate_public_key(ctx, dh, dh->priv_key, pub_key))
         goto err;
     
-    if (!fips_post_corrupt(FIPS_TEST_PAIRWISE, EVP_PKEY_DH, dh)) {
+    if (!fips_post_corrupt(FIPS_TEST_PAIRWISE, EVP_PKEY_DH, (void *)dh)) {
 		BN_clear(pub_key);
 	}
 
@@ -284,9 +285,9 @@ err:
     BN_free(pub_key);
     BN_CTX_free(ctx);
     if (ret <= 0) {
-        fips_post_failed(FIPS_TEST_PAIRWISE, EVP_PKEY_DH, dh);
+        fips_post_failed(FIPS_TEST_PAIRWISE, EVP_PKEY_DH, (void *)dh);
         return 0;
     }
-    return fips_post_success(FIPS_TEST_PAIRWISE, EVP_PKEY_DH, dh);
+    return fips_post_success(FIPS_TEST_PAIRWISE, EVP_PKEY_DH, (void *)dh);
 }
 

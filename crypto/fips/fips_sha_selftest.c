@@ -55,6 +55,8 @@
 #include <openssl/evp.h>
 #include <openssl/sha.h>
 
+#include "crypto/fips/fips_locl.h"
+
 #ifdef OPENSSL_FIPS
 static const char test[][60] = {
     "",

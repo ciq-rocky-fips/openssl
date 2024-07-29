@@ -31,6 +31,7 @@
 int MD4_Init(MD4_CTX *c)
 {
     if (FIPS_mode()) {
+        memset(c, 0, sizeof(*c));
         FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
         return 0;
     }

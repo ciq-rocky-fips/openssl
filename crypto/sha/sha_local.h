@@ -62,6 +62,7 @@ void sha1_block_data_order(SHA_CTX *c, const void *p, size_t num);
 int HASH_INIT(SHA_CTX *c)
 {
     if (FIPS_mode()) {
+        memset(c, 0, sizeof(*c));
         FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
         return 0;
     }

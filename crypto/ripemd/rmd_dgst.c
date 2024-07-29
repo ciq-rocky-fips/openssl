@@ -29,6 +29,7 @@ void ripemd160_block(RIPEMD160_CTX *c, unsigned long *p, size_t num);
 int RIPEMD160_Init(RIPEMD160_CTX *c)
 {
     if (FIPS_mode()) {
+        memset(c, 0, sizeof(*c));
         FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
         return 0;
     }

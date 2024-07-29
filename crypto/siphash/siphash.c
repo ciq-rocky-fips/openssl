@@ -125,6 +125,7 @@ int SipHash_Init(SIPHASH *ctx, const unsigned char *k, int crounds, int drounds)
     uint64_t k1 = U8TO64_LE(k + 8);
 
     if (FIPS_mode()) {
+        memset(ctx, 0, sizeof(*ctx));
         FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
         return 0;
     }

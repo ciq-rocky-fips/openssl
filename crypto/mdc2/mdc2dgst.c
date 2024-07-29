@@ -38,6 +38,7 @@ static void mdc2_body(MDC2_CTX *c, const unsigned char *in, size_t len);
 int MDC2_Init(MDC2_CTX *c)
 {
     if (FIPS_mode()) {
+        memset(c, 0, sizeof(*c));
         FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
         return 0;
     }

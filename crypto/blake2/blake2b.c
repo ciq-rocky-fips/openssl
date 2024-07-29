@@ -90,6 +90,7 @@ static void blake2b_init_param(BLAKE2B_CTX *S, const BLAKE2B_PARAM *P)
 int BLAKE2b_Init(BLAKE2B_CTX *c)
 {
     if (FIPS_mode()) {
+        memset(c, 0, sizeof(*c));
         FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
         return 0;
     }

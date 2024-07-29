@@ -88,6 +88,7 @@ int BLAKE2s_Init(BLAKE2S_CTX *c)
     BLAKE2S_PARAM P[1];
 
     if (FIPS_mode()) {
+        memset(c, 0, sizeof(*c));
         FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
         return 0;
     }

@@ -16,6 +16,14 @@
 
 #include <assert.h>
 #include <string.h>
+
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include <openssl/crypto.h>
 
 #include "blake2_local.h"
@@ -78,6 +86,12 @@ static void blake2s_init_param(BLAKE2S_CTX *S, const BLAKE2S_PARAM *P)
 int BLAKE2s_Init(BLAKE2S_CTX *c)
 {
     BLAKE2S_PARAM P[1];
+
+    if (FIPS_mode()) {
+        memset(c, 0, sizeof(*c));
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return 0;
+    }
 
     P->digest_length = BLAKE2S_DIGEST_LENGTH;
     P->key_length    = 0;
@@ -201,6 +215,12 @@ int BLAKE2s_Update(BLAKE2S_CTX *c, const void *data, size_t datalen)
     const uint8_t *in = data;
     size_t fill;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return 0;
+    }
+
     /*
      * Intuitively one would expect intermediate buffer, c->buf, to
      * store incomplete blocks. But in this case we are interested to
@@ -247,6 +267,12 @@ int BLAKE2s_Update(BLAKE2S_CTX *c, const void *data, size_t datalen)
 int BLAKE2s_Final(unsigned char *md, BLAKE2S_CTX *c)
 {
     int i;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return 0;
+    }
 
     blake2s_set_lastblock(c);
     /* Padding */

@@ -25,6 +25,14 @@
 
 #include <stdlib.h>
 #include <string.h>
+
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include <openssl/crypto.h>
 
 #include "crypto/siphash.h"
@@ -116,6 +124,12 @@ int SipHash_Init(SIPHASH *ctx, const unsigned char *k, int crounds, int drounds)
     uint64_t k0 = U8TO64_LE(k);
     uint64_t k1 = U8TO64_LE(k + 8);
 
+    if (FIPS_mode()) {
+        memset(ctx, 0, sizeof(*ctx));
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return 0;
+    }
+
     /* If the hash size wasn't set, i.e. is zero */
     ctx->hash_size = siphash_adjust_hash_size(ctx->hash_size);
 
@@ -151,6 +165,12 @@ void SipHash_Update(SIPHASH *ctx, const unsigned char *in, size_t inlen)
     uint64_t v1 = ctx->v1;
     uint64_t v2 = ctx->v2;
     uint64_t v3 = ctx->v3;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
 
     ctx->total_inlen += inlen;
 
@@ -208,6 +228,12 @@ int SipHash_Final(SIPHASH *ctx, unsigned char *out, size_t outlen)
     uint64_t v1 = ctx->v1;
     uint64_t v2 = ctx->v2;
     uint64_t v3 = ctx->v3;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return 0;
+    }
 
     if (outlen != (size_t)ctx->hash_size)
         return 0;

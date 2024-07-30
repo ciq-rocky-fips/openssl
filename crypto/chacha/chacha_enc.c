@@ -11,6 +11,13 @@
 
 #include <string.h>
 
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include "crypto/chacha.h"
 #include "crypto/ctype.h"
 
@@ -77,6 +84,12 @@ void ChaCha20_ctr32(unsigned char *out, const unsigned char *inp,
     u32 input[16];
     chacha_buf buf;
     size_t todo, i;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
 
     /* sigma constant "expand 32-byte k" in little-endian encoding */
     input[0] = ((u32)ossl_toascii('e')) | ((u32)ossl_toascii('x') << 8)

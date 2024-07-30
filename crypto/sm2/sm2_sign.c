@@ -9,6 +9,13 @@
  * https://www.openssl.org/source/license.html
  */
 
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include "crypto/sm2.h"
 #include "crypto/sm2err.h"
 #include "crypto/ec.h" /* ec_group_do_inverse_ord() */
@@ -45,6 +52,12 @@ int sm2_compute_z_digest(uint8_t *out,
     ctx = BN_CTX_new();
     if (hash == NULL || ctx == NULL) {
         SM2err(SM2_F_SM2_COMPUTE_Z_DIGEST, ERR_R_MALLOC_FAILURE);
+        goto done;
+    }
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
         goto done;
     }
 
@@ -370,6 +383,12 @@ ECDSA_SIG *sm2_do_sign(const EC_KEY *key,
     BIGNUM *e = NULL;
     ECDSA_SIG *sig = NULL;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        goto done;
+    }
+
     e = sm2_compute_msg_hash(digest, key, id, id_len, msg, msg_len);
     if (e == NULL) {
         /* SM2err already called */
@@ -393,6 +412,12 @@ int sm2_do_verify(const EC_KEY *key,
     BIGNUM *e = NULL;
     int ret = 0;
 
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        goto done;
+    }
+
     e = sm2_compute_msg_hash(digest, key, id, id_len, msg, msg_len);
     if (e == NULL) {
         /* SM2err already called */
@@ -413,6 +438,12 @@ int sm2_sign(const unsigned char *dgst, int dgstlen,
     ECDSA_SIG *s = NULL;
     int sigleni;
     int ret = -1;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        goto done;
+    }
 
     e = BN_bin2bn(dgst, dgstlen, NULL);
     if (e == NULL) {
@@ -446,6 +477,12 @@ int sm2_verify(const unsigned char *dgst, int dgstlen,
     unsigned char *der = NULL;
     int derlen = -1;
     int ret = -1;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        goto done;
+    }
 
     s = ECDSA_SIG_new();
     if (s == NULL) {

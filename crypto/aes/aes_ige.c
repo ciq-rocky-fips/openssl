@@ -7,6 +7,13 @@
  * https://www.openssl.org/source/license.html
  */
 
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include "internal/cryptlib.h"
 
 #include <openssl/aes.h>
@@ -44,6 +51,12 @@ void AES_ige_encrypt(const unsigned char *in, unsigned char *out,
 {
     size_t n;
     size_t len = length;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
 
     if (length == 0)
         return;
@@ -183,6 +196,12 @@ void AES_bi_ige_encrypt(const unsigned char *in, unsigned char *out,
     unsigned char prev[AES_BLOCK_SIZE];
     const unsigned char *iv;
     const unsigned char *iv2;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
 
     OPENSSL_assert(in && out && key && ivec);
     OPENSSL_assert((AES_ENCRYPT == enc) || (AES_DECRYPT == enc));

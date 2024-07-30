@@ -10,6 +10,7 @@
 
 #include "internal/cryptlib.h"
 #ifndef OPENSSL_NO_ARIA
+#define FIPS_CIPHER_DISABLE 1
 # include <openssl/evp.h>
 # include <openssl/modes.h>
 # include <openssl/rand.h>

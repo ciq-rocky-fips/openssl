@@ -7,6 +7,13 @@
  * https://www.openssl.org/source/license.html
  */
 
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include <openssl/rc4.h>
 #include "rc4_local.h"
 
@@ -24,6 +31,12 @@ void RC4(RC4_KEY *key, size_t len, const unsigned char *indata,
     register RC4_INT *d;
     register RC4_INT x, y, tx, ty;
     size_t i;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return;
+    }
 
     x = key->x;
     y = key->y;

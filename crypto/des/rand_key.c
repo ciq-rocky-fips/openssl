@@ -7,11 +7,23 @@
  * https://www.openssl.org/source/license.html
  */
 
+#include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include <openssl/des.h>
 #include <openssl/rand.h>
 
 int DES_random_key(DES_cblock *ret)
 {
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return 0;
+    }
+
     do {
         if (RAND_priv_bytes((unsigned char *)ret, sizeof(DES_cblock)) != 1)
             return 0;

@@ -10,6 +10,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+# include "openssl/opensslconf.h"
+
+#ifdef OPENSSL_FIPS
+# include "openssl/fips.h"
+# include "openssl/err.h"
+#endif
+
 #include <openssl/crypto.h>
 #include <openssl/des.h>
 #include <openssl/mdc2.h>
@@ -29,6 +37,12 @@
 static void mdc2_body(MDC2_CTX *c, const unsigned char *in, size_t len);
 int MDC2_Init(MDC2_CTX *c)
 {
+    if (FIPS_mode()) {
+        memset(c, 0, sizeof(*c));
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        return 0;
+    }
+
     c->num = 0;
     c->pad_type = 1;
     memset(&(c->h[0]), 0x52, MDC2_BLOCK);
@@ -39,6 +53,12 @@ int MDC2_Init(MDC2_CTX *c)
 int MDC2_Update(MDC2_CTX *c, const unsigned char *in, size_t len)
 {
     size_t i, j;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return 0;
+    }
 
     i = c->num;
     if (i != 0) {
@@ -111,6 +131,12 @@ int MDC2_Final(unsigned char *md, MDC2_CTX *c)
 {
     unsigned int i;
     int j;
+
+    if (FIPS_mode()) {
+        FIPSerr(ERR_LIB_FIPS, FIPS_R_NON_FIPS_METHOD);
+        OpenSSLDie(__FILE__, __LINE__, "FATAL FIPS Unapproved algorithm called");
+        return 0;
+    }
 
     i = c->num;
     j = c->pad_type;

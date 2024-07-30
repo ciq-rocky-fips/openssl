@@ -62,14 +62,6 @@ typedef struct {
 } HMAC_KAT;
 
 static const HMAC_KAT vector[] = {
-    {EVP_sha1,
-     /* from http://csrc.nist.gov/publications/fips/fips198/fips-198a.pdf */
-     "0123456789:;<=>?@ABC",
-     "Sample #2",
-     {0x09, 0x22, 0xd3, 0x40, 0x5f, 0xaa, 0x3d, 0x19,
-      0x4f, 0x82, 0xa4, 0x58, 0x30, 0x73, 0x7d, 0x5c,
-      0xc6, 0xc7, 0x5d, 0x24}
-     },
     {EVP_sha224,
      /* just keep extending the above... */
      "0123456789:;<=>?@ABC",

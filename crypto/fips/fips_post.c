@@ -171,8 +171,6 @@ int FIPS_selftest(void)
         ERR_add_error_data(2, "Type=", "rand_drbg_selftest");
         rv = 0;
     }
-    if (!FIPS_selftest_sha1())
-        rv = 0;
     if (!FIPS_selftest_sha2())
         rv = 0;
     if (!FIPS_selftest_sha3())

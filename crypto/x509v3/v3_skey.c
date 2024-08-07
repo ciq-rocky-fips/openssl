@@ -90,8 +90,18 @@ static ASN1_OCTET_STRING *s2i_skey_id(X509V3_EXT_METHOD *method,
 
     X509_PUBKEY_get0_param(NULL, &pk, &pklen, NULL, pubkey);
 
-    if (!EVP_Digest(pk, pklen, pkey_dig, &diglen, EVP_sha1(), NULL))
-        goto err;
+    if (FIPS_mode()) {
+        /* This uses https://datatracker.ietf.org/doc/html/rfc7093#section-2
+         * the SHA512 hash truncated to 20 bytes (the size of a SHA1 hash). */
+        if (!EVP_Digest(pk, pklen, pkey_dig, &diglen, EVP_sha512(), NULL))
+            goto err;
+        diglen = 20;
+    } else {
+        /* This uses https://www.rfc-editor.org/rfc/rfc3280#section-4.2.1.2
+         * section 1 - the SHA1 hash (20 bytes). */
+        if (!EVP_Digest(pk, pklen, pkey_dig, &diglen, EVP_sha1(), NULL))
+            goto err;
+    }
 
     if (!ASN1_OCTET_STRING_set(oct, pkey_dig, diglen)) {
         X509V3err(X509V3_F_S2I_SKEY_ID, ERR_R_MALLOC_FAILURE);

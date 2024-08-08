@@ -38,6 +38,7 @@ unsigned long X509_issuer_and_serial_hash(X509 *a)
 
     if (ctx == NULL)
         goto err;
+    EVP_MD_CTX_set_flags(ctx, EVP_MD_CTX_FLAG_NON_FIPS_ALLOW);
     f = X509_NAME_oneline(a->cert_info.issuer, NULL, 0);
     if (f == NULL)
         goto err;

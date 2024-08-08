@@ -151,8 +151,15 @@ int main(int argc, char *argv[])
     CRYPTO_mem_ctrl(CRYPTO_MEM_CHECK_ON);
 
     if (getenv("OPENSSL_FIPS")) {
+#ifdef OPENSSL_FIPS
+        if (!FIPS_mode_set(1)) {
+            ERR_print_errors(bio_err);
+            return 1;
+        }
+#else
         BIO_printf(bio_err, "FIPS mode not supported.\n");
         return 1;
+#endif
     }
 
     if (!apps_startup()) {

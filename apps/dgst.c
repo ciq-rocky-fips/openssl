@@ -104,6 +104,10 @@ int dgst_main(int argc, char **argv)
     prog = opt_progname(argv[0]);
     buf = app_malloc(BUFSIZE, "I/O buffer");
     md = EVP_get_digestbyname(prog);
+    if (md == NULL && strcmp(prog, "dgst") != 0) {
+        BIO_printf(bio_err, "%s is not a known digest\n", prog);
+        goto end;
+    }
 
     prog = opt_init(argc, argv, dgst_options);
     while ((o = opt_next()) != OPT_EOF) {

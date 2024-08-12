@@ -442,6 +442,8 @@ static int pkey_dh_derive(EVP_PKEY_CTX *ctx, unsigned char *key,
         if (ret < 0)
             return ret;
         *keylen = ret;
+        fips_sli_check_key_dh_EVP_PKEY_CTX(ctx, ctx->peerkey->pkey.dh);
+        fips_sli_check_key_dh_EVP_PKEY_CTX(ctx, dh);
         return 1;
     }
 #ifndef OPENSSL_NO_CMS
@@ -469,6 +471,8 @@ static int pkey_dh_derive(EVP_PKEY_CTX *ctx, unsigned char *key,
                           dctx->kdf_ukm, dctx->kdf_ukmlen, dctx->kdf_md))
             goto err;
         *keylen = dctx->kdf_outlen;
+        fips_sli_check_key_dh_EVP_PKEY_CTX(ctx, ctx->peerkey->pkey.dh);
+        fips_sli_check_key_dh_EVP_PKEY_CTX(ctx, dh);
         ret = 1;
  err:
         OPENSSL_clear_free(Z, Zlen);

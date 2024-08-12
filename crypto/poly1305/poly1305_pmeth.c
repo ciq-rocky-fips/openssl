@@ -108,8 +108,10 @@ static int poly1305_signctx(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *sigle
     POLY1305_PKEY_CTX *pctx = ctx->data;
 
     *siglen = POLY1305_DIGEST_SIZE;
-    if (sig != NULL)
+    if (sig != NULL) {
         Poly1305_Final(&pctx->ctx, sig);
+        fips_sli_disapprove_EVP_PKEY_CTX(ctx); // Poly1305 isn't an approved MAC
+    }
     return 1;
 }
 

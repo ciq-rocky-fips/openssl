@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include "internal/cryptlib.h"
+#include "internal/fips_sli_local.h"
 #include <openssl/rand.h>
 #include <openssl/rsa.h>
 #include <openssl/evp.h>
@@ -44,6 +45,8 @@ int EVP_SealInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type,
         ekl[i] =
             EVP_PKEY_encrypt_old(ek[i], key, EVP_CIPHER_CTX_key_length(ctx),
                                  pubk[i]);
+        // EVP_PKEY_encrypt_old always uses RSA encryption
+        fips_sli_disapprove_EVP_CIPHER_CTX(ctx);
         if (ekl[i] <= 0) {
             rv = -1;
             goto err;

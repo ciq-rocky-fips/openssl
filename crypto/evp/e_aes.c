@@ -4284,3 +4284,73 @@ BLOCK_CIPHER_custom(NID_aes, 192, 16, 12, ocb, OCB,
 BLOCK_CIPHER_custom(NID_aes, 256, 16, 12, ocb, OCB,
                     EVP_CIPH_FLAG_AEAD_CIPHER | CUSTOM_FLAGS)
 #endif                         /* OPENSSL_NO_OCB */
+
+/* Use an explicit whitelist here (due to the number of ciphers and modes) */
+FIPS_STATUS EVP_CIPHER_get_fips_status(const EVP_CIPHER *cipher) {
+    /* switch on pointers is not entirely portable */
+    if (cipher->do_cipher == aes_cbc_cipher
+            || cipher->do_cipher == aes_ecb_cipher
+            || cipher->do_cipher == aes_xts_cipher
+            || cipher->do_cipher == aes_ofb_cipher
+            || cipher->do_cipher == aes_cfb_cipher
+            || cipher->do_cipher == aes_cfb1_cipher
+            || cipher->do_cipher == aes_cfb8_cipher
+            || cipher->do_cipher == aes_ctr_cipher
+            || cipher->do_cipher == aes_gcm_cipher
+            || cipher->do_cipher == aes_gcm_tls_cipher
+            || cipher->do_cipher == aes_ccm_cipher
+            #if defined(OPENSSL_CPUID_OBJ) && ( \
+                    ((defined(__i386) || defined(__i386__) || defined(_M_IX86))\
+                    && defined(OPENSSL_IA32_SSE2)) \
+                || defined(__x86_64) || defined(__x86_64__) \
+                || defined(_M_AMD64) || defined(_M_X64))
+            || cipher->do_cipher == aesni_cbc_cipher /* AES-NI */
+            || cipher->do_cipher == aesni_ecb_cipher
+            || cipher->do_cipher == aesni_xts_cipher
+            || cipher->do_cipher == aesni_ofb_cipher
+            || cipher->do_cipher == aesni_cfb_cipher
+            || cipher->do_cipher == aesni_cfb1_cipher
+            || cipher->do_cipher == aesni_cfb8_cipher
+            || cipher->do_cipher == aesni_ctr_cipher
+            || cipher->do_cipher == aesni_gcm_cipher
+            || cipher->do_cipher == aesni_ccm_cipher
+            #elif defined(OPENSSL_CPUID_OBJ) && defined(__s390__)
+            || cipher->do_cipher == s390x_aes_cbc_cipher /* System/390 */
+            || cipher->do_cipher == s390x_aes_ecb_cipher
+            || cipher->do_cipher == s390x_aes_xts_cipher
+            || cipher->do_cipher == s390x_aes_ofb_cipher
+            || cipher->do_cipher == s390x_aes_cfb_cipher
+            || cipher->do_cipher == s390x_aes_cfb1_cipher
+            || cipher->do_cipher == s390x_aes_cfb8_cipher
+            || cipher->do_cipher == s390x_aes_ctr_cipher
+            || cipher->do_cipher == s390x_aes_gcm_cipher
+            || cipher->do_cipher == s390x_aes_gcm_tls_cipher
+            || cipher->do_cipher == s390x_aes_ccm_cipher
+            #endif
+            || cipher->do_cipher == aes_wrap_cipher /* key wrapping */
+       ) {
+        switch (EVP_CIPHER_key_length(cipher) * 8) {
+        case 128:
+        case 192:
+            if (cipher->do_cipher == aes_xts_cipher
+                #if defined(OPENSSL_CPUID_OBJ) && ( \
+                        ((defined(__i386) || defined(__i386__) || defined(_M_IX86))\
+                        && defined(OPENSSL_IA32_SSE2)) \
+                    || defined(__x86_64) || defined(__x86_64__) \
+                    || defined(_M_AMD64) || defined(_M_X64))
+                || cipher->do_cipher == aesni_xts_cipher
+                #elif defined(OPENSSL_CPUID_OBJ) && defined(__s390__)
+                || cipher->do_cipher == s390x_aes_xts_cipher
+                #endif
+            )
+                return FIPS_NONAPPROVED;
+            /* intended fall-through */
+        case 256:
+            return FIPS_APPROVED;
+        }
+    }
+    /* disapproved for enc and dec: all others, including
+     * 3DES and AES modes
+     * aes_ocb_cipher */
+    return FIPS_NONAPPROVED;
+}

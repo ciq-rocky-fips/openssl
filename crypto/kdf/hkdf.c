@@ -223,6 +223,11 @@ static int kdf_hkdf_derive(EVP_KDF_IMPL *impl, unsigned char *key,
     }
 }
 
+static int kdf_hkdf_fips_sli_is_approved(ossl_unused const EVP_KDF_IMPL *impl) {
+    return 0; /* can't check whether this is only used for DH / TLS1.3 because
+    this is handled by the application. Thus label HKDF as non-approved. */
+}
+
 const EVP_KDF_METHOD hkdf_kdf_meth = {
     EVP_KDF_HKDF,
     kdf_hkdf_new,
@@ -231,7 +236,8 @@ const EVP_KDF_METHOD hkdf_kdf_meth = {
     kdf_hkdf_ctrl,
     kdf_hkdf_ctrl_str,
     kdf_hkdf_size,
-    kdf_hkdf_derive
+    kdf_hkdf_derive,
+    kdf_hkdf_fips_sli_is_approved
 };
 
 const EVP_PKEY_METHOD *hkdf_pkey_method(void)

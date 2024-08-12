@@ -8,6 +8,7 @@
  */
 
 #include "internal/cryptlib.h"
+#include "internal/fips_sli_local.h"
 #ifdef OPENSSL_NO_RSA
 NON_EMPTY_TRANSLATION_UNIT
 #else
@@ -47,6 +48,8 @@ int EVP_OpenInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type,
         goto err;
     }
 
+    // EVP_PKEY_decrypt_old always uses RSA dec
+    fips_sli_disapprove_EVP_CIPHER_CTX(ctx);
     i = EVP_PKEY_decrypt_old(key, ek, ekl, priv);
     if ((i <= 0) || !EVP_CIPHER_CTX_set_key_length(ctx, i)) {
         /* ERROR */

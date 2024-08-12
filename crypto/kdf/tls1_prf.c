@@ -35,7 +35,15 @@ struct evp_kdf_impl_st {
     /* Buffer of concatenated seed data */
     unsigned char seed[TLS1_PRF_MAXBUF];
     size_t seedlen;
+    FIPS_STATUS sli; /* Service Level Indicator */
 };
+
+fips_sli_define_basic_for(static, struct_evp_kdf_impl_st, struct evp_kdf_impl_st)
+
+static void fips_sli_check_hash_kdf_struct_evp_kdf_impl_st(struct evp_kdf_impl_st *ctx) {
+    fips_sli_fsm_struct_evp_kdf_impl_st(ctx,
+                                        fips_sli_get_hash_status_kdf_tls1_prf(ctx->md));
+}
 
 static EVP_KDF_IMPL *kdf_tls1_prf_new(void)
 {
@@ -152,6 +160,7 @@ static int kdf_tls1_prf_derive(EVP_KDF_IMPL *impl, unsigned char *key,
         KDFerr(KDF_F_KDF_TLS1_PRF_DERIVE, KDF_R_MISSING_SEED);
         return 0;
     }
+    fips_sli_check_hash_kdf_struct_evp_kdf_impl_st(impl);
     return tls1_prf_alg(impl->md, impl->sec, impl->seclen,
                         impl->seed, impl->seedlen,
                         key, keylen);
@@ -165,7 +174,8 @@ const EVP_KDF_METHOD tls1_prf_kdf_meth = {
     kdf_tls1_prf_ctrl,
     kdf_tls1_prf_ctrl_str,
     NULL,
-    kdf_tls1_prf_derive
+    kdf_tls1_prf_derive,
+    fips_sli_is_approved_struct_evp_kdf_impl_st
 };
 
 const EVP_PKEY_METHOD *tls1_prf_pkey_method(void)

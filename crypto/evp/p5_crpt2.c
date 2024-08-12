@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "internal/cryptlib.h"
+#include "internal/fips_sli_local.h"
 #include <openssl/x509.h>
 #include <openssl/evp.h>
 #include <openssl/kdf.h>
@@ -24,13 +25,13 @@
 static void h__dump(const unsigned char *p, int len);
 #endif
 
-int PKCS5_PBKDF2_HMAC(const char *pass, int passlen,
+static int PKCS5_PBKDF2_HMAC_internal(const char *pass, int passlen,
                       const unsigned char *salt, int saltlen, int iter,
-                      const EVP_MD *digest, int keylen, unsigned char *out)
+                      const EVP_MD *digest, int keylen, unsigned char *out,
+                      EVP_KDF_CTX *kctx)
 {
     const char *empty = "";
     int rv = 1;
-    EVP_KDF_CTX *kctx;
 
     /* Keep documented behaviour. */
     if (pass == NULL) {
@@ -42,9 +43,6 @@ int PKCS5_PBKDF2_HMAC(const char *pass, int passlen,
     if (salt == NULL && saltlen == 0)
         salt = (unsigned char *)empty;
 
-    kctx = EVP_KDF_CTX_new_id(EVP_KDF_PBKDF2);
-    if (kctx == NULL)
-        return 0;
     if (EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_PASS, pass, (size_t)passlen) != 1
             || EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_SALT,
                             salt, (size_t)saltlen) != 1
@@ -52,8 +50,6 @@ int PKCS5_PBKDF2_HMAC(const char *pass, int passlen,
             || EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_MD, digest) != 1
             || EVP_KDF_derive(kctx, out, keylen) != 1)
         rv = 0;
-
-    EVP_KDF_CTX_free(kctx);
 
 # ifdef OPENSSL_DEBUG_PKCS5V2
     fprintf(stderr, "Password:\n");
@@ -65,6 +61,32 @@ int PKCS5_PBKDF2_HMAC(const char *pass, int passlen,
     h__dump(out, keylen);
 # endif
     return rv;
+}
+
+int PKCS5_PBKDF2_HMAC(const char *pass, int passlen,
+                      const unsigned char *salt, int saltlen, int iter,
+                      const EVP_MD *digest, int keylen, unsigned char *out)
+{
+    EVP_KDF_CTX *kctx;
+     kctx = EVP_KDF_CTX_new_id(EVP_KDF_PBKDF2);
+    if (kctx == NULL)
+        return 0;
+    int ret = PKCS5_PBKDF2_HMAC_internal(pass, passlen, salt, saltlen, iter, digest, keylen, out, kctx);
+    EVP_KDF_CTX_free(kctx);
+    return ret;
+}
+
+int fips_sli_PKCS5_PBKDF2_HMAC_is_approved(const char *pass, int passlen,
+                      const unsigned char *salt, int saltlen, int iter,
+                      const EVP_MD *digest, int keylen, unsigned char *out)
+{
+    EVP_KDF_CTX *kctx = EVP_KDF_CTX_new_id(EVP_KDF_PBKDF2);
+    if (kctx == NULL)
+        return 0;
+    PKCS5_PBKDF2_HMAC_internal(pass, passlen, salt, saltlen, iter, digest, keylen, out, kctx);
+    int ret = fips_sli_is_approved_EVP_KDF_CTX(kctx);
+    EVP_KDF_CTX_free(kctx);
+    return ret;
 }
 
 int PKCS5_PBKDF2_HMAC_SHA1(const char *pass, int passlen,

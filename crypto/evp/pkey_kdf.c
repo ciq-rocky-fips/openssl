@@ -159,7 +159,10 @@ static int pkey_kdf_derive(EVP_PKEY_CTX *ctx, unsigned char *key,
         if (key == NULL)
             return 1;
     }
-    return EVP_KDF_derive(kctx, key, *keylen);
+    int ret =  EVP_KDF_derive(kctx, key, *keylen);
+    if (!fips_sli_is_approved_EVP_KDF_CTX(kctx))
+        fips_sli_disapprove_EVP_PKEY_CTX(ctx);
+    return ret;
 }
 
 #ifndef OPENSSL_NO_SCRYPT

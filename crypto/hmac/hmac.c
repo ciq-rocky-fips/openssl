@@ -23,6 +23,7 @@ int HMAC_Init_ex(HMAC_CTX *ctx, const void *key, int len,
     unsigned char pad[HMAC_MAX_MD_CBLOCK_SIZE];
     unsigned int keytmp_length;
     unsigned char keytmp[HMAC_MAX_MD_CBLOCK_SIZE];
+    ctx->sli = FIPS_UNSET;
 
     /* If we are changing MD then we must have a key */
     if (md != NULL && md != ctx->md && (key == NULL || len < 0))
@@ -83,9 +84,17 @@ int HMAC_Init_ex(HMAC_CTX *ctx, const void *key, int len,
         if (!EVP_DigestInit_ex(ctx->o_ctx, md, impl)
                 || !EVP_DigestUpdate(ctx->o_ctx, pad, EVP_MD_block_size(md)))
             goto err;
+        ctx->sli_key_len = len;
     }
     if (!EVP_MD_CTX_copy_ex(ctx->md_ctx, ctx->i_ctx))
         goto err;
+    /* On reuse, key/key_len might be NULL. Use cached value. */
+    if (ctx->sli_key_len >= 112/8) {
+        fips_sli_approve_HMAC_CTX(ctx);
+    } else {
+        fips_sli_disapprove_HMAC_CTX(ctx);
+    }
+    fips_sli_check_hash_mac_HMAC_CTX(ctx, md);
     rv = 1;
  err:
     if (reset) {
@@ -190,6 +199,7 @@ static int hmac_ctx_alloc_mds(HMAC_CTX *ctx)
 
 int HMAC_CTX_reset(HMAC_CTX *ctx)
 {
+    ctx->sli = FIPS_UNSET;
     hmac_ctx_cleanup(ctx);
     if (!hmac_ctx_alloc_mds(ctx)) {
         hmac_ctx_cleanup(ctx);
@@ -209,24 +219,22 @@ int HMAC_CTX_copy(HMAC_CTX *dctx, HMAC_CTX *sctx)
     if (!EVP_MD_CTX_copy_ex(dctx->md_ctx, sctx->md_ctx))
         goto err;
     dctx->md = sctx->md;
+    dctx->sli = sctx->sli;
     return 1;
  err:
     hmac_ctx_cleanup(dctx);
     return 0;
 }
 
-unsigned char *HMAC(const EVP_MD *evp_md, const void *key, int key_len,
+static unsigned char *HMAC_internal(const EVP_MD *evp_md, const void *key, int key_len,
                     const unsigned char *d, size_t n, unsigned char *md,
-                    unsigned int *md_len)
+                    unsigned int *md_len, HMAC_CTX *c)
 {
-    HMAC_CTX *c = NULL;
     static unsigned char m[EVP_MAX_MD_SIZE];
     static const unsigned char dummy_key[1] = {'\0'};
 
     if (md == NULL)
         md = m;
-    if ((c = HMAC_CTX_new()) == NULL)
-        goto err;
 
     /* For HMAC_Init_ex, NULL key signals reuse. */
     if (key == NULL && key_len == 0) {
@@ -239,11 +247,38 @@ unsigned char *HMAC(const EVP_MD *evp_md, const void *key, int key_len,
         goto err;
     if (!HMAC_Final(c, md, md_len))
         goto err;
-    HMAC_CTX_free(c);
     return md;
  err:
-    HMAC_CTX_free(c);
     return NULL;
+}
+
+unsigned char *HMAC(const EVP_MD *evp_md, const void *key, int key_len,
+                    const unsigned char *d, size_t n, unsigned char *md,
+                    unsigned int *md_len)
+{
+    HMAC_CTX *c = HMAC_CTX_new();
+    unsigned char *ret = NULL;
+    if (c == NULL)
+        goto err;
+    ret = HMAC_internal(evp_md, key, key_len, d, n, md, md_len, c);
+    HMAC_CTX_free(c);
+    err:
+        return ret;
+}
+
+int fips_sli_HMAC_is_approved(const EVP_MD *evp_md, const void *key, int key_len,
+                    const unsigned char *d, size_t n, unsigned char *md,
+                    unsigned int *md_len)
+{
+    HMAC_CTX *c = HMAC_CTX_new();
+    int ret = 0;
+    if (c == NULL)
+        goto err;
+    HMAC_internal(evp_md, key, key_len, d, n, md, md_len, c);
+    ret = fips_sli_is_approved_HMAC_CTX(c);
+    HMAC_CTX_free(c);
+    err:
+        return ret;
 }
 
 void HMAC_CTX_set_flags(HMAC_CTX *ctx, unsigned long flags)

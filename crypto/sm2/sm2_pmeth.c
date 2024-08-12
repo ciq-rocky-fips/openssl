@@ -107,6 +107,7 @@ static int pkey_sm2_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen,
         return 0;
     }
 
+    fips_sli_disapprove_EVP_PKEY_CTX(ctx);
     ret = sm2_sign(tbs, tbslen, sig, &sltmp, ec);
 
     if (ret <= 0)
@@ -120,7 +121,7 @@ static int pkey_sm2_verify(EVP_PKEY_CTX *ctx,
                            const unsigned char *tbs, size_t tbslen)
 {
     EC_KEY *ec = ctx->pkey->pkey.ec;
-
+    fips_sli_disapprove_EVP_PKEY_CTX(ctx);
     return sm2_verify(tbs, tbslen, sig, siglen, ec);
 }
 
@@ -139,6 +140,7 @@ static int pkey_sm2_encrypt(EVP_PKEY_CTX *ctx,
             return 1;
     }
 
+    fips_sli_disapprove_EVP_PKEY_CTX(ctx);
     return sm2_encrypt(ec, md, in, inlen, out, outlen);
 }
 
@@ -157,6 +159,7 @@ static int pkey_sm2_decrypt(EVP_PKEY_CTX *ctx,
             return 1;
     }
 
+    fips_sli_disapprove_EVP_PKEY_CTX(ctx);
     return sm2_decrypt(ec, md, in, inlen, out, outlen);
 }
 

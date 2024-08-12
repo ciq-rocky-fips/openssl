@@ -26,3 +26,8 @@ unsigned char *SHA1(const unsigned char *d, size_t n, unsigned char *md)
     OPENSSL_cleanse(&c, sizeof(c));
     return md;
 }
+
+int fips_sli_SHA1_is_approved(const unsigned char *d, size_t n, unsigned char *md) {
+    /* Only approved depending on usage context, so default to false */
+    return 0;
+}

@@ -122,6 +122,7 @@ static int pkey_ec_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen,
 
     type = (dctx->md != NULL) ? EVP_MD_type(dctx->md) : NID_sha1;
 
+    fips_sli_check_curve_siggen_EVP_PKEY_CTX(ctx, EC_KEY_get0_group(ec));
     ret = ECDSA_sign(type, tbs, tbslen, sig, &sltmp, ec);
 
     if (ret <= 0)
@@ -143,6 +144,7 @@ static int pkey_ec_verify(EVP_PKEY_CTX *ctx,
     else
         type = NID_sha1;
 
+    fips_sli_check_curve_sigver_EVP_PKEY_CTX(ctx, EC_KEY_get0_group(ec));
     ret = ECDSA_verify(type, tbs, tbslen, sig, siglen, ec);
 
     return ret;
@@ -182,6 +184,8 @@ static int pkey_ec_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen)
     if (ret <= 0)
         return 0;
     *keylen = ret;
+    fips_sli_check_key_ecdh_EVP_PKEY_CTX(ctx, eckey);
+    fips_sli_check_key_ecdh_EVP_PKEY_CTX(ctx, ctx->peerkey->pkey.ec);
     return 1;
 }
 
@@ -208,6 +212,8 @@ static int pkey_ec_kdf_derive(EVP_PKEY_CTX *ctx,
     }
     if (!pkey_ec_derive(ctx, ktmp, &ktmplen))
         goto err;
+    /* ANSI-X9.63-KDF (X9_62) is FIPS-approved, but we don't have a selftest */
+    fips_sli_disapprove_EVP_PKEY_CTX(ctx);
     /* Do KDF stuff */
     if (!ecdh_KDF_X9_63(key, *keylen, ktmp, ktmplen,
                         dctx->kdf_ukm, dctx->kdf_ukmlen, dctx->kdf_md))
@@ -433,7 +439,12 @@ static int pkey_ec_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY *pkey)
     else
         ret = EC_KEY_set_group(ec, dctx->gen_group);
 
-    return ret ? EC_KEY_generate_key(ec) : 0;
+    if (ret) {
+        fips_sli_check_key_ec_keygen_EVP_PKEY_CTX(ctx, ec);
+        return EC_KEY_generate_key(ec);
+    } else {
+        return 0;
+    }
 }
 
 const EVP_PKEY_METHOD ec_pkey_meth = {

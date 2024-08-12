@@ -162,6 +162,7 @@ static EVP_PKEY_CTX *int_ctx_new(EVP_PKEY *pkey, ENGINE *e, int id)
         EVPerr(EVP_F_INT_CTX_NEW, ERR_R_MALLOC_FAILURE);
         return NULL;
     }
+    ret->sli = FIPS_UNSET;
     ret->engine = e;
     ret->pmeth = pmeth;
     ret->operation = EVP_PKEY_OP_UNDEFINED;
@@ -299,6 +300,7 @@ EVP_PKEY_CTX *EVP_PKEY_CTX_dup(EVP_PKEY_CTX *pctx)
     rctx->data = NULL;
     rctx->app_data = NULL;
     rctx->operation = pctx->operation;
+    rctx->sli = pctx->sli;
 
     if (pctx->pmeth->copy(rctx, pctx) > 0)
         return rctx;

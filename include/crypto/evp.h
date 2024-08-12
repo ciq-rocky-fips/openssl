@@ -9,6 +9,7 @@
 
 #include <openssl/evp.h>
 #include "internal/refcount.h"
+#include "internal/fips_sli_local.h"
 
 /*
  * Don't free up md_ctx->pctx in EVP_MD_CTX_reset, use the reserved flag
@@ -36,6 +37,7 @@ struct evp_pkey_ctx_st {
     /* implementation specific keygen data */
     int *keygen_info;
     int keygen_info_count;
+    FIPS_STATUS sli; /* Service Level Indicator */
 } /* EVP_PKEY_CTX */ ;
 
 #define EVP_PKEY_FLAG_DYNAMIC   1
@@ -123,6 +125,9 @@ typedef struct {
     int (*ctrl_str) (EVP_KDF_IMPL *impl, const char *type, const char *value);
     size_t (*size) (EVP_KDF_IMPL *impl);
     int (*derive) (EVP_KDF_IMPL *impl, unsigned char *key, size_t keylen);
+    /* KDFs are handled differently by the SLI because the EVP_KDF_IMPL, which
+     holds the required information, is defined implementation-dependent */
+    int (*fips_sli_is_approved) (const EVP_KDF_IMPL *impl);
 } EVP_KDF_METHOD;
 
 extern const EVP_KDF_METHOD pbkdf2_kdf_meth;

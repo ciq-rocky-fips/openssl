@@ -10,6 +10,8 @@
 #ifndef OSSL_CRYPTO_HMAC_LOCAL_H
 # define OSSL_CRYPTO_HMAC_LOCAL_H
 
+#include "internal/fips_sli_local.h"
+
 /* The current largest case is for SHA3-224 */
 #define HMAC_MAX_MD_CBLOCK_SIZE     144
 
@@ -18,6 +20,8 @@ struct hmac_ctx_st {
     EVP_MD_CTX *md_ctx;
     EVP_MD_CTX *i_ctx;
     EVP_MD_CTX *o_ctx;
+    FIPS_STATUS sli; /* Service Level Indicator */
+    size_t sli_key_len; /* SLI needs to cache keylen in case of context reuse */
 };
 
 #endif

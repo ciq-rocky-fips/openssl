@@ -23,6 +23,8 @@ int EVP_SignFinal(EVP_MD_CTX *ctx, unsigned char *sigret,
     size_t sltmp;
     EVP_PKEY_CTX *pkctx = NULL;
 
+    fips_sli_check_hash_sigver_EVP_MD_CTX(ctx, EVP_MD_CTX_md(ctx));
+
     *siglen = 0;
     if (EVP_MD_CTX_test_flags(ctx, EVP_MD_CTX_FLAG_FINALISE)) {
         if (!EVP_DigestFinal_ex(ctx, m, &m_len))
@@ -37,6 +39,7 @@ int EVP_SignFinal(EVP_MD_CTX *ctx, unsigned char *sigret,
         rv = EVP_MD_CTX_copy_ex(tmp_ctx, ctx);
         if (rv)
             rv = EVP_DigestFinal_ex(tmp_ctx, m, &m_len);
+
         EVP_MD_CTX_free(tmp_ctx);
         if (!rv)
             return 0;
@@ -53,6 +56,8 @@ int EVP_SignFinal(EVP_MD_CTX *ctx, unsigned char *sigret,
         goto err;
     if (EVP_PKEY_sign(pkctx, sigret, &sltmp, m, m_len) <= 0)
         goto err;
+    if (!fips_sli_is_approved_EVP_PKEY_CTX(pkctx))
+        fips_sli_disapprove_EVP_MD_CTX(ctx);
     *siglen = sltmp;
     i = 1;
  err:

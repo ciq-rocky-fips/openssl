@@ -24,6 +24,7 @@ int EVP_MD_CTX_reset(EVP_MD_CTX *ctx)
     if (ctx == NULL)
         return 1;
 
+    ctx->sli = FIPS_UNSET;
     /*
      * Don't assume ctx->md_data was cleaned in EVP_Digest_Final, because
      * sometimes only copies of the context are ever finalised.
@@ -69,6 +70,7 @@ int EVP_DigestInit(EVP_MD_CTX *ctx, const EVP_MD *type)
 int EVP_DigestInit_ex(EVP_MD_CTX *ctx, const EVP_MD *type, ENGINE *impl)
 {
     EVP_MD_CTX_clear_flags(ctx, EVP_MD_CTX_FLAG_CLEANED);
+    ctx->sli = FIPS_UNSET;
 #ifdef OPENSSL_FIPS
     if (FIPS_selftest_failed()) {
         FIPSerr(FIPS_F_EVP_DIGESTINIT_EX, FIPS_R_FIPS_SELFTEST_FAILED);

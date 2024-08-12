@@ -692,6 +692,7 @@ static int pkey_ecx_derive25519(EVP_PKEY_CTX *ctx, unsigned char *key,
                 && X25519(key, privkey, pubkey) == 0))
         return 0;
     *keylen = X25519_KEYLEN;
+    fips_sli_disapprove_EVP_PKEY_CTX(ctx);
     return 1;
 }
 
@@ -705,6 +706,7 @@ static int pkey_ecx_derive448(EVP_PKEY_CTX *ctx, unsigned char *key,
                 && X448(key, privkey, pubkey) == 0))
         return 0;
     *keylen = X448_KEYLEN;
+    fips_sli_disapprove_EVP_PKEY_CTX(ctx);
     return 1;
 }
 

@@ -22,6 +22,8 @@ int EVP_VerifyFinal(EVP_MD_CTX *ctx, const unsigned char *sigbuf,
     int i = 0;
     EVP_PKEY_CTX *pkctx = NULL;
 
+    fips_sli_check_hash_sigver_EVP_MD_CTX(ctx, EVP_MD_CTX_md(ctx));
+
     if (EVP_MD_CTX_test_flags(ctx, EVP_MD_CTX_FLAG_FINALISE)) {
         if (!EVP_DigestFinal_ex(ctx, m, &m_len))
             goto err;
@@ -49,6 +51,8 @@ int EVP_VerifyFinal(EVP_MD_CTX *ctx, const unsigned char *sigbuf,
     if (EVP_PKEY_CTX_set_signature_md(pkctx, EVP_MD_CTX_md(ctx)) <= 0)
         goto err;
     i = EVP_PKEY_verify(pkctx, sigbuf, siglen, m, m_len);
+    if (!fips_sli_is_approved_EVP_PKEY_CTX(pkctx))
+        fips_sli_disapprove_EVP_MD_CTX(ctx);
  err:
     EVP_PKEY_CTX_free(pkctx);
     return i;

@@ -13,6 +13,7 @@
 #include "internal/cryptlib.h"
 #include <openssl/cmac.h>
 #include <openssl/err.h>
+#include "internal/fips_sli_local.h"
 
 struct CMAC_CTX_st {
     /* Cipher context to use */
@@ -26,7 +27,10 @@ struct CMAC_CTX_st {
     unsigned char last_block[EVP_MAX_BLOCK_LENGTH];
     /* Number of bytes in last block: -1 means context not initialised */
     int nlast_block;
+    FIPS_STATUS sli; /* Service Level Indicator */
 };
+
+fips_sli_define_for(CMAC_CTX)
 
 /* Make temporary keys K1 and K2 */
 
@@ -62,6 +66,7 @@ CMAC_CTX *CMAC_CTX_new(void)
 
 void CMAC_CTX_cleanup(CMAC_CTX *ctx)
 {
+    ctx->sli = FIPS_UNSET;
     EVP_CIPHER_CTX_reset(ctx->cctx);
     OPENSSL_cleanse(ctx->tbl, EVP_MAX_BLOCK_LENGTH);
     OPENSSL_cleanse(ctx->k1, EVP_MAX_BLOCK_LENGTH);
@@ -97,6 +102,7 @@ int CMAC_CTX_copy(CMAC_CTX *out, const CMAC_CTX *in)
     memcpy(out->tbl, in->tbl, bl);
     memcpy(out->last_block, in->last_block, bl);
     out->nlast_block = in->nlast_block;
+    out->sli = in->sli;
     return 1;
 }
 
@@ -104,6 +110,7 @@ int CMAC_Init(CMAC_CTX *ctx, const void *key, size_t keylen,
               const EVP_CIPHER *cipher, ENGINE *impl)
 {
     static const unsigned char zero_iv[EVP_MAX_BLOCK_LENGTH] = { 0 };
+    ctx->sli = FIPS_UNSET;
     /* All zeros means restart */
     if (!key && !cipher && !impl && keylen == 0) {
         /* Not initialised */
@@ -214,6 +221,15 @@ int CMAC_Final(CMAC_CTX *ctx, unsigned char *out, size_t *poutlen)
     if (!EVP_Cipher(ctx->cctx, out, out, bl)) {
         OPENSSL_cleanse(out, bl);
         return 0;
+    }
+    switch (EVP_CIPHER_nid(EVP_CIPHER_CTX_cipher(ctx->cctx))) {
+    case NID_aes_128_cbc:
+    case NID_aes_192_cbc:
+    case NID_aes_256_cbc:
+        fips_sli_approve_CMAC_CTX(ctx);
+        break;
+    default:
+        fips_sli_disapprove_CMAC_CTX(ctx);
     }
     return 1;
 }

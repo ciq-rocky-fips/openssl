@@ -941,6 +941,13 @@ int RAND_priv_bytes(unsigned char *buf, int num)
     return 0;
 }
 
+int fips_sli_RAND_priv_bytes_is_approved(unsigned char *buf, int num) {
+    const RAND_METHOD *meth = RAND_get_rand_method();
+    if (meth != NULL && meth != RAND_OpenSSL())
+        return 0;
+    return 1;
+}
+
 int RAND_bytes(unsigned char *buf, int num)
 {
     const RAND_METHOD *meth = RAND_get_rand_method();
@@ -949,6 +956,11 @@ int RAND_bytes(unsigned char *buf, int num)
         return meth->bytes(buf, num);
     RANDerr(RAND_F_RAND_BYTES, RAND_R_FUNC_NOT_IMPLEMENTED);
     return -1;
+}
+
+int fips_sli_RAND_bytes_is_approved(unsigned char *buf, int num) {
+    const RAND_METHOD *meth = RAND_get_rand_method();
+    return meth == RAND_OpenSSL();
 }
 
 #if OPENSSL_API_COMPAT < 0x10100000L

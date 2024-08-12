@@ -32,6 +32,7 @@ int EVP_CIPHER_CTX_reset(EVP_CIPHER_CTX *c)
 #endif
     if (c == NULL)
         return 1;
+    c->sli = FIPS_UNSET;
     if (c->cipher != NULL) {
         if (c->cipher->cleanup && !c->cipher->cleanup(c))
             return 0;
@@ -112,6 +113,7 @@ int EVP_CipherInit_ex(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *cipher,
             /* Restore encrypt and flags */
             ctx->encrypt = enc;
             ctx->flags = flags;
+            ctx->sli = FIPS_UNSET;
         }
 #ifndef OPENSSL_NO_ENGINE
         if (impl) {
@@ -237,6 +239,7 @@ int EVP_CipherInit_ex(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *cipher,
     ctx->buf_len = 0;
     ctx->final_used = 0;
     ctx->block_mask = ctx->cipher->block_size - 1;
+    fips_sli_check_cipher_EVP_CIPHER_CTX(ctx, ctx->cipher);
     return 1;
 }
 

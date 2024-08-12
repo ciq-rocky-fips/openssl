@@ -1,0 +1,110 @@
+=pod
+
+=head1 NAME
+
+C<int fips_sli_is_approved_*_CTX> - get status of the FIPS Service Level Indicator (SLI) for context operations
+
+C<int fips_sli_*_is_approved> - get status of the FIPS SLI for standalone operations
+
+=head1 SYNOPSIS
+
+ #include <openssl/fips_sli.h>
+
+ int fips_sli_is_approved_EVP_CIPHER_CTX(const EVP_CIPHER_CTX *ctx);
+
+ int fips_sli_is_approved_EVP_KDF_CTX(const EVP_KDF_CTX *ctx);
+
+ int fips_sli_is_approved_EVP_MD_CTX(const EVP_MD_CTX *ctx);
+
+ int fips_sli_is_approved_EVP_PKEY_CTX(const EVP_PKEY_CTX *ctx);
+
+ int fips_sli_is_approved_CMAC_CTX(const CMAC_CTX *ctx);
+
+ int fips_sli_is_approved_HMAC_CTX(const HMAC_CTX *ctx);
+
+ int fips_sli_SHA1_is_approved(const unsigned char *d, size_t n, unsigned char *md);
+
+ int fips_sli_HMAC_is_approved(const EVP_MD *evp_md, const void *key, int key_len,
+                     const unsigned char *d, size_t n, unsigned char *md,
+                     unsigned int *md_len);
+
+ int fips_sli_PKCS5_PBKDF2_HMAC_is_approved(const char *pass, int passlen,
+                       const unsigned char *salt, int saltlen, int iter,
+                       const EVP_MD *digest, int keylen, unsigned char *out);
+
+ int fips_sli_RAND_bytes_is_approved(unsigned char *buf, int num);
+
+ int fips_sli_RAND_priv_bytes_is_approved(unsigned char *buf, int num);
+
+=head1 DESCRIPTION
+
+The service level indicator has two different usage scenarios.
+
+=over 1
+
+=item C<int fips_sli_is_approved_*_CTX(...)>
+
+Most operations happen on some form of a context, which also holds the SLI.
+This function returns whether the FIPS SLI indicates an approved operation or not.
+
+After a disapproved operation is encountered, the SLI will continue to indicate this disapproved state. The SLI can only
+be reset by the various existing resetting functions such as C<EVP_MD_CTX_reset(EVP_MD_CTX *ctx)> or reinitializing the
+context, e.g. via L<EVP_DigestInit(3)>.
+
+=item C<int fips_sli_*_is_approved(...)>
+
+Operations without a context (standalone functions) have a separate SLI with the name fips_sli_FNNAME_is_approved().
+These indicator functions take the same parameters as their corresponding operation
+and may modify them just like their corresponding function might do.
+
+In order to check the SLI status of an operation C<FNNAME()>, the function
+C<fips_sli_FNNAME_is_approved()> must be called with the same set of parameters as C<FNNAME()>.
+Note that applications must check the return value of C<FNNAME()> according to its documentation B<as well as> the return value of the SLI (see below for L</RETURN VALUES>).
+Both are orthogonal: the former reports about success and failure of C<FNNAME()>, and the latter whether a disapproved operation happened or not.
+Well-behaving applications check for both.
+
+The following explicit indicators exist:
+
+C<int fips_sli_SHA1_is_approved(const unsigned char *d, size_t n, unsigned char *md);>
+
+C<int fips_sli_HMAC_is_approved(const EVP_MD *evp_md, const void *key, int key_len, const unsigned char *d, size_t n, unsigned char *md, unsigned int *md_len);>
+
+C<int fips_sli_PKCS5_PBKDF2_HMAC_is_approved(const char *pass, int passlen, const unsigned char *salt, int saltlen, int iter, const EVP_MD *digest, int keylen, unsigned char *out);>
+
+C<int fips_sli_RAND_bytes_is_approved(unsigned char *buf, int num);>
+
+C<int fips_sli_RAND_priv_bytes_is_approved(unsigned char *buf, int num);>
+
+=back
+
+=head1 Notes on the RNG
+
+OpenSSL 1.1.1l implements a CTR DRBG with AES 128/192/256 (defaults to AES-256).
+See L<RAND_bytes(3)>/RAND_priv_bytes().
+
+Swapping out OPENSSL's RNG implementation (e.g. via L<RAND_set_rand_method(3)>) is NOT allowed.
+
+=head1 RETURN VALUES
+
+C<fips_sli_is_approved_*_CTX()> returns 0 if the previous operation(s) was unapproved or B<ctx> was B<NULL>, and returns 1
+if the previous operation(s) were approved (or rather, no non-approved operations happened).
+
+C<fips_sli_*_is_approved()> returns 0 if an operation with a given set of parameters was unapproved, and returns 1
+if the operation is approved with the given set of parameters.
+
+These functions can be invoked at any time.
+
+=head1 HISTORY
+
+The FIPS SLI was added in OpenSSL 1.1.1.l.
+
+=head1 COPYRIGHT
+
+Copyright 2022
+
+Licensed under the OpenSSL license (the "License").  You may not use
+this file except in compliance with the License.  You can obtain a copy
+in the file LICENSE in the source distribution or at
+L<https://www.openssl.org/source/license.html>.
+
+=cut

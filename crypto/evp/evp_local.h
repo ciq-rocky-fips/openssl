@@ -1,3 +1,4 @@
+#include "internal/fips_sli_local.h"
 /*
  * Copyright 2000-2018 The OpenSSL Project Authors. All Rights Reserved.
  *
@@ -19,6 +20,7 @@ struct evp_md_ctx_st {
     EVP_PKEY_CTX *pctx;
     /* Update function: usually copied from EVP_MD */
     int (*update) (EVP_MD_CTX *ctx, const void *data, size_t count);
+    FIPS_STATUS sli; /* Service Level Indicator */
 } /* EVP_MD_CTX */ ;
 
 struct evp_cipher_ctx_st {
@@ -39,11 +41,13 @@ struct evp_cipher_ctx_st {
     int final_used;
     int block_mask;
     unsigned char final[EVP_MAX_BLOCK_LENGTH]; /* possible final block */
+    FIPS_STATUS sli; /* Service Level Indicator */
 } /* EVP_CIPHER_CTX */ ;
 
 struct evp_kdf_ctx_st {
     const EVP_KDF_METHOD *kmeth;
     EVP_KDF_IMPL *impl;          /* Algorithm-specific data */
+    FIPS_STATUS sli; /* Service Level Indicator */
 } /* EVP_KDF_CTX */ ;
 
 int PKCS5_v2_PBKDF2_keyivgen(EVP_CIPHER_CTX *ctx, const char *pass,

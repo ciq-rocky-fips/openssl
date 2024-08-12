@@ -52,7 +52,7 @@ INCLUDE_MAIN___test_libtestutil_OLB = /INCLUDE=MAIN
           recordlentest drbgtest drbg_cavs_test sslbuffertest \
           time_offset_test pemtest ssl_cert_table_internal_test ciphername_test \
           servername_test ocspapitest rsa_mp_test fatalerrtest tls13ccstest \
-          sysdefaulttest errtest ssl_ctx_test gosttest
+          sysdefaulttest errtest ssl_ctx_test gosttest fips_slitest
 
   SOURCE[versions]=versions.c
   INCLUDE[versions]=../include
@@ -572,6 +572,10 @@ INCLUDE_MAIN___test_libtestutil_OLB = /INCLUDE=MAIN
   SOURCE[gosttest]=gosttest.c ssltestlib.c
   INCLUDE[gosttest]=../include ..
   DEPEND[gosttest]=../libcrypto ../libssl libtestutil.a
+
+  SOURCE[fips_slitest]=fips_slitest.c fips_slitest_helper.c
+  INCLUDE[fips_slitest]=../include
+  DEPEND[fips_slitest]=../libcrypto libtestutil.a
 
   SOURCE[ssl_ctx_test]=ssl_ctx_test.c
   INCLUDE[ssl_ctx_test]=../include

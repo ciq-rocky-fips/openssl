@@ -35,7 +35,18 @@ struct evp_kdf_impl_st {
     char type; /* X */
     unsigned char *session_id;
     size_t session_id_len;
+    FIPS_STATUS sli; /* Service Level Indicator */
 };
+
+
+fips_sli_define_basic_for(static, struct_evp_kdf_impl_st, struct evp_kdf_impl_st)
+
+static void fips_sli_check_hash_kdf_struct_evp_kdf_impl_st(struct evp_kdf_impl_st *ctx) {
+    fips_sli_fsm_struct_evp_kdf_impl_st(ctx,
+                                        fips_sli_get_hash_status_sshkdf(ctx->md));
+    fips_sli_fsm_struct_evp_kdf_impl_st(ctx,
+                                        fips_sli_get_kdf_keylen_status(ctx->key_len));
+}
 
 static EVP_KDF_IMPL *kdf_sshkdf_new(void)
 {
@@ -203,6 +214,7 @@ static int kdf_sshkdf_derive(EVP_KDF_IMPL *impl, unsigned char *key,
         KDFerr(KDF_F_KDF_SSHKDF_DERIVE, KDF_R_MISSING_TYPE);
         return 0;
     }
+    fips_sli_check_hash_kdf_struct_evp_kdf_impl_st(impl);
     return SSHKDF(impl->md, impl->key, impl->key_len,
                   impl->xcghash, impl->xcghash_len,
                   impl->session_id, impl->session_id_len,
@@ -218,6 +230,7 @@ const EVP_KDF_METHOD sshkdf_kdf_meth = {
     kdf_sshkdf_ctrl_str,
     kdf_sshkdf_size,
     kdf_sshkdf_derive,
+    fips_sli_is_approved_struct_evp_kdf_impl_st
 };
 
 static int SSHKDF(const EVP_MD *evp_md,

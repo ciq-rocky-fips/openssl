@@ -133,6 +133,7 @@ static int pkey_rsa_sign(EVP_PKEY_CTX *ctx, unsigned char *sig,
     RSA_PKEY_CTX *rctx = ctx->data;
     RSA *rsa = ctx->pkey->pkey.rsa;
 
+    fips_sli_check_key_rsa_siggen_EVP_PKEY_CTX(ctx, rsa);
     if (rctx->md) {
         if (tbslen != (size_t)EVP_MD_size(rctx->md)) {
             RSAerr(RSA_F_PKEY_RSA_SIGN, RSA_R_INVALID_DIGEST_LENGTH);
@@ -143,6 +144,8 @@ static int pkey_rsa_sign(EVP_PKEY_CTX *ctx, unsigned char *sig,
             unsigned int sltmp;
             if (rctx->pad_mode != RSA_PKCS1_PADDING)
                 return -1;
+            /* PKCS1-v1.5 padding is disallowed after 2023 */
+            fips_sli_disapprove_EVP_PKEY_CTX(ctx);
             ret = RSA_sign_ASN1_OCTET_STRING(0,
                                              tbs, tbslen, sig, &sltmp, rsa);
 
@@ -162,11 +165,30 @@ static int pkey_rsa_sign(EVP_PKEY_CTX *ctx, unsigned char *sig,
                 RSAerr(RSA_F_PKEY_RSA_SIGN, ERR_R_MALLOC_FAILURE);
                 return -1;
             }
+            /* MINOR fips: refactor out? May have to read rctx->pad_mode (RSA_PKEY_CTX), though */
+            /* ANSI X9.31 */
+            switch (EVP_MD_type(rctx->md)) {
+            case NID_sha256:
+            case NID_sha384:
+            case NID_sha512:
+            case NID_sha3_224:
+            case NID_sha3_256:
+            case NID_sha3_384:
+            case NID_sha3_512:
+            case NID_shake128:
+            case NID_shake256:
+                fips_sli_approve_EVP_PKEY_CTX(ctx);
+                break;
+            default:
+                fips_sli_disapprove_EVP_PKEY_CTX(ctx);
+            }
             memcpy(rctx->tbuf, tbs, tbslen);
             rctx->tbuf[tbslen] = RSA_X931_hash_id(EVP_MD_type(rctx->md));
             ret = RSA_private_encrypt(tbslen + 1, rctx->tbuf,
                                       sig, rsa, RSA_X931_PADDING);
         } else if (rctx->pad_mode == RSA_PKCS1_PADDING) {
+            /*  PKCS1-v1.5 padding is disallowed after 2023  */
+            fips_sli_disapprove_EVP_PKEY_CTX(ctx);
             unsigned int sltmp;
             ret = RSA_sign(EVP_MD_type(rctx->md),
                            tbs, tbslen, sig, &sltmp, rsa);
@@ -181,12 +203,14 @@ static int pkey_rsa_sign(EVP_PKEY_CTX *ctx, unsigned char *sig,
                                                 rctx->md, rctx->mgf1md,
                                                 rctx->saltlen))
                 return -1;
+            fips_sli_check_hash_siggen_EVP_PKEY_CTX(ctx, rctx->md);
             ret = RSA_private_encrypt(RSA_size(rsa), rctx->tbuf,
                                       sig, rsa, RSA_NO_PADDING);
         } else {
             return -1;
         }
     } else {
+        fips_sli_approve_EVP_PKEY_CTX(ctx); /* plain sig without hash */
         ret = RSA_private_encrypt(tbslen, tbs, sig, ctx->pkey->pkey.rsa,
                                   rctx->pad_mode);
     }
@@ -207,6 +231,23 @@ static int pkey_rsa_verifyrecover(EVP_PKEY_CTX *ctx,
         if (rctx->pad_mode == RSA_X931_PADDING) {
             if (!setup_tbuf(rctx, ctx))
                 return -1;
+            /* MINOR fips: refactor out? May have to read rctx->pad_mode (RSA_PKEY_CTX), though */
+            /* ANSI X9.31 */
+            switch (EVP_MD_type(rctx->md)) {
+            case NID_sha256:
+            case NID_sha384:
+            case NID_sha512:
+            case NID_sha3_224:
+            case NID_sha3_256:
+            case NID_sha3_384:
+            case NID_sha3_512:
+            case NID_shake128:
+            case NID_shake256:
+                fips_sli_approve_EVP_PKEY_CTX(ctx);
+                break;
+            default:
+                fips_sli_disapprove_EVP_PKEY_CTX(ctx);
+            }
             ret = RSA_public_decrypt(siglen, sig,
                                      rctx->tbuf, ctx->pkey->pkey.rsa,
                                      RSA_X931_PADDING);
@@ -253,11 +294,15 @@ static int pkey_rsa_verify(EVP_PKEY_CTX *ctx,
     RSA_PKEY_CTX *rctx = ctx->data;
     RSA *rsa = ctx->pkey->pkey.rsa;
     size_t rslen;
+    fips_sli_check_key_rsa_sigver_EVP_PKEY_CTX(ctx, rsa);
 
     if (rctx->md) {
-        if (rctx->pad_mode == RSA_PKCS1_PADDING)
+        if (rctx->pad_mode == RSA_PKCS1_PADDING) {
+            /* PKCS1-v1.5 padding is disallowed after 2023 */
+            fips_sli_disapprove_EVP_PKEY_CTX(ctx);
             return RSA_verify(EVP_MD_type(rctx->md), tbs, tbslen,
                               sig, siglen, rsa);
+        }
         if (tbslen != (size_t)EVP_MD_size(rctx->md)) {
             RSAerr(RSA_F_PKEY_RSA_VERIFY, RSA_R_INVALID_DIGEST_LENGTH);
             return -1;
@@ -278,6 +323,7 @@ static int pkey_rsa_verify(EVP_PKEY_CTX *ctx,
                                             rctx->tbuf, rctx->saltlen);
             if (ret <= 0)
                 return 0;
+            fips_sli_check_hash_sigver_EVP_PKEY_CTX(ctx, rctx->md);
             return 1;
         } else {
             return -1;
@@ -285,6 +331,7 @@ static int pkey_rsa_verify(EVP_PKEY_CTX *ctx,
     } else {
         if (!setup_tbuf(rctx, ctx))
             return -1;
+        fips_sli_approve_EVP_PKEY_CTX(ctx); /* plain sig without hash */
         rslen = RSA_public_decrypt(siglen, sig, rctx->tbuf,
                                    rsa, rctx->pad_mode);
         if (rslen == 0)
@@ -321,6 +368,8 @@ static int pkey_rsa_encrypt(EVP_PKEY_CTX *ctx,
         ret = RSA_public_encrypt(inlen, in, out, ctx->pkey->pkey.rsa,
                                  rctx->pad_mode);
     }
+    fips_sli_check_padding_rsa_enc_EVP_PKEY_CTX(ctx, rctx->pad_mode);
+    fips_sli_check_key_rsa_enc_EVP_PKEY_CTX(ctx, ctx->pkey->pkey.rsa);
     if (ret < 0)
         return ret;
     *outlen = ret;
@@ -355,6 +404,8 @@ static int pkey_rsa_decrypt(EVP_PKEY_CTX *ctx,
             pad_mode = rctx->pad_mode;
         ret = RSA_private_decrypt(inlen, in, out, ctx->pkey->pkey.rsa, pad_mode);
     }
+    fips_sli_check_padding_rsa_dec_EVP_PKEY_CTX(ctx, rctx->pad_mode);
+    fips_sli_check_key_rsa_dec_EVP_PKEY_CTX(ctx, ctx->pkey->pkey.rsa);
     *outlen = constant_time_select_s(constant_time_msb_s(ret), *outlen, ret);
     ret = constant_time_select_int(constant_time_msb(ret), ret, 1);
     return ret;
@@ -781,9 +832,13 @@ static int pkey_rsa_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY *pkey)
         RSA_free(rsa);
         return 0;
     }
-    if (ret > 0)
+    if (rctx->primes != 2)
+        fips_sli_disapprove_EVP_PKEY_CTX(ctx);
+
+    if (ret > 0) {
+        fips_sli_check_key_rsa_keygen_EVP_PKEY_CTX(ctx, rsa);
         EVP_PKEY_assign(pkey, ctx->pmeth->pkey_id, rsa);
-    else
+    } else
         RSA_free(rsa);
     return ret;
 }

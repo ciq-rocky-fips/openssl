@@ -105,15 +105,21 @@ int EVP_DigestSignFinal(EVP_MD_CTX *ctx, unsigned char *sigret,
     if (pctx->pmeth->flags & EVP_PKEY_FLAG_SIGCTX_CUSTOM) {
         if (!sigret)
             return pctx->pmeth->signctx(pctx, sigret, siglen, ctx);
-        if (ctx->flags & EVP_MD_CTX_FLAG_FINALISE)
+        if (ctx->flags & EVP_MD_CTX_FLAG_FINALISE) {
             r = pctx->pmeth->signctx(pctx, sigret, siglen, ctx);
-        else {
+            if (!fips_sli_is_approved_EVP_PKEY_CTX(pctx))
+                fips_sli_disapprove_EVP_MD_CTX(ctx);
+        } else {
             EVP_PKEY_CTX *dctx = EVP_PKEY_CTX_dup(ctx->pctx);
             if (!dctx)
                 return 0;
             r = dctx->pmeth->signctx(dctx, sigret, siglen, ctx);
+            if (!fips_sli_is_approved_EVP_PKEY_CTX(dctx))
+                fips_sli_disapprove_EVP_MD_CTX(ctx);
             EVP_PKEY_CTX_free(dctx);
         }
+        /* stricter than necessary, ctx->digest might be set but unused */
+        fips_sli_check_hash_siggen_EVP_MD_CTX(ctx, ctx->digest);
         return r;
     }
     if (pctx->pmeth->signctx)
@@ -124,8 +130,11 @@ int EVP_DigestSignFinal(EVP_MD_CTX *ctx, unsigned char *sigret,
         unsigned char md[EVP_MAX_MD_SIZE];
         unsigned int mdlen = 0;
         if (ctx->flags & EVP_MD_CTX_FLAG_FINALISE) {
-            if (sctx)
+            if (sctx) {
                 r = ctx->pctx->pmeth->signctx(ctx->pctx, sigret, siglen, ctx);
+                if (!fips_sli_is_approved_EVP_PKEY_CTX(ctx->pctx))
+                    fips_sli_disapprove_EVP_MD_CTX(ctx);
+            }
             else
                 r = EVP_DigestFinal_ex(ctx, md, &mdlen);
         } else {
@@ -136,16 +145,25 @@ int EVP_DigestSignFinal(EVP_MD_CTX *ctx, unsigned char *sigret,
                 EVP_MD_CTX_free(tmp_ctx);
                 return 0;
             }
-            if (sctx)
+            if (sctx) {
                 r = tmp_ctx->pctx->pmeth->signctx(tmp_ctx->pctx,
                                                   sigret, siglen, tmp_ctx);
+                if (!fips_sli_is_approved_EVP_PKEY_CTX(tmp_ctx->pctx))
+                    fips_sli_disapprove_EVP_MD_CTX(ctx);
+            }
             else
                 r = EVP_DigestFinal_ex(tmp_ctx, md, &mdlen);
             EVP_MD_CTX_free(tmp_ctx);
         }
+        /* stricter than necessary, ctx->digest might be set but unused */
+        fips_sli_check_hash_siggen_EVP_MD_CTX(ctx, ctx->digest);
+
         if (sctx || !r)
             return r;
-        if (EVP_PKEY_sign(ctx->pctx, sigret, siglen, md, mdlen) <= 0)
+        r = EVP_PKEY_sign(ctx->pctx, sigret, siglen, md, mdlen);
+        if (!fips_sli_is_approved_EVP_PKEY_CTX(ctx->pctx))
+            fips_sli_disapprove_EVP_MD_CTX(ctx);
+        if (r <= 0)
             return 0;
     } else {
         if (sctx) {
@@ -163,8 +181,12 @@ int EVP_DigestSignFinal(EVP_MD_CTX *ctx, unsigned char *sigret,
 int EVP_DigestSign(EVP_MD_CTX *ctx, unsigned char *sigret, size_t *siglen,
                    const unsigned char *tbs, size_t tbslen)
 {
-    if (ctx->pctx->pmeth->digestsign != NULL)
+    if (ctx->pctx->pmeth->digestsign != NULL) {
+        /* digestsign is only used for ed25519 and ed448 signatures, so should
+         * be safe to disapprove it completely */
+        fips_sli_disapprove_EVP_MD_CTX(ctx);
         return ctx->pctx->pmeth->digestsign(ctx, sigret, siglen, tbs, tbslen);
+    }
     if (sigret != NULL && EVP_DigestSignUpdate(ctx, tbs, tbslen) <= 0)
         return 0;
     return EVP_DigestSignFinal(ctx, sigret, siglen);
@@ -178,9 +200,14 @@ int EVP_DigestVerifyFinal(EVP_MD_CTX *ctx, const unsigned char *sig,
     unsigned int mdlen = 0;
     int vctx = 0;
 
-    if (ctx->pctx->pmeth->verifyctx)
+    fips_sli_check_hash_sigver_EVP_MD_CTX(ctx, EVP_MD_CTX_md(ctx));
+
+    if (ctx->pctx->pmeth->verifyctx) {
         vctx = 1;
-    else
+        /* verifyctx seems to be unused by openssl, so should be safe to
+         * disapprove it */
+        fips_sli_disapprove_EVP_MD_CTX(ctx);
+    } else
         vctx = 0;
     if (ctx->flags & EVP_MD_CTX_FLAG_FINALISE) {
         if (vctx)
@@ -204,14 +231,21 @@ int EVP_DigestVerifyFinal(EVP_MD_CTX *ctx, const unsigned char *sig,
     }
     if (vctx || !r)
         return r;
-    return EVP_PKEY_verify(ctx->pctx, sig, siglen, md, mdlen);
+    const int res = EVP_PKEY_verify(ctx->pctx, sig, siglen, md, mdlen);
+    if (!fips_sli_is_approved_EVP_PKEY_CTX(ctx->pctx))
+        fips_sli_disapprove_EVP_MD_CTX(ctx);
+    return res;
 }
 
 int EVP_DigestVerify(EVP_MD_CTX *ctx, const unsigned char *sigret,
                      size_t siglen, const unsigned char *tbs, size_t tbslen)
 {
-    if (ctx->pctx->pmeth->digestverify != NULL)
+    if (ctx->pctx->pmeth->digestverify != NULL) {
+        /* digestverify is only used for ed25519 and ed448 signatures, so should
+         * be safe to disapprove it completely */
+        fips_sli_disapprove_EVP_MD_CTX(ctx);
         return ctx->pctx->pmeth->digestverify(ctx, sigret, siglen, tbs, tbslen);
+    }
     if (EVP_DigestVerifyUpdate(ctx, tbs, tbslen) <= 0)
         return -1;
     return EVP_DigestVerifyFinal(ctx, sigret, siglen);

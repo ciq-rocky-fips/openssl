@@ -267,6 +267,10 @@ static int kdf_scrypt_derive(EVP_KDF_IMPL *impl, unsigned char *key,
                       impl->maxmem_bytes, key, keylen);
 }
 
+static int kdf_scrypt_fips_sli_is_approved(ossl_unused const EVP_KDF_IMPL *impl) {
+    return 0; /* not FIPS-approved */
+}
+
 const EVP_KDF_METHOD scrypt_kdf_meth = {
     EVP_KDF_SCRYPT,
     kdf_scrypt_new,
@@ -275,7 +279,8 @@ const EVP_KDF_METHOD scrypt_kdf_meth = {
     kdf_scrypt_ctrl,
     kdf_scrypt_ctrl_str,
     NULL,
-    kdf_scrypt_derive
+    kdf_scrypt_derive,
+    kdf_scrypt_fips_sli_is_approved
 };
 
 #define R(a,b) (((a) << (b)) | ((a) >> (32 - (b))))

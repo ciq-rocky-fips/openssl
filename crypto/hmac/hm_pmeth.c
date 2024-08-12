@@ -128,8 +128,11 @@ static int hmac_signctx(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen,
     if (!sig)
         return 1;
 
-    if (!HMAC_Final(hctx->ctx, sig, &hlen))
+    if (!HMAC_Final(hctx->ctx, sig, &hlen)) {
+        if (!fips_sli_is_approved_HMAC_CTX(hctx->ctx))
+            fips_sli_disapprove_EVP_PKEY_CTX(ctx);
         return 0;
+    }
     *siglen = (size_t)hlen;
     return 1;
 }

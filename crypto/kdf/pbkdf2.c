@@ -31,7 +31,15 @@ struct evp_kdf_impl_st {
     size_t salt_len;
     int iter;
     const EVP_MD *md;
+    FIPS_STATUS sli; /* Service Level Indicator */
 };
+
+static ossl_unused int fips_sli_is_approved_struct_evp_kdf_impl_st(const struct evp_kdf_impl_st *ctx);
+fips_sli_define_basic_for(static, struct_evp_kdf_impl_st, struct evp_kdf_impl_st)
+
+static void fips_sli_check_hash_kdf_struct_evp_kdf_impl_st(struct evp_kdf_impl_st *ctx) {
+    fips_sli_fsm_struct_evp_kdf_impl_st(ctx, fips_sli_get_hash_status_pbkdf2(ctx->md));
+}
 
 static EVP_KDF_IMPL *kdf_pbkdf2_new(void)
 {
@@ -64,6 +72,7 @@ static void kdf_pbkdf2_init(EVP_KDF_IMPL *impl)
 {
     impl->iter = PKCS5_DEFAULT_ITER;
     impl->md = EVP_sha1();
+    impl->sli = FIPS_UNSET;
 }
 
 static int pbkdf2_set_membuf(unsigned char **buffer, size_t *buflen,
@@ -175,6 +184,8 @@ static int kdf_pbkdf2_derive(EVP_KDF_IMPL *impl, unsigned char *key,
         return 0;
     }
 
+    fips_sli_check_hash_kdf_struct_evp_kdf_impl_st(impl);
+
     return pkcs5_pbkdf2_alg((char *)impl->pass, impl->pass_len,
                             impl->salt, impl->salt_len, impl->iter,
                             impl->md, key, keylen);
@@ -188,7 +199,8 @@ const EVP_KDF_METHOD pbkdf2_kdf_meth = {
     kdf_pbkdf2_ctrl,
     kdf_pbkdf2_ctrl_str,
     NULL,
-    kdf_pbkdf2_derive
+    kdf_pbkdf2_derive,
+    fips_sli_is_approved_struct_evp_kdf_impl_st
 };
 
 /*

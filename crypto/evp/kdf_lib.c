@@ -17,6 +17,7 @@
 #include <openssl/kdf.h>
 #include "crypto/asn1.h"
 #include "crypto/evp.h"
+#include "internal/fips_sli_local.h"
 #include "internal/numbers.h"
 #include "evp_local.h"
 
@@ -85,6 +86,7 @@ EVP_KDF_CTX *EVP_KDF_CTX_new_id(int id)
     }
 
     ret->kmeth = kmeth;
+    ret->sli = FIPS_UNSET;
     return ret;
 }
 
@@ -104,6 +106,7 @@ void EVP_KDF_reset(EVP_KDF_CTX *ctx)
 
     if (ctx->kmeth->reset != NULL)
         ctx->kmeth->reset(ctx->impl);
+    ctx->sli = FIPS_UNSET;
 }
 
 int EVP_KDF_ctrl(EVP_KDF_CTX *ctx, int cmd, ...)
@@ -164,6 +167,12 @@ int EVP_KDF_derive(EVP_KDF_CTX *ctx, unsigned char *key, size_t keylen)
     if (ctx == NULL)
         return 0;
 
-    return ctx->kmeth->derive(ctx->impl, key, keylen);
+    int ret = ctx->kmeth->derive(ctx->impl, key, keylen);
+    if (ctx->kmeth->fips_sli_is_approved(ctx->impl))
+        fips_sli_approve_EVP_KDF_CTX(ctx);
+    else
+        fips_sli_disapprove_EVP_KDF_CTX(ctx);
+
+    return ret;
 }
 

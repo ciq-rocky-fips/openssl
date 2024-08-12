@@ -4636,3 +4636,14 @@ EVP_KDF_size                            6596	1_1_1b	EXIST::FUNCTION:
 EVP_KDF_derive                          6597	1_1_1b	EXIST::FUNCTION:
 FIPS_show_version                       6598	1_1_1k	EXIST::FUNCTION:
 EC_GROUP_get0_field                     6599	1_1_1k  EXIST::FUNCTION:
+fips_sli_is_approved_EVP_MD_CTX         6600	1_1_1k	EXIST::FUNCTION:
+fips_sli_is_approved_CMAC_CTX           6601	1_1_1k	EXIST::FUNCTION:
+fips_sli_is_approved_HMAC_CTX           6602	1_1_1k	EXIST::FUNCTION:
+fips_sli_is_approved_EVP_PKEY_CTX       6603	1_1_1k	EXIST::FUNCTION:
+fips_sli_is_approved_EVP_CIPHER_CTX     6604	1_1_1k	EXIST::FUNCTION:
+fips_sli_is_approved_EVP_KDF_CTX        6605	1_1_1k	EXIST::FUNCTION:
+fips_sli_SHA1_is_approved               6606	1_1_1k	EXIST::FUNCTION:
+fips_sli_PKCS5_PBKDF2_HMAC_is_approved  6607	1_1_1k	EXIST::FUNCTION:
+fips_sli_HMAC_is_approved               6608	1_1_1k	EXIST::FUNCTION:
+fips_sli_RAND_bytes_is_approved         6609	1_1_1k	EXIST::FUNCTION:
+fips_sli_RAND_priv_bytes_is_approved    6610	1_1_1k	EXIST::FUNCTION:

@@ -77,6 +77,8 @@ static int pkey_dsa_sign(EVP_PKEY_CTX *ctx, unsigned char *sig,
     DSA_PKEY_CTX *dctx = ctx->data;
     DSA *dsa = ctx->pkey->pkey.dsa;
 
+    fips_sli_check_key_dsa_siggen_EVP_PKEY_CTX(ctx, dsa);
+
     if (dctx->md != NULL && tbslen != (size_t)EVP_MD_size(dctx->md))
         return 0;
 
@@ -95,6 +97,8 @@ static int pkey_dsa_verify(EVP_PKEY_CTX *ctx,
     int ret;
     DSA_PKEY_CTX *dctx = ctx->data;
     DSA *dsa = ctx->pkey->pkey.dsa;
+
+    fips_sli_check_key_dsa_sigver_EVP_PKEY_CTX(ctx, dsa);
 
     if (dctx->md != NULL && tbslen != (size_t)EVP_MD_size(dctx->md))
         return 0;
@@ -224,6 +228,7 @@ static int pkey_dsa_paramgen(EVP_PKEY_CTX *ctx, EVP_PKEY *pkey)
 static int pkey_dsa_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY *pkey)
 {
     DSA *dsa = NULL;
+    fips_sli_disapprove_EVP_PKEY_CTX(ctx);
 
     if (ctx->pkey == NULL) {
         DSAerr(DSA_F_PKEY_DSA_KEYGEN, DSA_R_NO_PARAMETERS_SET);

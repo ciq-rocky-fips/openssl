@@ -135,9 +135,15 @@ extern "C" {
 # define FIPS_F_FIPS_SELFTEST_PBKDF2                      152
 # define FIPS_F_FIPS_SELFTEST_SHA1                        115
 # define FIPS_F_FIPS_SELFTEST_SHA2                        105
+/* openssl-1_1-ossl-sli-001-fix-faults-preventing-make-update.patch */
+# define FIPS_F_FIPS_SELFTEST_SHA3                        156
+# define FIPS_F_ECDSA_SIMPLE_VERIFY_SIG                   157
+# define FIPS_F_ECDSA_SIMPLE_SIGN_SIG                     158
+# define FIPS_F_OSSL_ECDSA_SIMPLE_VERIFY_SIG              159
+# define FIPS_F_OSSL_ECDH_COMPUTE_KEY                     160
 # define FIPS_F_FIPS_SELFTEST_SSHKDF                      155
-# define FIPS_F_FIPS_SELFTEST_SSKDF                       156
-# define FIPS_F_FIPS_SELFTEST_TLS1_PRF                    157
+# define FIPS_F_FIPS_SELFTEST_SSKDF                       161
+# define FIPS_F_FIPS_SELFTEST_TLS1_PRF                    162
 # define FIPS_F_OSSL_ECDSA_SIGN_SIG                       143
 # define FIPS_F_OSSL_ECDSA_VERIFY_SIG                     148
 # define FIPS_F_RSA_BUILTIN_KEYGEN                        116
@@ -146,7 +152,7 @@ extern "C" {
 # define FIPS_F_RSA_OSSL_PRIVATE_ENCRYPT                  118
 # define FIPS_F_RSA_OSSL_PUBLIC_DECRYPT                   119
 # define FIPS_F_RSA_OSSL_PUBLIC_ENCRYPT                   120
-# define FIPS_F_FIPS_SELFTEST_TLS13                       158
+# define FIPS_F_FIPS_SELFTEST_TLS13                       163
 
 /* Reason codes. */
 # define FIPS_R_ADDITIONAL_INPUT_ERROR_UNDETECTED         150

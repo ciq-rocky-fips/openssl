@@ -28,7 +28,7 @@ int ossl_ecdh_compute_key(unsigned char **psec, size_t *pseclen,
 {
 #ifdef OPENSSL_FIPS
     if (FIPS_selftest_failed()) {
-        FIPSerr(FIPS_F_ECDH_COMPUTE_KEY, FIPS_R_FIPS_SELFTEST_FAILED);
+        FIPSerr(FIPS_F_OSSL_ECDH_COMPUTE_KEY, FIPS_R_FIPS_SELFTEST_FAILED);
         return -1;
     }
 #endif

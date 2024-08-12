@@ -204,7 +204,7 @@ ECDSA_SIG *ecdsa_simple_sign_sig(const unsigned char *dgst, int dgst_len,
 
 #ifdef OPENSSL_FIPS
     if (FIPS_selftest_failed()) {
-        FIPSerr(FIPS_F_OSSL_ECDSA_SIGN_SIG, FIPS_R_FIPS_SELFTEST_FAILED);
+        FIPSerr(FIPS_F_ECDSA_SIMPLE_SIGN_SIG, FIPS_R_FIPS_SELFTEST_FAILED);
         return NULL;
     }
 #endif
@@ -373,7 +373,7 @@ int ecdsa_simple_verify_sig(const unsigned char *dgst, int dgst_len,
 
 #ifdef OPENSSL_FIPS
     if (FIPS_selftest_failed()) {
-        FIPSerr(FIPS_F_OSSL_ECDSA_VERIFY_SIG, FIPS_R_FIPS_SELFTEST_FAILED);
+        FIPSerr(FIPS_F_ECDSA_SIMPLE_VERIFY_SIG, FIPS_R_FIPS_SELFTEST_FAILED);
         return -1;
     }
 #endif

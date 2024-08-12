@@ -195,25 +195,25 @@ int FIPS_selftest_sha3(void)
 
     EVP_Digest(msg_sha3_256, sizeof(msg_sha3_256), md, NULL, EVP_sha3_256(), NULL);
     if (memcmp(dig_sha3_256, md, sizeof(dig_sha3_256))) {
-        FIPSerr(FIPS_F_FIPS_SELFTEST, FIPS_R_SELFTEST_FAILED);
+        FIPSerr(FIPS_F_FIPS_SELFTEST_SHA3, FIPS_R_SELFTEST_FAILED);
         return 0;
     }
 
     EVP_Digest(msg_sha3_512, sizeof(msg_sha3_512), md, NULL, EVP_sha3_512(), NULL);
     if (memcmp(dig_sha3_512, md, sizeof(dig_sha3_512))) {
-        FIPSerr(FIPS_F_FIPS_SELFTEST, FIPS_R_SELFTEST_FAILED);
+        FIPSerr(FIPS_F_FIPS_SELFTEST_SHA3, FIPS_R_SELFTEST_FAILED);
         return 0;
     }
 
     EVP_Digest(msg_shake_128, sizeof(msg_shake_128), md, NULL, EVP_shake128(), NULL);
     if (memcmp(dig_shake_128, md, sizeof(dig_shake_128))) {
-        FIPSerr(FIPS_F_FIPS_SELFTEST, FIPS_R_SELFTEST_FAILED);
+        FIPSerr(FIPS_F_FIPS_SELFTEST_SHA3, FIPS_R_SELFTEST_FAILED);
         return 0;
     }
 
     EVP_Digest(msg_shake_256, sizeof(msg_shake_256), md, NULL, EVP_shake256(), NULL);
     if (memcmp(dig_shake_256, md, sizeof(dig_shake_256))) {
-        FIPSerr(FIPS_F_FIPS_SELFTEST, FIPS_R_SELFTEST_FAILED);
+        FIPSerr(FIPS_F_FIPS_SELFTEST_SHA3, FIPS_R_SELFTEST_FAILED);
         return 0;
     }
 

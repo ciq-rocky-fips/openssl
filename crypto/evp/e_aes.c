@@ -4347,6 +4347,21 @@ FIPS_STATUS EVP_CIPHER_get_fips_status(const EVP_CIPHER *cipher) {
             /* intended fall-through */
         case 256:
             return FIPS_APPROVED;
+        case 512:
+            if (cipher->do_cipher == aes_xts_cipher
+                #if defined(OPENSSL_CPUID_OBJ) && ( \
+                        ((defined(__i386) || defined(__i386__) || defined(_M_IX86))\
+                        && defined(OPENSSL_IA32_SSE2)) \
+                    || defined(__x86_64) || defined(__x86_64__) \
+                    || defined(_M_AMD64) || defined(_M_X64))
+                || cipher->do_cipher == aesni_xts_cipher
+                #elif defined(OPENSSL_CPUID_OBJ) && defined(__s390__)
+                || cipher->do_cipher == s390x_aes_xts_cipher
+                #endif
+            )
+                return FIPS_APPROVED;
+            else
+                return FIPS_ERROR;
         }
     }
     /* disapproved for enc and dec: all others, including

@@ -260,6 +260,8 @@ static const SLI_CIPHER_TEST cipher_tests[] = {
     {0, NID_des_ede_ecb},
     {0, NID_des_ede_ofb64},
     {0, NID_idea_cbc},
+    {1, NID_aes_128_xts},
+    {1, NID_aes_256_xts},
 };
 static const size_t cipher_tests_len = sizeof(cipher_tests) / sizeof(cipher_tests[0]);
 

@@ -354,14 +354,14 @@ static FIPS_STATUS get_fips_keygen_ecdsa_order_status(const EC_KEY *ec) {
     BN_set_bit(pwr24, 24);
     BN_set_bit(pwr32, 32);
 
-    if (224 < n && n <= 255) {
+    if (224 <= n && n <= 255) {
         if (BN_cmp(cofactor, pwr14) != 1)
             ret = FIPS_APPROVED;
-    } else if (256 < n && n <= 383) {
+    } else if (256 <= n && n <= 383) {
         if (BN_cmp(cofactor, pwr16) != 1)
             ret = FIPS_APPROVED;
 
-    } else if (384 < n && n <= 511) {
+    } else if (384 <= n && n <= 511) {
         if (BN_cmp(cofactor, pwr24) != 1)
             ret = FIPS_APPROVED;
 

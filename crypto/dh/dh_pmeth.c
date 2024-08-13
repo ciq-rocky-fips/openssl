@@ -330,6 +330,30 @@ static int pkey_dh_paramgen(EVP_PKEY_CTX *ctx, EVP_PKEY *pkey)
     DH_PKEY_CTX *dctx = ctx->data;
     BN_GENCB *pcb;
     int ret;
+
+#ifdef OPENSSL_FIPS
+    /* In FIPS mode we default to an appropriate group. */
+    if (FIPS_mode() && (!(dctx->rfc5114_param)) && (dctx->param_nid == 0)) {
+        switch (dctx->prime_len) {
+        case 8192:
+            dctx->param_nid = NID_ffdhe8192;
+            break;
+        case 6144:
+            dctx->param_nid = NID_ffdhe6144;
+            break;
+        case 4096:
+            dctx->param_nid = NID_ffdhe4096;
+            break;
+        case 3072:
+            dctx->param_nid = NID_ffdhe3072;
+            break;
+        default:
+            dctx->param_nid = NID_ffdhe2048;
+            break;
+        }
+    }
+#endif /* OPENSSL_FIPS */
+
     if (dctx->rfc5114_param) {
         switch (dctx->rfc5114_param) {
         case 1:

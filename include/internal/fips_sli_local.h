@@ -68,6 +68,7 @@ void fips_sli_check_hash_mac_HMAC_CTX(HMAC_CTX * ctx, const EVP_MD * md);
 
 FIPS_STATUS fips_sli_get_hash_status_sshkdf(const EVP_MD * md);
 FIPS_STATUS fips_sli_get_hash_status_pbkdf2(const EVP_MD * md);
+FIPS_STATUS fips_sli_get_hash_status_kbkdf(const EVP_MD * md);
 FIPS_STATUS fips_sli_get_hash_status_kdf_tls1_prf(const EVP_MD * md);
 FIPS_STATUS fips_sli_get_kdf_keylen_status(size_t keylen_bytes);
 

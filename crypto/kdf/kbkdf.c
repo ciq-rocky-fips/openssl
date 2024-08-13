@@ -71,7 +71,15 @@ struct evp_kdf_impl_st {
     size_t context_len;
     unsigned char *iv;
     size_t iv_len;
+    FIPS_STATUS sli; /* Service Level Indicator */
 };
+
+fips_sli_define_basic_for(static, struct_evp_kdf_impl_st, struct evp_kdf_impl_st)
+
+static void fips_sli_check_hash_kdf_struct_evp_kdf_impl_st(struct evp_kdf_impl_st *ctx) {
+    fips_sli_fsm_struct_evp_kdf_impl_st(ctx,
+                                        fips_sli_get_hash_status_kbkdf(ctx->md));
+}
 
 static MAC_CTX *EVP_MAC_CTX_new(int mac_type)
 {
@@ -325,6 +333,8 @@ static int kbkdf_derive(EVP_KDF_IMPL *ctx, unsigned char *key, size_t keylen)
         return 0;
     }
 
+    fips_sli_check_hash_kdf_struct_evp_kdf_impl_st(ctx);
+
     h = EVP_MAC_size(ctx->ctx_init);
     if (h == 0)
         goto done;
@@ -536,5 +546,6 @@ const EVP_KDF_METHOD kb_kdf_meth = {
     kbkdf_ctrl_str,
     kbkdf_size,
     kbkdf_derive,
+    fips_sli_is_approved_struct_evp_kdf_impl_st
 };
 

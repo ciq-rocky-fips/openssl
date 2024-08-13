@@ -16,6 +16,13 @@
 
 void openssl_add_all_digests_int(void)
 {
+#ifdef OPENSSL_FIPS
+    /*
+     * This function is called from FIPS_selftest_ecdsa() before FIPS mode is
+     * turned on. That is the reason why we need to also check fips_in_post().
+     */
+    if (!FIPS_mode() && !fips_in_post()) {
+#endif
 #ifndef OPENSSL_NO_MD4
     EVP_add_digest(EVP_md4());
 #endif
@@ -57,4 +64,24 @@ void openssl_add_all_digests_int(void)
     EVP_add_digest(EVP_sha3_512());
     EVP_add_digest(EVP_shake128());
     EVP_add_digest(EVP_shake256());
+#ifdef OPENSSL_FIPS
+    } else {
+        EVP_add_digest(EVP_md5_sha1());
+        EVP_add_digest(EVP_sha1());
+        EVP_add_digest_alias(SN_sha1, "ssl3-sha1");
+        EVP_add_digest_alias(SN_sha1WithRSAEncryption, SN_sha1WithRSA);
+        EVP_add_digest(EVP_sha224());
+        EVP_add_digest(EVP_sha256());
+        EVP_add_digest(EVP_sha384());
+        EVP_add_digest(EVP_sha512());
+        EVP_add_digest(EVP_sha512_224());
+        EVP_add_digest(EVP_sha512_256());
+        EVP_add_digest(EVP_sha3_224());
+        EVP_add_digest(EVP_sha3_256());
+        EVP_add_digest(EVP_sha3_384());
+        EVP_add_digest(EVP_sha3_512());
+        EVP_add_digest(EVP_shake128());
+        EVP_add_digest(EVP_shake256());
+    }
+#endif
 }

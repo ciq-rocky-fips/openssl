@@ -35,7 +35,11 @@ IMPLEMENT_OBJ_BSEARCH_CMP_FN(const EVP_PKEY_ASN1_METHOD *,
 
 int EVP_PKEY_asn1_get_count(void)
 {
+#ifdef OPENSSL_FIPS
+    int num = FIPS_mode() ? OSSL_NELEM(standard_fips_methods) : OSSL_NELEM(standard_methods);
+#else
     int num = OSSL_NELEM(standard_methods);
+#endif
     if (app_methods)
         num += sk_EVP_PKEY_ASN1_METHOD_num(app_methods);
     return num;
@@ -43,11 +47,19 @@ int EVP_PKEY_asn1_get_count(void)
 
 const EVP_PKEY_ASN1_METHOD *EVP_PKEY_asn1_get0(int idx)
 {
+#ifdef OPENSSL_FIPS
+    int num = FIPS_mode() ? OSSL_NELEM(standard_fips_methods) : OSSL_NELEM(standard_methods);
+#else
     int num = OSSL_NELEM(standard_methods);
+#endif
     if (idx < 0)
         return NULL;
     if (idx < num)
+#ifdef OPENSSL_FIPS
+        return FIPS_mode() ? standard_fips_methods[idx] : standard_methods[idx];
+#else
         return standard_methods[idx];
+#endif
     idx -= num;
     return sk_EVP_PKEY_ASN1_METHOD_value(app_methods, idx);
 }
@@ -63,7 +75,13 @@ static const EVP_PKEY_ASN1_METHOD *pkey_asn1_find(int type)
         if (idx >= 0)
             return sk_EVP_PKEY_ASN1_METHOD_value(app_methods, idx);
     }
+#ifdef OPENSSL_FIPS
+    ret = FIPS_mode() ? \
+          OBJ_bsearch_ameth(&t, standard_fips_methods, OSSL_NELEM(standard_fips_methods)) : \
+          OBJ_bsearch_ameth(&t, standard_methods, OSSL_NELEM(standard_methods));
+#else
     ret = OBJ_bsearch_ameth(&t, standard_methods, OSSL_NELEM(standard_methods));
+#endif
     if (!ret || !*ret)
         return NULL;
     return *ret;

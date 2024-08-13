@@ -194,15 +194,42 @@ int dhparam_main(int argc, char **argv)
         } else
 #endif
         {
-            dh = DH_new();
-            BIO_printf(bio_err,
-                       "Generating DH parameters, %d bit long safe prime, generator %d\n",
-                       num, g);
-            BIO_printf(bio_err, "This is going to take a long time\n");
-            if (dh == NULL || !DH_generate_parameters_ex(dh, num, g, cb)) {
-                BN_GENCB_free(cb);
-                ERR_print_errors(bio_err);
-                goto end;
+#ifdef OPENSSL_FIPS
+            if (FIPS_mode()) {
+                /* In FIPS mode, instead of generating DH parameters, we use parameters
+                 * from an approved group, in this case, RFC-7919. */
+                int param_nid;
+                switch (num) {
+                case 8192:
+                  param_nid = NID_ffdhe8192;
+                  break;
+                case 6144:
+                  param_nid = NID_ffdhe6144;
+                  break;
+                case 4096:
+                  param_nid = NID_ffdhe4096;
+                  break;
+                case 3072:
+                  param_nid = NID_ffdhe3072;
+                  break;
+                default:
+                  param_nid = NID_ffdhe2048;
+                  break;
+                }
+                dh = DH_new_by_nid(param_nid);
+            } else
+#endif /* OPENSSL_FIPS */
+            {
+                dh = DH_new();
+                BIO_printf(bio_err,
+                           "Generating DH parameters, %d bit long safe prime, generator %d\n",
+                           num, g);
+                BIO_printf(bio_err, "This is going to take a long time\n");
+                if (dh == NULL || !DH_generate_parameters_ex(dh, num, g, cb)) {
+                    BN_GENCB_free(cb);
+                    ERR_print_errors(bio_err);
+                    goto end;
+                }
             }
         }
 

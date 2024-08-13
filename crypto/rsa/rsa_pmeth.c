@@ -144,13 +144,11 @@ static int pkey_rsa_sign(EVP_PKEY_CTX *ctx, unsigned char *sig,
             unsigned int sltmp;
             if (rctx->pad_mode != RSA_PKCS1_PADDING)
                 return -1;
-            /* PKCS1-v1.5 padding is disallowed after 2023 */
-            fips_sli_disapprove_EVP_PKEY_CTX(ctx);
             ret = RSA_sign_ASN1_OCTET_STRING(0,
                                              tbs, tbslen, sig, &sltmp, rsa);
-
             if (ret <= 0)
                 return ret;
+            fips_sli_check_hash_siggen_EVP_PKEY_CTX(ctx, rctx->md);
             ret = sltmp;
         } else if (rctx->pad_mode == RSA_X931_PADDING) {
             if (FIPS_mode()) {
@@ -187,13 +185,12 @@ static int pkey_rsa_sign(EVP_PKEY_CTX *ctx, unsigned char *sig,
             ret = RSA_private_encrypt(tbslen + 1, rctx->tbuf,
                                       sig, rsa, RSA_X931_PADDING);
         } else if (rctx->pad_mode == RSA_PKCS1_PADDING) {
-            /*  PKCS1-v1.5 padding is disallowed after 2023  */
-            fips_sli_disapprove_EVP_PKEY_CTX(ctx);
             unsigned int sltmp;
             ret = RSA_sign(EVP_MD_type(rctx->md),
                            tbs, tbslen, sig, &sltmp, rsa);
             if (ret <= 0)
                 return ret;
+            fips_sli_check_hash_siggen_EVP_PKEY_CTX(ctx, rctx->md);
             ret = sltmp;
         } else if (rctx->pad_mode == RSA_PKCS1_PSS_PADDING) {
             if (!setup_tbuf(rctx, ctx))
@@ -298,10 +295,13 @@ static int pkey_rsa_verify(EVP_PKEY_CTX *ctx,
 
     if (rctx->md) {
         if (rctx->pad_mode == RSA_PKCS1_PADDING) {
-            /* PKCS1-v1.5 padding is disallowed after 2023 */
-            fips_sli_disapprove_EVP_PKEY_CTX(ctx);
-            return RSA_verify(EVP_MD_type(rctx->md), tbs, tbslen,
-                              sig, siglen, rsa);
+            int ret;
+            ret = RSA_verify(EVP_MD_type(rctx->md), tbs, tbslen,
+                             sig, siglen, rsa);
+            if (ret <= 0)
+                return 0;
+            fips_sli_check_hash_sigver_EVP_PKEY_CTX(ctx, rctx->md);
+            return ret;
         }
         if (tbslen != (size_t)EVP_MD_size(rctx->md)) {
             RSAerr(RSA_F_PKEY_RSA_VERIFY, RSA_R_INVALID_DIGEST_LENGTH);

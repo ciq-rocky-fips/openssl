@@ -72,6 +72,9 @@ FIPS_STATUS fips_sli_get_hash_status_kbkdf(const EVP_MD * md);
 FIPS_STATUS fips_sli_get_hash_status_sskdf(const EVP_MD * md);
 FIPS_STATUS fips_sli_get_hash_status_kdf_tls1_prf(const EVP_MD * md);
 FIPS_STATUS fips_sli_get_kdf_keylen_status(size_t keylen_bytes);
+FIPS_STATUS fips_sli_get_kdf_saltlen_status(size_t saltlen_bytes);
+FIPS_STATUS fips_sli_get_kdf_iteration_status(size_t iter);
+FIPS_STATUS fips_sli_get_kdf_passlen_status(size_t passlen_bytes);
 
 /* Check if used curve is okay for and in this context */
 void fips_sli_check_curve_siggen_EVP_PKEY_CTX(EVP_PKEY_CTX *ctx, const EC_GROUP *group);

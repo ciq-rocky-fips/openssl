@@ -257,6 +257,27 @@ FIPS_STATUS fips_sli_get_kdf_keylen_status(size_t keylen_bytes) {
         return FIPS_NONAPPROVED;
 }
 
+FIPS_STATUS fips_sli_get_kdf_saltlen_status(size_t saltlen_bytes) {
+    if (saltlen_bytes >= 128/8)
+        return FIPS_APPROVED;
+    else
+        return FIPS_NONAPPROVED;
+}
+
+FIPS_STATUS fips_sli_get_kdf_iteration_status(size_t iter) {
+    if (iter >= 1000)
+        return FIPS_APPROVED;
+    else
+        return FIPS_NONAPPROVED;
+}
+
+FIPS_STATUS fips_sli_get_kdf_passlen_status(size_t passlen_bytes) {
+    if (passlen_bytes >= 20)
+        return FIPS_APPROVED;
+    else
+        return FIPS_NONAPPROVED;
+}
+
 void fips_sli_check_key_rsa_keygen_EVP_PKEY_CTX(EVP_PKEY_CTX * ctx, const RSA * rsa) {
     fips_sli_check_key_rsa_siggen_EVP_PKEY_CTX(ctx, rsa);
 }

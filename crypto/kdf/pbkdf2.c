@@ -187,6 +187,12 @@ static int kdf_pbkdf2_derive(EVP_KDF_IMPL *impl, unsigned char *key,
     fips_sli_check_hash_kdf_struct_evp_kdf_impl_st(impl);
     fips_sli_fsm_struct_evp_kdf_impl_st(impl,
                                         fips_sli_get_kdf_keylen_status(keylen));
+    fips_sli_fsm_struct_evp_kdf_impl_st(impl,
+                                        fips_sli_get_kdf_saltlen_status(impl->salt_len));
+    fips_sli_fsm_struct_evp_kdf_impl_st(impl,
+                                        fips_sli_get_kdf_iteration_status(impl->iter));
+    fips_sli_fsm_struct_evp_kdf_impl_st(impl,
+                                        fips_sli_get_kdf_passlen_status(impl->pass_len));
     return pkcs5_pbkdf2_alg((char *)impl->pass, impl->pass_len,
                             impl->salt, impl->salt_len, impl->iter,
                             impl->md, key, keylen);

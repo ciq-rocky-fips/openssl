@@ -51,6 +51,7 @@ static void init_fips_mode(void)
     if (buf[0] != '1') {
         /* drop down to non-FIPS mode if it is not requested */
         FIPS_mode_set(0);
+        ERR_clear_error();
     } else {
         /* abort if selftest failed */
         FIPS_selftest_check();

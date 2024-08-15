@@ -610,6 +610,8 @@ int ec_key_simple_generate_key(EC_KEY *eckey);
 int ec_key_simple_generate_public_key(EC_KEY *eckey);
 int ec_key_simple_check_key(const EC_KEY *eckey);
 
+int ec_key_public_check(const EC_KEY *eckey, BN_CTX *ctx);
+
 int ec_curve_nid_from_params(const EC_GROUP *group, BN_CTX *ctx);
 
 /* EC_METHOD definitions */

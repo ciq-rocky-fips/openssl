@@ -148,6 +148,14 @@ int ECDH_compute_key(void *out, size_t outlen, const EC_POINT *pub_key,
             outlen = seclen;
         memcpy(out, sec, outlen);
     }
+
+    if (FIPS_mode()) {
+        if (EC_KEY_check_key(eckey) <= 0) {
+           EC_POINT_set_to_infinity(eckey->group, eckey->pub_key);
+           return 0;
+        }
+    }
+
     OPENSSL_clear_free(sec, seclen);
     return outlen;
 }

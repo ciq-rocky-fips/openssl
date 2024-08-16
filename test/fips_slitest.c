@@ -187,6 +187,24 @@ static int ecdsa_via_EVP_DigestSign(int ecdsa_test_index) {
     int success = 0;
     const uint8_t* tbs = get_msg_128();
 
+#ifdef OPENSSL_FIPS
+    switch (nid) {
+    case NID_brainpoolP512r1:
+    case NID_secp112r2:
+        /*
+         * CIQ openssl fips code version doesn't have these curves
+         * compiled into our code, fips defined or not.
+         */
+        eckey = EC_KEY_new_by_curve_name(nid);
+        if (eckey == NULL) {
+            TEST_note("Skipping test because curve %s cannot be instantiated", OBJ_nid2sn(nid));
+            return 1;
+        }
+    default:
+        break;
+    }
+#endif
+
     TEST_note("testing ECDSA for curve %s", OBJ_nid2sn(nid));
 
     if (!TEST_ptr(mctx = EVP_MD_CTX_new())
@@ -298,7 +316,9 @@ static int cipher(int cipher_test_index) {
         case NID_des_ede_ecb:
         case NID_des_ede_ofb64:
         case NID_idea_cbc:
-            TEST_note("Skipping test since DES/IDEA are disabled in FIPS mode");
+        case NID_des_ede3_cbc:
+        case NID_des_ede3_cfb8:
+            TEST_note("Skipping test since DES/DES3/IDEA are disabled in FIPS mode");
             success = 1;
             goto end;
         }
@@ -427,7 +447,8 @@ static int sealenv(int sealenv_test_index) {
     if (FIPS_mode()) {
         switch (cipher_nid) {
         case NID_idea_cbc:
-            TEST_note("Skipping test since IDEA is disabled in FIPS mode");
+        case NID_des_ede3_cbc:
+            TEST_note("Skipping test since IDEA and DES3 is disabled in FIPS mode");
             success = 1;
             goto end;
         }

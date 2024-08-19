@@ -32,7 +32,10 @@ struct evp_kdf_impl_st {
     size_t key_len;
     unsigned char *constant;
     size_t constant_len;
+    FIPS_STATUS sli; /* Service Level Indicator */
 };
+
+fips_sli_define_basic_for(static, struct_evp_kdf_impl_st, struct evp_kdf_impl_st)
 
 static void krb5kdf_reset(EVP_KDF_IMPL *ctx);
 
@@ -73,6 +76,10 @@ static int krb5kdf_derive(EVP_KDF_IMPL *ctx, unsigned char *key,
         KDFerr(KDF_F_KRB5KDF_DERIVE, KDF_R_MISSING_CONSTANT);
         return 0;
     }
+
+    fips_sli_fsm_struct_evp_kdf_impl_st(ctx,
+                                        fips_sli_get_kdf_keylen_status(keylen));
+
     return KRB5KDF(ctx->cipher, ctx->key, ctx->key_len,
                    ctx->constant, ctx->constant_len,
                    key, keylen);
@@ -333,6 +340,8 @@ static int KRB5KDF(const EVP_CIPHER *cipher,
     if (ctx == NULL)
         return 0;
 
+    fips_sli_check_cipher_EVP_CIPHER_CTX(ctx, cipher);
+
     ret = cipher_init(ctx, cipher, key, key_len);
     if (!ret)
         goto out;
@@ -419,5 +428,6 @@ const EVP_KDF_METHOD krb5kdf_kdf_meth = {
     krb5kdf_ctrl_str,
     krb5kdf_size,
     krb5kdf_derive,
+    fips_sli_is_approved_struct_evp_kdf_impl_st
 };
 

@@ -138,6 +138,7 @@ typedef enum hash_usage_e {
     HASH_KDF_PBKDF2,
     HASH_KDF_TLS,
     HASH_KDF_KBKDF,
+    HASH_KDF_SSKDF,
     HASH_RNG,
     HASH_MAC
 } HASH_USAGE;
@@ -183,6 +184,16 @@ static FIPS_STATUS get_fips_hash_status(const EVP_MD *md, HASH_USAGE u) {
         switch (EVP_MD_type(md)) {
         case NID_sha256:
         case NID_sha384:
+            return FIPS_APPROVED;
+        default:
+            return FIPS_NONAPPROVED;
+        }
+    case HASH_KDF_SSKDF:
+        switch (EVP_MD_type(md)) {
+        case NID_sha224:
+        case NID_sha256:
+        case NID_sha384:
+        case NID_sha512:
             return FIPS_APPROVED;
         default:
             return FIPS_NONAPPROVED;
@@ -234,6 +245,9 @@ FIPS_STATUS fips_sli_get_hash_status_kdf_tls1_prf(const EVP_MD * md) {
 }
 FIPS_STATUS fips_sli_get_hash_status_kbkdf(const EVP_MD * md) {
     return get_fips_hash_status(md, HASH_KDF_KBKDF);
+}
+FIPS_STATUS fips_sli_get_hash_status_sskdf(const EVP_MD * md) {
+    return get_fips_hash_status(md, HASH_KDF_SSKDF);
 }
 
 FIPS_STATUS fips_sli_get_kdf_keylen_status(size_t keylen_bytes) {

@@ -51,7 +51,15 @@ struct evp_kdf_impl_st {
     size_t secret_len;
     unsigned char *info;
     size_t info_len;
+    FIPS_STATUS sli; /* Service Level Indicator */
 };
+
+fips_sli_define_basic_for(static, struct_evp_kdf_impl_st, struct evp_kdf_impl_st)
+
+static void fips_sli_check_hash_kdf_struct_evp_kdf_impl_st(struct evp_kdf_impl_st *ctx) {
+    fips_sli_fsm_struct_evp_kdf_impl_st(ctx,
+                                        fips_sli_get_hash_status_sskdf(ctx->md));
+}
 
 #define SSKDF_MAX_INLEN (1<<30)
 
@@ -239,6 +247,9 @@ static int sskdf_derive(EVP_KDF_IMPL *impl, unsigned char *key, size_t keylen)
         KDFerr(KDF_F_SSKDF_DERIVE, KDF_R_MISSING_MESSAGE_DIGEST);
         return 0;
     }
+
+    fips_sli_check_hash_kdf_struct_evp_kdf_impl_st(impl);
+
     return SSKDF_hash_kdm(impl->md, impl->secret, impl->secret_len,
                           impl->info, impl->info_len, key, keylen);
 }
@@ -251,5 +262,6 @@ const EVP_KDF_METHOD ss_kdf_meth = {
     sskdf_ctrl,
     sskdf_ctrl_str,
     sskdf_size,
-    sskdf_derive
+    sskdf_derive,
+    fips_sli_is_approved_struct_evp_kdf_impl_st
 };

@@ -181,6 +181,12 @@ struct drbg_ctx_st {
     /* Indicates we have finished with nonce buffer */
     void (*cleanup_nonce) (DRBG_CTX *ctx, unsigned char *out, size_t olen);
 
+    /* Continuous random number test temporary area */
+	/* Last block */	
+	unsigned char lb[EVP_MAX_MD_SIZE];
+	/* set if lb is valid */
+	int lb_valid;
+
     /* Callbacks used when called through RAND interface */
     /* Get any additional input for generate */
     size_t (*get_adin) (DRBG_CTX *ctx, unsigned char **pout);

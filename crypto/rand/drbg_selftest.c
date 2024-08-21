@@ -16,6 +16,8 @@
 #include <openssl/obj_mac.h>
 #include "internal/thread_once.h"
 #include "crypto/rand.h"
+#include "crypto/fips/fips_locl.h"
+#include <openssl/fips.h>
 
 typedef struct test_ctx_st {
     const unsigned char *entropy;
@@ -270,9 +272,13 @@ static int single_kat_no_reseed(const struct drbg_kat *td)
     unsigned int flags = 0;
     int failures = 0;
     TEST_CTX t;
+    int adinlen;
 
     if (td->df != USE_DF)
         flags |= RAND_DRBG_FLAG_CTR_NO_DF;
+
+    if (!fips_post_started(FIPS_TEST_DRBG, td->nid, &flags))
+            return 1;
 
     if ((drbg = RAND_DRBG_new(td->nid, flags, NULL)) == NULL)
         return 0;
@@ -295,11 +301,16 @@ static int single_kat_no_reseed(const struct drbg_kat *td)
         goto err;
     }
 
+    if (!fips_post_corrupt(FIPS_TEST_DRBG, td->nid, &flags)) {
+        adinlen = td->addinlen / 2;
+    } else
+        adinlen = td->addinlen;
+
     if (!RAND_DRBG_instantiate(drbg, data->persstr, td->persstrlen)
         || !RAND_DRBG_generate(drbg, buff, td->retbyteslen, 0,
-                               data->addin1, td->addinlen)
+                               data->addin1, adinlen)
         || !RAND_DRBG_generate(drbg, buff, td->retbyteslen, 0,
-                               data->addin2, td->addinlen)
+                               data->addin2, adinlen)
         || memcmp(data->retbytes, buff,
                   td->retbyteslen) != 0)
         failures++;
@@ -308,7 +319,12 @@ err:
     OPENSSL_free(buff);
     RAND_DRBG_uninstantiate(drbg);
     RAND_DRBG_free(drbg);
-    return failures == 0;
+    if ( failures == 0 )
+        return fips_post_success(FIPS_TEST_DRBG, td->nid, &flags);
+    else {
+  	    fips_post_failed(FIPS_TEST_DRBG, td->nid, &flags);
+        return failures == 0;
+	}
 }
 
 /*-
@@ -330,9 +346,13 @@ static int single_kat_pr_false(const struct drbg_kat *td)
     unsigned int flags = 0;
     int failures = 0;
     TEST_CTX t;
+    int adinlen;
 
     if (td->df != USE_DF)
         flags |= RAND_DRBG_FLAG_CTR_NO_DF;
+
+    if (!fips_post_started(FIPS_TEST_DRBG, td->nid, &flags))
+        return 1;
 
     if ((drbg = RAND_DRBG_new(td->nid, flags, NULL)) == NULL)
         return 0;
@@ -361,11 +381,16 @@ static int single_kat_pr_false(const struct drbg_kat *td)
     t.entropy = data->entropyinreseed;
     t.entropylen = td->entropyinlen;
 
+    if (!fips_post_corrupt(FIPS_TEST_DRBG, td->nid, &flags)) {
+        adinlen = td->addinlen / 2;
+    } else
+        adinlen = td->addinlen;
+
     if (!RAND_DRBG_reseed(drbg, data->addinreseed, td->addinlen, 0)
         || !RAND_DRBG_generate(drbg, buff, td->retbyteslen, 0,
-                               data->addin1, td->addinlen)
+                               data->addin1, adinlen)
         || !RAND_DRBG_generate(drbg, buff, td->retbyteslen, 0,
-                               data->addin2, td->addinlen)
+                               data->addin2, adinlen)
         || memcmp(data->retbytes, buff,
                   td->retbyteslen) != 0)
         failures++;
@@ -374,7 +399,12 @@ err:
     OPENSSL_free(buff);
     RAND_DRBG_uninstantiate(drbg);
     RAND_DRBG_free(drbg);
-    return failures == 0;
+    if ( failures == 0 )
+        return fips_post_success(FIPS_TEST_DRBG, td->nid, &flags);
+    else {
+        fips_post_failed(FIPS_TEST_DRBG, td->nid, &flags);
+		return failures == 0;
+	}
 }
 
 /*-
@@ -395,9 +425,13 @@ static int single_kat_pr_true(const struct drbg_kat *td)
     unsigned int flags = 0;
     int failures = 0;
     TEST_CTX t;
+    int adinlen;
 
     if (td->df != USE_DF)
         flags |= RAND_DRBG_FLAG_CTR_NO_DF;
+    
+    if (!fips_post_started(FIPS_TEST_DRBG, td->nid, &flags))
+        return 1;
 
     if ((drbg = RAND_DRBG_new(td->nid, flags, NULL)) == NULL)
         return 0;
@@ -433,8 +467,13 @@ static int single_kat_pr_true(const struct drbg_kat *td)
     t.entropy = data->entropyinpr2;
     t.entropylen = td->entropyinlen;
 
+    if (!fips_post_corrupt(FIPS_TEST_DRBG, td->nid, &flags)) {
+        adinlen = td->addinlen / 2;
+    } else
+        adinlen = td->addinlen;
+
     if (!RAND_DRBG_generate(drbg, buff, td->retbyteslen, 1,
-                            data->addin2, td->addinlen)
+                            data->addin2, adinlen)
         || memcmp(data->retbytes, buff,
                   td->retbyteslen) != 0)
         failures++;
@@ -443,7 +482,12 @@ err:
     OPENSSL_free(buff);
     RAND_DRBG_uninstantiate(drbg);
     RAND_DRBG_free(drbg);
-    return failures == 0;
+    if ( failures == 0 )
+        return fips_post_success(FIPS_TEST_DRBG, td->nid, &flags);
+    else {
+	    fips_post_failed(FIPS_TEST_DRBG, td->nid, &flags);
+        return failures == 0;
+    }
 }
 
 static int test_kats(int i)
@@ -490,6 +534,8 @@ static int test_drbg_sanity(const struct drbg_kat *td)
     if (td->df != USE_DF)
         flags |= RAND_DRBG_FLAG_CTR_NO_DF;
 
+    if (!fips_post_started(FIPS_TEST_DRBG, td->nid, &flags))
+        return 1;
     if ((drbg = RAND_DRBG_new(td->nid, flags, NULL)) == NULL)
         return 0;
 
@@ -507,14 +553,23 @@ static int test_drbg_sanity(const struct drbg_kat *td)
 
     ERR_set_mark();
     /* This must fail. */
-    if (RAND_DRBG_instantiate(drbg, data->persstr, td->persstrlen))
+    if (!RAND_DRBG_instantiate(drbg, data->persstr, td->persstrlen))
         failures++;
     RAND_DRBG_uninstantiate(drbg);
     ERR_pop_to_mark();
 
 err:
     RAND_DRBG_free(drbg);
-    return failures == 0;
+    if ( failures == 1 )
+        if (!fips_post_corrupt(FIPS_TEST_DRBG, td->nid, &flags)) {
+            fips_post_failed(FIPS_TEST_DRBG, td->nid, &flags);
+            return 0;
+        } else
+            return fips_post_success(FIPS_TEST_DRBG, td->nid, &flags);
+    else {
+	    fips_post_failed(FIPS_TEST_DRBG, td->nid, &flags);
+        return failures == 0;
+    }
 }
 
 

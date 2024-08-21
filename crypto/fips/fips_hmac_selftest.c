@@ -433,15 +433,33 @@ int FIPS_selftest_hmac()
     const EVP_MD *md;
     const HMAC_KAT *t;
     const HMAC_KAT_SHA3 *t3;
+    int subid = -1;
+    int rv = 1;
 
     /* SHA1 and SHA2 */
     for (n = 0, t = vector; n < sizeof(vector) / sizeof(vector[0]); n++, t++) {
         md = (*t->alg) ();
-        HMAC(md, t->key, strlen(t->key),
-             (const unsigned char *)t->iv, strlen(t->iv), out, &outlen);
+        subid = EVP_MD_type(md);
+        if (!fips_post_started(FIPS_TEST_HMAC, subid, 0))
+            continue;
+        if (!fips_post_corrupt(FIPS_TEST_HMAC, subid, 0)) {
+            HMAC(md, t->key, strlen(t->key),
+                 (const unsigned char *)"t->iv", strlen("t->iv"), out, &outlen);
+        } else {
+            HMAC(md, t->key, strlen(t->key),
+                 (const unsigned char *)t->iv, strlen(t->iv), out, &outlen);
+        }
 
         if (memcmp(out, t->kaval, outlen)) {
             FIPSerr(FIPS_F_FIPS_SELFTEST_HMAC, FIPS_R_SELFTEST_FAILED);
+            if (!fips_post_failed(FIPS_TEST_HMAC, subid, NULL) ) {
+                return 0;
+            } else {
+                if (rv == 1) {
+                    rv = 0;
+                }
+            }
+        } else if (!fips_post_success(FIPS_TEST_HMAC, subid, NULL)) {
             return 0;
         }
     }
@@ -449,14 +467,30 @@ int FIPS_selftest_hmac()
     /* SHA3 */
     for (n = 0, t3 = vector_SHA3; n < sizeof(vector_SHA3) / sizeof(vector_SHA3[0]); n++, t3++) {
         md = (*t3->alg) ();
-        HMAC(md, t3->key, t3->keylen,
-             (const unsigned char *)t3->iv, strlen(t3->iv), out, &outlen);
+        subid = EVP_MD_type(md);
+        if (!fips_post_started(FIPS_TEST_HMAC, subid, 0))
+            continue;
+        if (!fips_post_corrupt(FIPS_TEST_HMAC, subid, 0)) {
+            HMAC(md, t3->key, t3->keylen,
+                 (const unsigned char *)"t3->iv", strlen("t3->iv"), out, &outlen);
+        } else {
+            HMAC(md, t3->key, t3->keylen,
+                 (const unsigned char *)t3->iv, strlen(t3->iv), out, &outlen);
+        }
 
         if (memcmp(out, t3->kaval, outlen)) {
             FIPSerr(FIPS_F_FIPS_SELFTEST_HMAC, FIPS_R_SELFTEST_FAILED);
+            if (!fips_post_failed(FIPS_TEST_HMAC, subid, NULL) ) {
+                return 0;
+            } else {
+                if (rv == 1) {
+                    rv = 0;
+                }
+            }
+        } else if (!fips_post_success(FIPS_TEST_HMAC, subid, NULL)) {
             return 0;
         }
     }
-    return 1;
+    return rv;
 }
 #endif

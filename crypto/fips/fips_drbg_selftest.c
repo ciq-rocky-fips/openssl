@@ -55,8 +55,8 @@
 #include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/fips.h>
-#define FIPS_DRBG_generate FIPS_DRBG_generate_internal
-#define FIPS_DRBG_reseed FIPS_DRBG_reseed_internal
+#define FIPS_drbg_generate FIPS_drbg_generate_internal
+#define FIPS_drbg_reseed FIPS_drbg_reseed_internal
 #include <openssl/fips_rand.h>
 #include "fips_rand_lcl.h"
 #include "fips_locl.h"
@@ -219,10 +219,11 @@ static int fips_drbg_single_kat(DRBG_CTX *dctx, DRBG_SELFTEST_DATA * td,
      * ignore bytes after the keylength: so reduce adinlen
      * to half to ensure invalid data is fed in.
      */
-    if (!fips_post_corrupt(FIPS_TEST_DRBG, dctx->type, &dctx->iflags))
+    if (!fips_post_corrupt(FIPS_TEST_DRBG, dctx->type, &dctx->iflags)) {
         adinlen = td->adinlen / 2;
-    else
+    } else {
         adinlen = td->adinlen;
+    }
 
     /* Generate with no PR and verify output matches expected data */
     if (!FIPS_drbg_generate(dctx, randout, td->katlen, 0, td->adin, adinlen))
@@ -289,9 +290,9 @@ static int fips_drbg_single_kat(DRBG_CTX *dctx, DRBG_SELFTEST_DATA * td,
      * ignore bytes after the keylength: so reduce adinlen
      * to half to ensure invalid data is fed in.
      */
-    if (!fips_post_corrupt(FIPS_TEST_DRBG, dctx->type, &dctx->iflags))
+    if (!fips_post_corrupt(FIPS_TEST_DRBG, dctx->type, &dctx->iflags)) {
         adinlen = td->adinlen_pr / 2;
-    else
+    } else
         adinlen = td->adinlen_pr;
     if (!FIPS_drbg_generate(dctx, randout, td->katlen_pr, 1,
                             td->adin_pr, adinlen))

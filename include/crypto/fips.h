@@ -76,14 +76,14 @@ int FIPS_selftest_kdf(void);
 
 int fips_in_post(void);
 
-int fips_pkey_signature_test(EVP_PKEY *pkey,
+int fips_pkey_signature_test(int id, EVP_PKEY *pkey,
                                  const unsigned char *tbs, int tbslen,
                                  const unsigned char *kat,
                                  unsigned int katlen,
                                  const EVP_MD *digest,
                                  unsigned int md_flags, const char *fail_str);
 
-int fips_cipher_test(EVP_CIPHER_CTX *ctx,
+int fips_cipher_test(int id, EVP_CIPHER_CTX *ctx,
                          const EVP_CIPHER *cipher,
                          const unsigned char *key,
                          const unsigned char *iv,

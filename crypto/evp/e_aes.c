@@ -18,6 +18,7 @@
 #include "modes_local.h"
 #include <openssl/rand.h>
 #include "evp_local.h"
+#include <openssl/fips.h>
 
 typedef struct {
     union {
@@ -3346,10 +3347,13 @@ static int aes_xts_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
     if (!iv && !key)
         return 1;
 
+    if (!fips_post_started(FIPS_TEST_DUP, -1, -1))
+        return 1;
+
     if (key)
         do {
             /* The key is two half length keys in reality */
-            const int bytes = EVP_CIPHER_CTX_key_length(ctx) / 2;
+            int bytes = EVP_CIPHER_CTX_key_length(ctx) / 2;
 
             /*
              * Verify that the two keys are different.
@@ -3367,8 +3371,12 @@ static int aes_xts_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
              *       BEFORE using the keys in the XTS-AES algorithm to process
              *       data with them."
              */
+            if (!fips_post_corrupt(FIPS_TEST_DUP, -1, -1)) {
+                bytes = 0;
+	    }
             if (CRYPTO_memcmp(key, key + bytes, bytes) == 0) {
                 EVPerr(EVP_F_AES_XTS_INIT_KEY, EVP_R_XTS_DUPLICATED_KEYS);
+                fips_post_failed(FIPS_TEST_DUP, -1, -1);
                 return 0;
             }
 
@@ -3460,7 +3468,7 @@ static int aes_xts_init_key(EVP_CIPHER_CTX *ctx, const unsigned char *key,
         memcpy(EVP_CIPHER_CTX_iv_noconst(ctx), iv, 16);
     }
 
-    return 1;
+    return fips_post_success(FIPS_TEST_DUP, -1, -1);
 }
 
 static int aes_xts_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,

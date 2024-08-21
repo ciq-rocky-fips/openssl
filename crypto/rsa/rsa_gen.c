@@ -35,10 +35,10 @@ int fips_check_rsa(RSA *rsa)
     EVP_PKEY_set1_RSA(pk, rsa);
 
     /* Perform pairwise consistency signature test */
-    if (!fips_pkey_signature_test(pk, tbs, -1,
+    if (!fips_pkey_signature_test(FIPS_TEST_PAIRWISE, pk, tbs, -1,
                                   NULL, 0, EVP_sha256(),
                                   EVP_MD_CTX_FLAG_PAD_PKCS1, NULL)
-        || !fips_pkey_signature_test(pk, tbs, -1, NULL, 0, EVP_sha256(),
+        || !fips_pkey_signature_test(FIPS_TEST_PAIRWISE, pk, tbs, -1, NULL, 0, EVP_sha256(),
                                      EVP_MD_CTX_FLAG_PAD_PSS, NULL))
         goto err;
     /* Now perform pairwise consistency encrypt/decrypt test */

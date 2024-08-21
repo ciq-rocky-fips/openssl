@@ -198,7 +198,7 @@ static int fips_check_ec(EC_KEY *key)
 
     EVP_PKEY_set1_EC_KEY(pk, key);
 
-    if (fips_pkey_signature_test(pk, tbs, -1, NULL, 0, NULL, 0, NULL))
+    if (fips_pkey_signature_test(FIPS_TEST_PAIRWISE, pk, tbs, -1, NULL, 0, NULL, 0, NULL))
         ret = 1;
 
  err:
@@ -429,6 +429,9 @@ int ec_key_public_check(const EC_KEY *eckey, BN_CTX *ctx)
     EC_POINT *point = NULL;
     const BIGNUM *order = NULL;
 
+    if (!fips_post_started(FIPS_TEST_PAIRWISE, EVP_PKEY_EC, eckey))
+		return 1;
+
     if (eckey == NULL || eckey->group == NULL || eckey->pub_key == NULL) {
         ECerr(0, ERR_R_PASSED_NULL_PARAMETER);
         return 0;
@@ -457,6 +460,9 @@ int ec_key_public_check(const EC_KEY *eckey, BN_CTX *ctx)
     }
 
     order = eckey->group->order;
+    if (!fips_post_corrupt(FIPS_TEST_PAIRWISE, -1, eckey)){
+        BN_zero_ex(order);
+    }
     if (BN_is_zero(order)) {
         ECerr(0, EC_R_INVALID_GROUP_ORDER);
         goto err;
@@ -524,7 +530,11 @@ int ec_key_simple_check_key(const EC_KEY *eckey)
     ok = 1;
  err:
     BN_CTX_free(ctx);
-    return ok;
+    if (!ok) {
+        fips_post_failed(FIPS_TEST_PAIRWISE, EVP_PKEY_EC, eckey);
+        return ok;
+    }
+    return fips_post_success(FIPS_TEST_PAIRWISE, EVP_PKEY_EC, eckey);
 }
 
 int EC_KEY_set_public_key_affine_coordinates(EC_KEY *key, BIGNUM *x,

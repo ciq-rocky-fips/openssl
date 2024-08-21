@@ -548,7 +548,29 @@ void FIPS_drbg_set_reseed_interval(DRBG_CTX *dctx, int interval)
     dctx->reseed_interval = interval;
 }
 
+static int drbg_stick = 0;
+
 void FIPS_drbg_stick(int onoff)
 {
     /* Just backwards compatibility API call with no effect. */
+    drbg_stick = onoff;
+}
+
+/* Continuous DRBG utility function */
+int fips_drbg_cprng_test(DRBG_CTX *dctx, const unsigned char *out)
+{
+    /* No CPRNG in test mode */
+    if (dctx->xflags & DRBG_FLAG_TEST)
+        return 1;
+    if (drbg_stick)
+        memcpy(dctx->lb, out, dctx->blocklength);
+    /* Check against last block: fail if match */
+    if (!memcmp(dctx->lb, out, dctx->blocklength)) {
+        FIPSerr(FIPS_F_FIPS_DRBG_CPRNG_TEST, FIPS_R_DRBG_STUCK);
+        fips_set_selftest_fail();
+        return 0;
+    }
+    /* Save last block for next comparison */
+    memcpy(dctx->lb, out, dctx->blocklength);
+    return 1;
 }

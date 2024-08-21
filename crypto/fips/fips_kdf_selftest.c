@@ -32,6 +32,9 @@ static int FIPS_selftest_tls13(void)
         0x92, 0xCF, 0xF1, 0x7E, 0xEE, 0x91, 0x65, 0xE4,
         0xE2, 0x7B, 0xAB, 0xEE, 0x9E, 0xDE, 0xFD, 0x05
     };
+
+    if (!fips_post_started(FIPS_TEST_TLS13, -1, NULL))
+        return 1;
          
     if (EVP_PKEY_derive_init(pctx) <= 0)
         goto err;
@@ -43,6 +46,10 @@ static int FIPS_selftest_tls13(void)
         goto err;
     if (EVP_PKEY_derive(pctx, out, &outlen) <= 0)
         goto err;
+    
+    if (!fips_post_corrupt(FIPS_TEST_TLS13, -1, NULL)) {
+        out[0] ^= 1;
+    }
         
     {              
         static const unsigned char expected[] = { //tls13_kdf_early_secret[] = {
@@ -61,6 +68,10 @@ err:
     EVP_PKEY_CTX_free(pctx);
     if (!ret)
         FIPSerr(FIPS_F_FIPS_SELFTEST_TLS13, FIPS_R_SELFTEST_FAILED);
+    if ( ret == 0 )
+        fips_post_failed(FIPS_TEST_TLS13, -1, NULL);
+    else
+        fips_post_success(FIPS_TEST_TLS13, -1, NULL);
     return ret;
 }
 
@@ -69,6 +80,9 @@ static int FIPS_selftest_tls1_prf(void)
     int ret = 0;
     EVP_KDF_CTX *kctx;
     unsigned char out[16];
+
+    if (!fips_post_started(FIPS_TEST_TLS1, -1, NULL))
+        return 1;
 
     if ((kctx = EVP_KDF_CTX_new_id(EVP_KDF_TLS1_PRF)) == NULL) {
         goto err;
@@ -87,6 +101,10 @@ static int FIPS_selftest_tls1_prf(void)
         goto err;
     }
 
+    if (!fips_post_corrupt(FIPS_TEST_TLS1, -1, NULL)) {
+        out[0] ^= 1;
+    }
+
     {
         const unsigned char expected[sizeof(out)] = {
             0x8e, 0x4d, 0x93, 0x25, 0x30, 0xd7, 0x65, 0xa0,
@@ -102,6 +120,11 @@ err:
     if (!ret)
         FIPSerr(FIPS_F_FIPS_SELFTEST_TLS1_PRF, FIPS_R_SELFTEST_FAILED);
     EVP_KDF_CTX_free(kctx);
+
+    if ( ret == 0 )
+        fips_post_failed(FIPS_TEST_TLS1, -1, NULL);
+    else
+        fips_post_success(FIPS_TEST_TLS1, -1, NULL);
     return ret;
 }
 
@@ -110,6 +133,9 @@ static int FIPS_selftest_hkdf(void)
     int ret = 0;
     EVP_KDF_CTX *kctx;
     unsigned char out[10];
+
+    if (!fips_post_started(FIPS_TEST_HKDF, -1, NULL))
+        return 1;
 
     if ((kctx = EVP_KDF_CTX_new_id(EVP_KDF_HKDF)) == NULL) {
         goto err;
@@ -131,6 +157,10 @@ static int FIPS_selftest_hkdf(void)
         goto err;
     }
 
+    if (!fips_post_corrupt(FIPS_TEST_HKDF, -1, NULL)) {
+        out[0] ^= 1;
+    }
+
     {
         const unsigned char expected[sizeof(out)] = {
             0x2a, 0xc4, 0x36, 0x9f, 0x52, 0x59, 0x96, 0xf8, 0xde, 0x13
@@ -144,6 +174,10 @@ err:
     if (!ret)
         FIPSerr(FIPS_F_FIPS_SELFTEST_HKDF, FIPS_R_SELFTEST_FAILED);
     EVP_KDF_CTX_free(kctx);
+    if ( ret == 0 )
+        fips_post_failed(FIPS_TEST_HKDF, -1, NULL);
+    else
+        fips_post_success(FIPS_TEST_HKDF, -1, NULL);
     return ret;
 }
 
@@ -184,6 +218,8 @@ static int FIPS_selftest_sshkdf(void)
         0xba, 0x39, 0x4d, 0xaa, 0xfb, 0xc6, 0x21, 0xed
     };
 
+    if (!fips_post_started(FIPS_TEST_SSHKDF, -1, NULL))
+        return 1;
 
     if ((kctx = EVP_KDF_CTX_new_id(EVP_KDF_SSHKDF)) == NULL) {
         goto err;
@@ -210,6 +246,10 @@ static int FIPS_selftest_sshkdf(void)
         goto err;
     }
 
+    if (!fips_post_corrupt(FIPS_TEST_SSHKDF, -1, NULL)) {
+        out[0] ^= 1;
+    }
+
     {
         const unsigned char expected[sizeof(out)] = {
             0x14, 0x7a, 0x77, 0x14, 0x45, 0x12, 0x3f, 0x84,
@@ -226,6 +266,10 @@ static int FIPS_selftest_sshkdf(void)
 err:
     if (!ret)
         FIPSerr(FIPS_F_FIPS_SELFTEST_SSHKDF, FIPS_R_SELFTEST_FAILED);
+    if ( ret == 0 )
+        fips_post_failed(FIPS_TEST_SSHKDF, -1, NULL);
+    else
+        fips_post_success(FIPS_TEST_SSHKDF, -1, NULL);
     EVP_KDF_CTX_free(kctx);
     return ret;
 }
@@ -235,6 +279,9 @@ static int FIPS_selftest_pbkdf2(void)
     int ret = 0;
     EVP_KDF_CTX *kctx;
     unsigned char out[32];
+
+    if (!fips_post_started(FIPS_TEST_PBKDF, -1, NULL))
+        return 1;
 
     if ((kctx = EVP_KDF_CTX_new_id(EVP_KDF_PBKDF2)) == NULL) {
         goto err;
@@ -255,6 +302,10 @@ static int FIPS_selftest_pbkdf2(void)
         goto err;
     }
 
+    if (!fips_post_corrupt(FIPS_TEST_PBKDF, -1, NULL)) {
+        out[0] ^= 1;
+    }
+
     {
         const unsigned char expected[sizeof(out)] = {
             0xae, 0x4d, 0x0c, 0x95, 0xaf, 0x6b, 0x46, 0xd3,
@@ -272,6 +323,10 @@ err:
     if (!ret)
         FIPSerr(FIPS_F_FIPS_SELFTEST_PBKDF2, FIPS_R_SELFTEST_FAILED);
     EVP_KDF_CTX_free(kctx);
+    if ( ret == 0 )
+        fips_post_failed(FIPS_TEST_PBKDF, -1, NULL);
+    else
+        fips_post_success(FIPS_TEST_PBKDF, -1, NULL);
     return ret;
 }
 
@@ -294,6 +349,9 @@ static int FIPS_selftest_kbkdf(void)
     };
     unsigned char result[sizeof(output)] = { 0 };
 
+    if (!fips_post_started(FIPS_TEST_KBKDF, -1, NULL))
+        return 1;
+
     if ((kctx = EVP_KDF_CTX_new_id(EVP_KDF_KB)) == NULL) {
         goto err;
     }
@@ -312,11 +370,27 @@ static int FIPS_selftest_kbkdf(void)
     if (EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_KB_INFO, prf_input, strlen(prf_input)) <= 0) {
         goto err;
     }
-    ret = EVP_KDF_derive(kctx, result, sizeof(result)) > 0
-        && memcmp(result, output, sizeof(output)) == 0;
+    if (EVP_KDF_derive(kctx, result, sizeof(result)) <= 0) {
+        goto err;
+    }
+    
+    if (!fips_post_corrupt(FIPS_TEST_KBKDF, -1, NULL)) {
+        result[0] ^= 1;
+    }
+
+    if (memcmp(result, output, sizeof(output)) ){
+        goto err;
+    }
+
+    ret = 1;
+
 err:
     if (!ret)
         FIPSerr(FIPS_F_FIPS_SELFTEST_KBKDF, FIPS_R_SELFTEST_FAILED);
+    if ( ret == 0 )
+        fips_post_failed(FIPS_TEST_KBKDF, -1, NULL);
+    else
+        fips_post_success(FIPS_TEST_KBKDF, -1, NULL);
     EVP_KDF_CTX_free(kctx);
     return ret;
 }

@@ -288,22 +288,45 @@ static int fips_rsa_encrypt_test(RSA *rsa, const unsigned char *plaintext,
     if (!ctbuf)
         goto err;
 
+    if (!fips_post_started(FIPS_TEST_RSA_ENCRYPT, RSA_NO_PADDING, NULL))
+        return 1;
+
     len = RSA_public_encrypt(ptlen, plaintext, ctbuf, rsa, RSA_NO_PADDING);
     if (len <= 0)
         goto err;
+
+    if (!fips_post_corrupt(FIPS_TEST_RSA_ENCRYPT, RSA_NO_PADDING, NULL)){
+        memcpy(ctbuf, plaintext, ptlen);
+        len = ptlen;
+    }
+
     /* Check ciphertext doesn't match plaintext */
-    if (len >= ptlen && !memcmp(plaintext, ctbuf, ptlen) && memcmp(ctbuf, kat_enc_ct, len))
+    if (len >= ptlen && !memcmp(plaintext, ctbuf, ptlen) && memcmp(ctbuf, kat_enc_ct, len)) {
+        fips_post_failed(FIPS_TEST_RSA_ENCRYPT, RSA_NO_PADDING, NULL);
         goto err;
+    }
+
+    fips_post_success(FIPS_TEST_RSA_ENCRYPT, RSA_NO_PADDING, NULL);
 
     ptbuf = OPENSSL_malloc(RSA_size(rsa));
     if (!ptbuf)
         goto err;
 
+    if (!fips_post_started(FIPS_TEST_RSA_DECRYPT, RSA_NO_PADDING, NULL))
+        return 1;
+
     len = RSA_private_decrypt(len, ctbuf, ptbuf, rsa, RSA_NO_PADDING);
     if (len != ptlen)
         goto err;
-    if (memcmp(ptbuf, plaintext, len))
+
+    if (!fips_post_corrupt(FIPS_TEST_RSA_DECRYPT, RSA_NO_PADDING, NULL)) {
+        ptbuf[0] ^= 1;
+    }
+
+    if (memcmp(ptbuf, plaintext, len)) {
+        fips_post_failed(FIPS_TEST_RSA_DECRYPT, RSA_NO_PADDING, NULL);
         goto err;
+    }
 
     ret = 1;
 
@@ -332,13 +355,13 @@ int FIPS_selftest_rsa()
 
     EVP_PKEY_set1_RSA(pk, key);
 
-    if (!fips_pkey_signature_test(pk, kat_tbs, sizeof(kat_tbs) - 1,
+    if (!fips_pkey_signature_test(FIPS_TEST_SIGNATURE, pk, kat_tbs, sizeof(kat_tbs) - 1,
                                   kat_RSA_SHA256, sizeof(kat_RSA_SHA256),
                                   EVP_sha256(), EVP_MD_CTX_FLAG_PAD_PKCS1,
                                   "RSA SHA256 PKCS#1"))
         goto err;
 
-    if (!fips_pkey_signature_test(pk, kat_tbs, sizeof(kat_tbs) - 1,
+    if (!fips_pkey_signature_test(FIPS_TEST_SIGNATURE, pk, kat_tbs, sizeof(kat_tbs) - 1,
                                   kat_RSA_PSS_SHA256,
                                   sizeof(kat_RSA_PSS_SHA256), EVP_sha256(),
                                   EVP_MD_CTX_FLAG_PAD_PSS, "RSA SHA256 PSS"))

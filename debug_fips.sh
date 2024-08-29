@@ -13,7 +13,7 @@ DEBUG_BUILD="shared no-asm 386 no-sse2 zlib-dynamic -g -gdwarf-4 -fno-inline -O0
 	enable-cms enable-md2 enable-rc5\
 	enable-weak-ssl-ciphers \
 	no-mdc2 no-ec2m no-sm2 no-sm4 \
-	shared  linux-x86_64 $RPM_OPT_FLAGS '-DDEVRANDOM="\"/dev/urandom\""'
+	shared  linux-x86_64 $RPM_OPT_FLAGS '-DDEVRANDOM="\"/dev/urandom\"" -DOPENSSL_VERSION_SERVICE_STR="\"Rocky Linux 8 OpenSSL Cryptographic Module Version Rocky8.20240321\""'
 
 make clean
 make all

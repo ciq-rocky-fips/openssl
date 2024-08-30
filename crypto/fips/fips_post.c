@@ -70,10 +70,6 @@
 # include "crypto/rand.h"
 # include "fips_locl.h"
 
-char* FIPS_show_version(void)
-{
-    return "Rocky Linux 8 OpenSSL Cryptographic Module Version Rocky8.20240321";
-}
 
 /* Run all selftests */
 int FIPS_selftest(void)
@@ -115,7 +111,6 @@ int FIPS_selftest(void)
     if (!FIPS_selftest_kdf())
         rv = 0;
 
-    FIPS_show_version();
     return rv;
 }
 

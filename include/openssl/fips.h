@@ -64,7 +64,6 @@ extern "C" {
 
     int FIPS_selftest(void);
     int FIPS_selftest_failed(void);
-    char *FIPS_show_version(void);
 
     /*
      * This function is deprecated as it performs selftest of the old FIPS drbg

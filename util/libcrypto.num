@@ -4634,7 +4634,6 @@ EVP_KDF_vctrl                           6594	1_1_1b	EXIST::FUNCTION:
 EVP_KDF_ctrl_str                        6595	1_1_1b	EXIST::FUNCTION:
 EVP_KDF_size                            6596	1_1_1b	EXIST::FUNCTION:
 EVP_KDF_derive                          6597	1_1_1b	EXIST::FUNCTION:
-FIPS_show_version                       6598	1_1_1k	EXIST::FUNCTION:
 EC_GROUP_get0_field                     6599	1_1_1k  EXIST::FUNCTION:
 fips_sli_is_approved_EVP_MD_CTX         6600	1_1_1k	EXIST::FUNCTION:
 fips_sli_is_approved_CMAC_CTX           6601	1_1_1k	EXIST::FUNCTION:

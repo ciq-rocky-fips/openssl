@@ -14,6 +14,10 @@
 extern "C" {
 #endif
 
+
+#define Rocky_OPENSSL_STRING_PARAM_FUNCA(x) #x
+#define Rocky_OPENSSL_STRING_PARAM_FUNCB(x) Rocky_OPENSSL_STRING_PARAM_FUNCA(x)
+
 /*-
  * Numeric release version identifier:
  * MNNFFPPS: major minor fix patch status
@@ -40,7 +44,7 @@ extern "C" {
  *  major minor fix final patch/beta)
  */
 # define OPENSSL_VERSION_NUMBER  0x101010bfL
-# define OPENSSL_VERSION_TEXT    "OpenSSL 1.1.1k  FIPS 25 Mar 2021"
+# define OPENSSL_VERSION_TEXT    "OpenSSL 1.1.1k  FIPS 25 Mar 2021 Rocky release " Rocky_OPENSSL_STRING_PARAM_FUNCB(ROCKY_OPENSSL_RELEASE)
 
 /*-
  * The macros below are to be used for shared library (.so, .dll, ...)

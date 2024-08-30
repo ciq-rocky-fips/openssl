@@ -145,8 +145,6 @@ int main(int argc, char *argv[])
     win32_utf8argv(&argc, &argv);
 #endif
 
-    BIO_printf(bio_out, FIPS_show_version());
-
     p = getenv("OPENSSL_DEBUG_MEMORY");
     if (p != NULL && strcmp(p, "on") == 0)
         CRYPTO_set_mem_debug(1);

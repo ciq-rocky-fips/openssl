@@ -70,10 +70,6 @@
 # include "crypto/rand.h"
 # include "fips_locl.h"
 
-char* FIPS_show_version(void)
-{
-    return OPENSSL_VERSION_SERVICE_STR;
-}
 
 /* Run all selftests */
 int FIPS_selftest(void)

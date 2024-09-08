@@ -765,15 +765,34 @@ int pkcs12_main(int argc, char **argv)
     }
     if (macver) {
         EVP_KDF *pkcs12kdf;
+        char *adjusted_propq = NULL;
+        const char *nofips = "-fips";
+        size_t len = app_get0_propq() ? strlen(app_get0_propq()) + 1 + strlen(nofips) + 1 :
+                                                            strlen(nofips) + 1;
+        char *ptr = NULL;
+
+        adjusted_propq = OPENSSL_zalloc(len);
+        if (adjusted_propq != NULL) {
+                ptr = adjusted_propq;
+                if (app_get0_propq()) {
+                    memcpy(ptr, app_get0_propq(), strlen(app_get0_propq()));
+                    ptr += strlen(app_get0_propq());
+                    *ptr = ',';
+                    ptr++;
+                }
+                memcpy(ptr, nofips, strlen(nofips));
+        }
 
         pkcs12kdf = EVP_KDF_fetch(app_get0_libctx(), "PKCS12KDF",
-                                  app_get0_propq());
+                                  adjusted_propq ? adjusted_propq : app_get0_propq());
         if (pkcs12kdf == NULL) {
             BIO_printf(bio_err, "Error verifying PKCS12 MAC; no PKCS12KDF support.\n");
             BIO_printf(bio_err, "Use -nomacver if MAC verification is not required.\n");
+            OPENSSL_free(adjusted_propq);
             goto end;
         }
         EVP_KDF_free(pkcs12kdf);
+        OPENSSL_free(adjusted_propq);
         /* If we enter empty password try no password first */
         if (!mpass[0] && PKCS12_verify_mac(p12, NULL, 0)) {
             /* If mac and crypto pass the same set it to NULL too */

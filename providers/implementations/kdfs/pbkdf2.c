@@ -251,11 +251,42 @@ static const OSSL_PARAM *kdf_pbkdf2_settable_ctx_params(ossl_unused void *ctx,
 
 static int kdf_pbkdf2_get_ctx_params(void *vctx, OSSL_PARAM params[])
 {
+#ifdef FIPS_MODULE
+    KDF_PBKDF2 *ctx = (KDF_PBKDF2 *)vctx;
+#endif /* defined(FIPS_MODULE) */
     OSSL_PARAM *p;
+    int any_valid = 0; /* set to 1 when at least one parameter was valid */
 
-    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE)) != NULL)
-        return OSSL_PARAM_set_size_t(p, SIZE_MAX);
-    return -2;
+    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE)) != NULL) {
+        any_valid = 1;
+
+        if (!OSSL_PARAM_set_size_t(p, SIZE_MAX))
+            return 0;
+    }
+
+#ifdef FIPS_MODULE
+    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR))
+            != NULL) {
+        int fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_APPROVED;
+
+        /* The lower_bound_checks parameter enables checks required by FIPS. If
+         * those checks are disabled, the PBKDF2 implementation will also
+         * support non-approved parameters (e.g., salt lengths < 16 bytes, see
+         * NIST SP 800-132 section 5.1). */
+        if (!ctx->lower_bound_checks)
+            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+
+        if (!OSSL_PARAM_set_int(p, fips_indicator))
+            return 0;
+
+        any_valid = 1;
+    }
+#endif /* defined(FIPS_MODULE) */
+
+    if (!any_valid)
+        return -2;
+
+    return 1;
 }
 
 static const OSSL_PARAM *kdf_pbkdf2_gettable_ctx_params(ossl_unused void *ctx,
@@ -263,6 +294,9 @@ static const OSSL_PARAM *kdf_pbkdf2_gettable_ctx_params(ossl_unused void *ctx,
 {
     static const OSSL_PARAM known_gettable_ctx_params[] = {
         OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
+#ifdef FIPS_MODULE
+        OSSL_PARAM_int(OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR, NULL),
+#endif /* defined(FIPS_MODULE) */
         OSSL_PARAM_END
     };
     return known_gettable_ctx_params;

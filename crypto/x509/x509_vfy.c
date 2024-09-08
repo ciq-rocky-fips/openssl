@@ -25,6 +25,7 @@
 #include <openssl/objects.h>
 #include <openssl/core_names.h>
 #include "internal/dane.h"
+#include "internal/sslconf.h"
 #include "crypto/x509.h"
 #include "x509_local.h"
 
@@ -3430,14 +3431,30 @@ static int check_sig_level(X509_STORE_CTX *ctx, X509 *cert)
 {
     int secbits = -1;
     int level = ctx->param->auth_level;
+    int nid;
+    OSSL_LIB_CTX *libctx = NULL;
 
     if (level <= 0)
         return 1;
     if (level > NUM_AUTH_LEVELS)
         level = NUM_AUTH_LEVELS;
 
-    if (!X509_get_signature_info(cert, NULL, NULL, &secbits, NULL))
+    if (ctx->libctx)
+        libctx = ctx->libctx;
+    else if (cert->libctx)
+        libctx = cert->libctx;
+    else
+        libctx = OSSL_LIB_CTX_get0_global_default();
+
+    if (!X509_get_signature_info(cert, &nid, NULL, &secbits, NULL))
         return 0;
+
+    if (nid == NID_sha1
+            && ossl_ctx_legacy_digest_signatures_allowed(libctx, 0)
+            && ctx->param->auth_level < 3)
+        /* When rh-allow-sha1-signatures = yes and security level <= 2,
+         * explicitly allow SHA1 for backwards compatibility. */
+        return 1;
 
     return secbits >= minbits_table[level - 1];
 }

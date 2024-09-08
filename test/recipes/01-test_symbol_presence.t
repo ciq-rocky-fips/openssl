@@ -77,6 +77,7 @@ foreach my $libname (@libnames) {
                 s| .*||;
                 # Drop OpenSSL dynamic version information if there is any
                 s|\@\@.+$||;
+                s|\@.+$||;
                 # Return the result
                 $_
             }

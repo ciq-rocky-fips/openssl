@@ -398,6 +398,10 @@ int ossl_ec_key_fromdata(EC_KEY *ec, const OSSL_PARAM params[], int include_priv
     const OSSL_PARAM *param_priv_key = NULL, *param_pub_key = NULL;
     BN_CTX *ctx = NULL;
     BIGNUM *priv_key = NULL;
+#ifdef FIPS_MODULE
+    const OSSL_PARAM *param_sign_kat_k = NULL;
+    BIGNUM *sign_kat_k = NULL;
+#endif
     unsigned char *pub_key = NULL;
     size_t pub_key_len;
     const EC_GROUP *ecg = NULL;
@@ -413,7 +417,10 @@ int ossl_ec_key_fromdata(EC_KEY *ec, const OSSL_PARAM params[], int include_priv
     if (include_private)
         param_priv_key =
             OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PRIV_KEY);
-
+#ifdef FIPS_MODULE
+    param_sign_kat_k =
+        OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_REDHAT_SIGN_KAT_K);
+#endif
     ctx = BN_CTX_new_ex(ossl_ec_key_get_libctx(ec));
     if (ctx == NULL)
         goto err;
@@ -486,6 +493,17 @@ int ossl_ec_key_fromdata(EC_KEY *ec, const OSSL_PARAM params[], int include_priv
         && !EC_KEY_set_public_key(ec, pub_point))
         goto err;
 
+#ifdef FIPS_MODULE
+    if (param_sign_kat_k) {
+        if ((sign_kat_k = BN_secure_new()) == NULL)
+            goto err;
+        BN_set_flags(sign_kat_k, BN_FLG_CONSTTIME);
+
+        if (!OSSL_PARAM_get_BN(param_sign_kat_k, &sign_kat_k))
+            goto err;
+        ec->sign_kat_k = sign_kat_k;
+    }
+#endif
     ok = 1;
 
  err:

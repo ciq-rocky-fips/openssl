@@ -97,6 +97,9 @@ void EC_KEY_free(EC_KEY *r)
     EC_GROUP_free(r->group);
     EC_POINT_free(r->pub_key);
     BN_clear_free(r->priv_key);
+#ifdef FIPS_MODULE
+    BN_clear_free(r->sign_kat_k);
+#endif
     OPENSSL_free(r->propq);
 
     OPENSSL_clear_free((void *)r, sizeof(EC_KEY));

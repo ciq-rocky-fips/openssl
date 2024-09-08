@@ -20,6 +20,10 @@
 #include "crypto/bn.h"
 #include "ec_local.h"
 
+#ifdef FIPS_MODULE
+extern int REDHAT_FIPS_signature_st;
+#endif
+
 int ossl_ecdsa_sign_setup(EC_KEY *eckey, BN_CTX *ctx_in, BIGNUM **kinvp,
                           BIGNUM **rp)
 {
@@ -126,6 +130,11 @@ static int ecdsa_sign_setup(EC_KEY *eckey, BN_CTX *ctx_in,
         goto err;
 
     do {
+#ifdef FIPS_MODULE
+       if (REDHAT_FIPS_signature_st && eckey->sign_kat_k != NULL) {
+           BN_copy(k, eckey->sign_kat_k);
+       } else {
+#endif
         /* get random k */
         do {
             if (dgst != NULL) {
@@ -141,7 +150,9 @@ static int ecdsa_sign_setup(EC_KEY *eckey, BN_CTX *ctx_in,
                 }
             }
         } while (BN_is_zero(k));
-
+#ifdef FIPS_MODULE
+        }
+#endif
         /* compute r the x-coordinate of generator * k */
         if (!EC_POINT_mul(group, tmp_point, k, NULL, NULL, ctx)) {
             ERR_raise(ERR_LIB_EC, ERR_R_EC_LIB);

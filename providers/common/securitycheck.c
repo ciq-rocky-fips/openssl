@@ -27,7 +27,7 @@
  * Set protect = 1 for encryption or signing operations, or 0 otherwise. See
  * https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-131Ar2.pdf.
  */
-/* Red Hat build implements some extra limitations in providers/implementations/asymciphers/rsa_enc.c */
+/* Rocky build implements some extra limitations in providers/implementations/asymciphers/rsa_enc.c */
 int ossl_rsa_check_key(OSSL_LIB_CTX *ctx, const RSA *rsa, int operation)
 {
     int protect = 0;

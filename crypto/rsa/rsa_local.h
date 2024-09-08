@@ -199,6 +199,6 @@ int ossl_rsa_padding_add_PKCS1_OAEP_mgf1_ex2(OSSL_LIB_CTX *libctx,
                                              const unsigned char *param,
                                              int plen, const EVP_MD *md,
                                              const EVP_MD *mgf1md,
-                                             const char *redhat_st_seed);
+                                             const char *rocky_st_seed);
 
 #endif /* OSSL_CRYPTO_RSA_LOCAL_H */

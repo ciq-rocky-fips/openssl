@@ -176,7 +176,7 @@ static int kdf_hkdf_derive(void *vctx, unsigned char *key, size_t keylen,
 
 #ifdef FIPS_MODULE
     if (keylen < EVP_KDF_FIPS_MIN_KEY_LEN)
-        ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+        ctx->fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
 #endif /* defined(FIPS_MODULE) */
 
     switch (ctx->mode) {
@@ -312,9 +312,9 @@ static int kdf_hkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
     }
 
 #ifdef FIPS_MODULE
-    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR))
+    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR))
             != NULL) {
-        int fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_APPROVED;
+        int fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_APPROVED;
         const EVP_MD *md = ossl_prov_digest_md(&ctx->digest);
 
         any_valid = 1;
@@ -324,7 +324,7 @@ static int kdf_hkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
          * the key-derivation key [i.e., the input key] shall be at least 112
          * bits". */
         if (ctx->key_len < EVP_KDF_FIPS_MIN_KEY_LEN)
-            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+            fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
 
         /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
          * Verification Program, Section D.B and NIST Special Publication
@@ -333,8 +333,8 @@ static int kdf_hkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
          * be longer than that. If a derived key has ever been shorter than
          * that, ctx->output_keyelen_indicator will be NOT_APPROVED, and we
          * should also set the returned FIPS indicator to unapproved. */
-        if (ctx->fips_indicator == EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED)
-            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+        if (ctx->fips_indicator == EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED)
+            fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
 
         if (ctx->is_tls13) {
             if (md != NULL
@@ -349,7 +349,7 @@ static int kdf_hkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
                  * Option #3), SP 800-56Crev2, and SP 800-108."
                  *
                  * RFC 8446 appendix B.4 only lists SHA-256 and SHA-384. */
-                fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+                fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
             }
         } else {
             if (md != NULL
@@ -360,7 +360,7 @@ static int kdf_hkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
                  * of FIPS 140-3 IG, section C.C: "The SHAKE128 and SHAKE256
                  * extendable-output functions may only be used as the
                  * standalone algorithms." */
-                fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+                fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
             }
         }
         if (!OSSL_PARAM_set_int(p, fips_indicator))
@@ -380,7 +380,7 @@ static const OSSL_PARAM *kdf_hkdf_gettable_ctx_params(ossl_unused void *ctx,
     static const OSSL_PARAM known_gettable_ctx_params[] = {
         OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
 #ifdef FIPS_MODULE
-        OSSL_PARAM_int(OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR, NULL),
+        OSSL_PARAM_int(OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR, NULL),
 #endif /* defined(FIPS_MODULE) */
         OSSL_PARAM_END
     };
@@ -739,7 +739,7 @@ static int kdf_tls1_3_derive(void *vctx, unsigned char *key, size_t keylen,
 
 #ifdef FIPS_MODULE
     if (keylen < EVP_KDF_FIPS_MIN_KEY_LEN)
-        ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+        ctx->fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
 #endif /* defined(FIPS_MODULE) */
 
     switch (ctx->mode) {

@@ -45,7 +45,7 @@
 #define S390X_OFF_Y(n)                  (4 * n)
 
 #ifdef FIPS_MODULE
-extern int REDHAT_FIPS_signature_st;
+extern int ROCKY_FIPS_signature_st;
 #endif
 
 static int ec_GFp_s390x_nistp_mul(const EC_GROUP *group, EC_POINT *r,
@@ -188,7 +188,7 @@ static ECDSA_SIG *ecdsa_s390x_nistp_sign_sig(const unsigned char *dgst,
          * internally implementing counter-measures for RNG weakness.
          */
 #ifdef FIPS_MODULE
-       if (REDHAT_FIPS_signature_st && eckey->sign_kat_k != NULL) {
+       if (ROCKY_FIPS_signature_st && eckey->sign_kat_k != NULL) {
            BN_bn2binpad(eckey->sign_kat_k, param + S390X_OFF_RN(len), len);
            /* Turns KDSA internal nonce-generation off. */
            fc |= S390X_KDSA_D;

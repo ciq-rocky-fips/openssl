@@ -2,17 +2,17 @@
 
 =head1 NAME
 
-fips_module_indicators - Red Hat OpenSSL FIPS module indicators guide
+fips_module_indicators - Rocky OpenSSL FIPS module indicators guide
 
 =head1 DESCRIPTION
 
-This guide documents how the Red Hat Enterprise Linux 9 OpenSSL FIPS provider
+This guide documents how the Rocky Enterprise Linux 9 OpenSSL FIPS provider
 implements Approved Security Service Indicators according to the FIPS 140-3
 Implementation Guidelines, section 2.4.C. See
 L<https://csrc.nist.gov/CSRC/media/Projects/cryptographic-module-validation-program/documents/fips%20140-3/FIPS%20140-3%20IG.pdf>
 for the FIPS 140-3 Implementation Guidelines.
 
-For all approved services except signatures, the Red Hat OpenSSL FIPS provider
+For all approved services except signatures, the Rocky OpenSSL FIPS provider
 uses the return code as the indicator as understood by FIPS 140-3. That means
 that every operation that succeeds denotes use of an approved security service.
 Operations that do not succeed may not have been approved security services, or
@@ -25,8 +25,8 @@ explicit indicator must claim it as approved, and it must succeed.
 
 =head2 Querying the explicit indicator
 
-The Red Hat OpenSSL FIPS provider exports a symbol named
-I<redhat_ossl_query_fipsindicator> that provides information on which signature
+The Rocky OpenSSL FIPS provider exports a symbol named
+I<rocky_ossl_query_fipsindicator> that provides information on which signature
 operations are approved security functions. To use this function, either link
 against I<fips.so> directly, or load it at runtime using dlopen(3) and
 dlsym(3).
@@ -40,11 +40,11 @@ dlsym(3).
         // handle error
     }
 
-    const OSSL_RH_FIPSINDICATOR_ALORITHM *(*redhat_ossl_query_fipsindicator)(int) \
+    const OSSL_RL_FIPSINDICATOR_ALORITHM *(*rocky_ossl_query_fipsindicator)(int) \
         = dlsym(provider, "redhat_ossl_query_fipsindicator");
     if (redhat_ossl_query_fipsindicator == NULL) {
         fprintf(stderr, "%s\n", dlerror());
-        fprintf(stderr, "Does your copy of fips.so have the required Red Hat"
+        fprintf(stderr, "Does your copy of fips.so have the required Rocky"
                         " patches?\n");
         // handle error
     }
@@ -57,28 +57,28 @@ I</usr/src/debug/openssl-3.*/> in the compiler's include path.
 I<redhat_ossl_query_fipsindicator> expects an operation ID as its only
 argument. Currently, the only supported operation ID is I<OSSL_OP_SIGNATURE> to
 obtain the indicators for signature operations. On success, the return value is
-a pointer to an array of I<OSSL_RH_FIPSINDICATOR_STRUCT>s. On failure, NULL is
+a pointer to an array of I<OSSL_RL_FIPSINDICATOR_STRUCT>s. On failure, NULL is
 returned. The last entry in the array is indicated by I<algorithm_names> being
 NULL.
 
-    typedef struct ossl_rh_fipsindicator_algorithm_st {
+    typedef struct ossl_rl_fipsindicator_algorithm_st {
         const char *algorithm_names;     /* key */
         const char *property_definition; /* key */
-        const OSSL_RH_FIPSINDICATOR_DISPATCH *indicators;
-    } OSSL_RH_FIPSINDICATOR_ALGORITHM;
+        const OSSL_RL_FIPSINDICATOR_DISPATCH *indicators;
+    } OSSL_RL_FIPSINDICATOR_ALGORITHM;
 
-    typedef struct ossl_rh_fipsindicator_dispatch_st {
+    typedef struct ossl_rl_fipsindicator_dispatch_st {
         int function_id;
         int approved;
-    } OSSL_RH_FIPSINDICATOR_DISPATCH;
+    } OSSL_RL_FIPSINDICATOR_DISPATCH;
 
 The I<algorithm_names> field is a colon-separated list of algorithm names from
 one of the I<PROV_NAMES_...> constants, e.g., I<PROV_NAMES_RSA>. strtok(3) can
 be used to locate the appropriate entry. See the example below, where
 I<algorithm> contains the algorithm name to search for:
 
-    const OSSL_RH_FIPSINDICATOR_DISPATCH *indicator_dispatch = NULL;
-    const OSSL_RH_FIPSINDICATOR_ALGORITHM *indicator =
+    const OSSL_RL_FIPSINDICATOR_DISPATCH *indicator_dispatch = NULL;
+    const OSSL_RL_FIPSINDICATOR_ALGORITHM *indicator =
         redhat_ossl_query_fipsindicator(operation_id);
     if (indicator == NULL) {
         fprintf(stderr, "No indicator for operation, probably using implicit"
@@ -109,12 +109,12 @@ I<algorithm> contains the algorithm name to search for:
         // handle error
     }
 
-If an appropriate I<OSSL_RH_FIPSINDICATOR_DISPATCH> array is available for the
+If an appropriate I<OSSL_RL_FIPSINDICATOR_DISPATCH> array is available for the
 given algorithm name, it maps function IDs to their approval status. The last
 entry is indicated by a zero I<function_id>. I<approved> is
-I<OSSL_RH_FIPSINDICATOR_APPROVED> if the operation is an approved security
+I<OSSL_RL_FIPSINDICATOR_APPROVED> if the operation is an approved security
 service, or part of an approved security service, or
-I<OSSL_RH_FIPSINDICATOR_UNAPPROVED> otherwise. Any other value is invalid.
+I<OSSL_RL_FIPSINDICATOR_UNAPPROVED> otherwise. Any other value is invalid.
 Function IDs are I<OSSL_FUNC_*> constants from I<openssl/core_dispatch.h>,
 e.g., I<OSSL_FUNC_SIGNATURE_DIGEST_SIGN_UPDATE> or I<OSSL_FUNC_SIGNATURE_SIGN>.
 
@@ -124,10 +124,10 @@ used to query the approval status:
     for (; indicator_dispatch->function_id != 0; ++indicator_dispatch) {
         if (indicator_dispatch->function_id == function_id) {
             switch (indicator_dispatch->approved) {
-                case OSSL_RH_FIPSINDICATOR_APPROVED:
+                case OSSL_RL_FIPSINDICATOR_APPROVED:
                     // approved security service
                     break;
-                case OSSL_RH_FIPSINDICATOR_UNAPPROVED:
+                case OSSL_RL_FIPSINDICATOR_UNAPPROVED:
                     // unapproved security service
                     break;
                 default:

@@ -21,7 +21,7 @@
 #include "ec_local.h"
 
 #ifdef FIPS_MODULE
-extern int REDHAT_FIPS_signature_st;
+extern int ROCKY_FIPS_signature_st;
 #endif
 
 int ossl_ecdsa_sign_setup(EC_KEY *eckey, BN_CTX *ctx_in, BIGNUM **kinvp,
@@ -131,7 +131,7 @@ static int ecdsa_sign_setup(EC_KEY *eckey, BN_CTX *ctx_in,
 
     do {
 #ifdef FIPS_MODULE
-       if (REDHAT_FIPS_signature_st && eckey->sign_kat_k != NULL) {
+       if (ROCKY_FIPS_signature_st && eckey->sign_kat_k != NULL) {
            BN_copy(k, eckey->sign_kat_k);
        } else {
 #endif

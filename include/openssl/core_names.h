@@ -98,7 +98,7 @@ extern "C" {
 #define OSSL_CIPHER_PARAM_CTS_MODE             "cts_mode"     /* utf8_string */
 /* For passing the AlgorithmIdentifier parameter in DER form */
 #define OSSL_CIPHER_PARAM_ALGORITHM_ID_PARAMS  "alg_id_param" /* octet_string */
-#define OSSL_CIPHER_PARAM_REDHAT_FIPS_INDICATOR "redhat-fips-indicator" /* int */
+#define OSSL_CIPHER_PARAM_ROCKY_FIPS_INDICATOR "rocky-fips-indicator" /* int */
 
 #define OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK_MAX_SEND_FRAGMENT                    \
     "tls1multi_maxsndfrag" /* uint */
@@ -175,7 +175,7 @@ extern "C" {
 #define OSSL_MAC_PARAM_SIZE             "size"                    /* size_t */
 #define OSSL_MAC_PARAM_BLOCK_SIZE       "block-size"              /* size_t */
 #define OSSL_MAC_PARAM_TLS_DATA_SIZE    "tls-data-size"           /* size_t */
-#define OSSL_MAC_PARAM_REDHAT_FIPS_INDICATOR "redhat-fips-indicator"
+#define OSSL_MAC_PARAM_ROCKY_FIPS_INDICATOR "rocky-fips-indicator"
 
 /* Known MAC names */
 #define OSSL_MAC_NAME_BLAKE2BMAC    "BLAKE2BMAC"
@@ -227,7 +227,7 @@ extern "C" {
 #define OSSL_KDF_PARAM_X942_SUPP_PUBINFO    "supp-pubinfo"
 #define OSSL_KDF_PARAM_X942_SUPP_PRIVINFO   "supp-privinfo"
 #define OSSL_KDF_PARAM_X942_USE_KEYBITS     "use-keybits"
-#define OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR "redhat-fips-indicator"
+#define OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR "rocky-fips-indicator"
 
 /* Known KDF names */
 #define OSSL_KDF_NAME_HKDF           "HKDF"
@@ -298,7 +298,7 @@ extern "C" {
 #define OSSL_PKEY_PARAM_PUB_KEY             "pub"
 #define OSSL_PKEY_PARAM_PRIV_KEY            "priv"
 #define OSSL_PKEY_PARAM_IMPLICIT_REJECTION  "implicit-rejection"
-#define OSSL_PKEY_PARAM_REDHAT_SIGN_KAT_K   "rh_sign_kat_k"
+#define OSSL_PKEY_PARAM_ROCKY_SIGN_KAT_K   "rl_sign_kat_k"
 
 /* Diffie-Hellman/DSA Parameters */
 #define OSSL_PKEY_PARAM_FFC_P               "p"
@@ -459,7 +459,7 @@ extern "C" {
 #define OSSL_SIGNATURE_PARAM_MGF1_PROPERTIES    \
     OSSL_PKEY_PARAM_MGF1_PROPERTIES
 #define OSSL_SIGNATURE_PARAM_DIGEST_SIZE        OSSL_PKEY_PARAM_DIGEST_SIZE
-#define OSSL_SIGNATURE_PARAM_REDHAT_FIPS_INDICATOR "redhat-fips-indicator"
+#define OSSL_SIGNATURE_PARAM_ROCKY_FIPS_INDICATOR "rocky-fips-indicator"
 
 /* Asym cipher parameters */
 #define OSSL_ASYM_CIPHER_PARAM_DIGEST                   OSSL_PKEY_PARAM_DIGEST
@@ -478,9 +478,9 @@ extern "C" {
 #define OSSL_ASYM_CIPHER_PARAM_TLS_NEGOTIATED_VERSION   "tls-negotiated-version"
 #define OSSL_ASYM_CIPHER_PARAM_IMPLICIT_REJECTION       "implicit-rejection"
 #ifdef FIPS_MODULE
-#define OSSL_ASYM_CIPHER_PARAM_REDHAT_KAT_OEAP_SEED     "redhat-kat-oaep-seed"
+#define OSSL_ASYM_CIPHER_PARAM_ROCKY_KAT_OEAP_SEED     "rocky-kat-oaep-seed"
 #endif
-#define OSSL_ASYM_CIPHER_PARAM_REDHAT_FIPS_INDICATOR    "redhat-fips-indicator"
+#define OSSL_ASYM_CIPHER_PARAM_ROCKY_FIPS_INDICATOR    "rocky-fips-indicator"
 
 /*
  * Encoder / decoder parameters
@@ -515,7 +515,7 @@ extern "C" {
 
 /* KEM parameters */
 #define OSSL_KEM_PARAM_OPERATION            "operation"
-#define OSSL_KEM_PARAM_REDHAT_FIPS_INDICATOR "redhat-fips-indicator" /* int */
+#define OSSL_KEM_PARAM_ROCKY_FIPS_INDICATOR "rocky-fips-indicator" /* int */
 
 /* OSSL_KEM_PARAM_OPERATION values */
 #define OSSL_KEM_PARAM_OPERATION_RSASVE     "RSASVE"

@@ -419,7 +419,7 @@ int ossl_ec_key_fromdata(EC_KEY *ec, const OSSL_PARAM params[], int include_priv
             OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PRIV_KEY);
 #ifdef FIPS_MODULE
     param_sign_kat_k =
-        OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_REDHAT_SIGN_KAT_K);
+        OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_ROCKY_SIGN_KAT_K);
 #endif
     ctx = BN_CTX_new_ex(ossl_ec_key_get_libctx(ec));
     if (ctx == NULL)

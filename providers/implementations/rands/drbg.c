@@ -672,7 +672,7 @@ int ossl_prov_drbg_generate(PROV_DRBG *drbg, unsigned char *out, size_t outlen,
     if (drbg->parent != NULL
             && get_parent_reseed_count(drbg) != drbg->parent_reseed_counter) {
 #ifdef FIPS_MODULE
-        /* Red Hat patches provide chain reseeding when necessary so just sync counters*/
+        /* Rocky patches provide chain reseeding when necessary so just sync counters*/
         drbg->parent_reseed_counter = get_parent_reseed_count(drbg);
 #else
         reseed_required = 1;

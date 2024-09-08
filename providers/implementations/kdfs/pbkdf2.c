@@ -265,16 +265,16 @@ static int kdf_pbkdf2_get_ctx_params(void *vctx, OSSL_PARAM params[])
     }
 
 #ifdef FIPS_MODULE
-    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR))
+    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR))
             != NULL) {
-        int fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_APPROVED;
+        int fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_APPROVED;
 
         /* The lower_bound_checks parameter enables checks required by FIPS. If
          * those checks are disabled, the PBKDF2 implementation will also
          * support non-approved parameters (e.g., salt lengths < 16 bytes, see
          * NIST SP 800-132 section 5.1). */
         if (!ctx->lower_bound_checks)
-            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+            fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
 
         if (!OSSL_PARAM_set_int(p, fips_indicator))
             return 0;
@@ -295,7 +295,7 @@ static const OSSL_PARAM *kdf_pbkdf2_gettable_ctx_params(ossl_unused void *ctx,
     static const OSSL_PARAM known_gettable_ctx_params[] = {
         OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
 #ifdef FIPS_MODULE
-        OSSL_PARAM_int(OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR, NULL),
+        OSSL_PARAM_int(OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR, NULL),
 #endif /* defined(FIPS_MODULE) */
         OSSL_PARAM_END
     };

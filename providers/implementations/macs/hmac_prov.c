@@ -247,7 +247,7 @@ static const OSSL_PARAM known_gettable_ctx_params[] = {
     OSSL_PARAM_size_t(OSSL_MAC_PARAM_SIZE, NULL),
     OSSL_PARAM_size_t(OSSL_MAC_PARAM_BLOCK_SIZE, NULL),
 #ifdef FIPS_MODULE
-    OSSL_PARAM_int(OSSL_MAC_PARAM_REDHAT_FIPS_INDICATOR, NULL),
+    OSSL_PARAM_int(OSSL_MAC_PARAM_ROCKY_FIPS_INDICATOR, NULL),
 #endif /* defined(FIPS_MODULE) */
     OSSL_PARAM_END
 };
@@ -271,13 +271,13 @@ static int hmac_get_ctx_params(void *vmacctx, OSSL_PARAM params[])
         return 0;
 
 #ifdef FIPS_MODULE
-    if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_REDHAT_FIPS_INDICATOR)) != NULL) {
-        int fips_indicator = EVP_MAC_REDHAT_FIPS_INDICATOR_APPROVED;
+    if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_ROCKY_FIPS_INDICATOR)) != NULL) {
+        int fips_indicator = EVP_MAC_ROCKY_FIPS_INDICATOR_APPROVED;
         /* NIST SP 800-131Ar2, Table 9: Approval Status of MAC Algorithms
          * specifies key lengths < 112 bytes are disallowed for HMAC generation
          * and legacy use for HMAC verification. */
         if (macctx->keylen < EVP_HMAC_GEN_FIPS_MIN_KEY_LEN)
-            fips_indicator = EVP_MAC_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+            fips_indicator = EVP_MAC_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
         return OSSL_PARAM_set_int(p, fips_indicator);
     }
 #endif /* defined(FIPS_MODULE) */

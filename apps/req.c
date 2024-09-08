@@ -266,7 +266,7 @@ int req_main(int argc, char **argv)
     unsigned long chtype = MBSTRING_ASC, reqflag = 0;
 
 #ifndef OPENSSL_NO_DES
-    cipher = (EVP_CIPHER *)EVP_des_ede3_cbc();
+    cipher = (EVP_CIPHER *)EVP_aes_256_cbc();
 #endif
 
     prog = opt_init(argc, argv, req_options);

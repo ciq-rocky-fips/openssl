@@ -38,7 +38,6 @@ static OSSL_FUNC_provider_query_operation_fn fips_query;
 
 #define ALGC(NAMES, FUNC, CHECK) { { NAMES, FIPS_DEFAULT_PROPERTIES, FUNC }, CHECK }
 #define ALG(NAMES, FUNC) ALGC(NAMES, FUNC, NULL)
-
 extern OSSL_FUNC_core_thread_start_fn *c_thread_start;
 int FIPS_security_check_enabled(OSSL_LIB_CTX *libctx);
 
@@ -175,13 +174,13 @@ static int fips_get_params(void *provctx, OSSL_PARAM params[])
                                               &fips_prov_ossl_ctx_method);
 
     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_NAME);
-    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, "OpenSSL FIPS Provider"))
+    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, "Red Hat Enterprise Linux 9 - OpenSSL FIPS Provider"))
         return 0;
     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_VERSION);
-    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, OPENSSL_VERSION_STR))
+    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, REDHAT_FIPS_VERSION))
         return 0;
     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_BUILDINFO);
-    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, OPENSSL_FULL_VERSION_STR))
+    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, REDHAT_FIPS_VERSION))
         return 0;
     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_STATUS);
     if (p != NULL && !OSSL_PARAM_set_int(p, ossl_prov_is_running()))
@@ -265,10 +264,11 @@ static const OSSL_ALGORITHM fips_digests[] = {
      * KECCAK-KMAC-128 and KECCAK-KMAC-256 as hashes are mostly useful for
      * KMAC128 and KMAC256.
      */
-    { PROV_NAMES_KECCAK_KMAC_128, FIPS_DEFAULT_PROPERTIES,
+    /* We don't certify KECCAK in our FIPS provider */
+    /* { PROV_NAMES_KECCAK_KMAC_128, FIPS_DEFAULT_PROPERTIES,
       ossl_keccak_kmac_128_functions },
     { PROV_NAMES_KECCAK_KMAC_256, FIPS_DEFAULT_PROPERTIES,
-      ossl_keccak_kmac_256_functions },
+      ossl_keccak_kmac_256_functions }, */
     { NULL, NULL, NULL }
 };
 
@@ -327,8 +327,9 @@ static const OSSL_ALGORITHM_CAPABLE fips_ciphers[] = {
     ALGC(PROV_NAMES_AES_256_CBC_HMAC_SHA256, ossl_aes256cbc_hmac_sha256_functions,
          ossl_cipher_capable_aes_cbc_hmac_sha256),
 #ifndef OPENSSL_NO_DES
-    ALG(PROV_NAMES_DES_EDE3_ECB, ossl_tdes_ede3_ecb_functions),
-    ALG(PROV_NAMES_DES_EDE3_CBC, ossl_tdes_ede3_cbc_functions),
+    /* We don't certify 3DES in our FIPS provider */
+    /* ALG(PROV_NAMES_DES_EDE3_ECB, ossl_tdes_ede3_ecb_functions),
+    ALG(PROV_NAMES_DES_EDE3_CBC, ossl_tdes_ede3_cbc_functions), */
 #endif  /* OPENSSL_NO_DES */
     { { NULL, NULL, NULL }, NULL }
 };
@@ -340,8 +341,9 @@ static const OSSL_ALGORITHM fips_macs[] = {
 #endif
     { PROV_NAMES_GMAC, FIPS_DEFAULT_PROPERTIES, ossl_gmac_functions },
     { PROV_NAMES_HMAC, FIPS_DEFAULT_PROPERTIES, ossl_hmac_functions },
-    { PROV_NAMES_KMAC_128, FIPS_DEFAULT_PROPERTIES, ossl_kmac128_functions },
-    { PROV_NAMES_KMAC_256, FIPS_DEFAULT_PROPERTIES, ossl_kmac256_functions },
+    /* We don't certify KMAC in our FIPS provider */
+    /*{ PROV_NAMES_KMAC_128, FIPS_DEFAULT_PROPERTIES, ossl_kmac128_functions },
+    { PROV_NAMES_KMAC_256, FIPS_DEFAULT_PROPERTIES, ossl_kmac256_functions }, */
     { NULL, NULL, NULL }
 };
 
@@ -376,8 +378,9 @@ static const OSSL_ALGORITHM fips_keyexch[] = {
 #endif
 #ifndef OPENSSL_NO_EC
     { PROV_NAMES_ECDH, FIPS_DEFAULT_PROPERTIES, ossl_ecdh_keyexch_functions },
-    { PROV_NAMES_X25519, FIPS_DEFAULT_PROPERTIES, ossl_x25519_keyexch_functions },
-    { PROV_NAMES_X448, FIPS_DEFAULT_PROPERTIES, ossl_x448_keyexch_functions },
+    /* We don't certify Edwards curves in our FIPS provider */
+    /*{ PROV_NAMES_X25519, FIPS_DEFAULT_PROPERTIES, ossl_x25519_keyexch_functions },
+    { PROV_NAMES_X448, FIPS_DEFAULT_PROPERTIES, ossl_x448_keyexch_functions },*/
 #endif
     { PROV_NAMES_TLS1_PRF, FIPS_DEFAULT_PROPERTIES,
       ossl_kdf_tls1_prf_keyexch_functions },
@@ -387,12 +390,14 @@ static const OSSL_ALGORITHM fips_keyexch[] = {
 
 static const OSSL_ALGORITHM fips_signature[] = {
 #ifndef OPENSSL_NO_DSA
-    { PROV_NAMES_DSA, FIPS_DEFAULT_PROPERTIES, ossl_dsa_signature_functions },
+    /* We don't certify DSA in our FIPS provider */
+    /* { PROV_NAMES_DSA, FIPS_DEFAULT_PROPERTIES, ossl_dsa_signature_functions }, */
 #endif
     { PROV_NAMES_RSA, FIPS_DEFAULT_PROPERTIES, ossl_rsa_signature_functions },
 #ifndef OPENSSL_NO_EC
-    { PROV_NAMES_ED25519, FIPS_DEFAULT_PROPERTIES, ossl_ed25519_signature_functions },
-    { PROV_NAMES_ED448, FIPS_DEFAULT_PROPERTIES, ossl_ed448_signature_functions },
+    /* We don't certify Edwards curves in our FIPS provider */
+    /* { PROV_NAMES_ED25519, FIPS_DEFAULT_PROPERTIES, ossl_ed25519_signature_functions },
+    { PROV_NAMES_ED448, FIPS_DEFAULT_PROPERTIES, ossl_ed448_signature_functions }, */
     { PROV_NAMES_ECDSA, FIPS_DEFAULT_PROPERTIES, ossl_ecdsa_signature_functions },
 #endif
     { PROV_NAMES_HMAC, FIPS_DEFAULT_PROPERTIES,
@@ -422,8 +427,9 @@ static const OSSL_ALGORITHM fips_keymgmt[] = {
       PROV_DESCS_DHX },
 #endif
 #ifndef OPENSSL_NO_DSA
-    { PROV_NAMES_DSA, FIPS_DEFAULT_PROPERTIES, ossl_dsa_keymgmt_functions,
-      PROV_DESCS_DSA },
+    /* We don't certify DSA in our FIPS provider */
+    /* { PROV_NAMES_DSA, FIPS_DEFAULT_PROPERTIES, ossl_dsa_keymgmt_functions,
+      PROV_DESCS_DSA }, */
 #endif
     { PROV_NAMES_RSA, FIPS_DEFAULT_PROPERTIES, ossl_rsa_keymgmt_functions,
       PROV_DESCS_RSA },
@@ -432,14 +438,15 @@ static const OSSL_ALGORITHM fips_keymgmt[] = {
 #ifndef OPENSSL_NO_EC
     { PROV_NAMES_EC, FIPS_DEFAULT_PROPERTIES, ossl_ec_keymgmt_functions,
       PROV_DESCS_EC },
-    { PROV_NAMES_X25519, FIPS_DEFAULT_PROPERTIES, ossl_x25519_keymgmt_functions,
+    /* We don't certify Edwards curves in our FIPS provider */
+    /* { PROV_NAMES_X25519, FIPS_DEFAULT_PROPERTIES, ossl_x25519_keymgmt_functions,
       PROV_DESCS_X25519 },
     { PROV_NAMES_X448, FIPS_DEFAULT_PROPERTIES, ossl_x448_keymgmt_functions,
       PROV_DESCS_X448 },
     { PROV_NAMES_ED25519, FIPS_DEFAULT_PROPERTIES, ossl_ed25519_keymgmt_functions,
       PROV_DESCS_ED25519 },
     { PROV_NAMES_ED448, FIPS_DEFAULT_PROPERTIES, ossl_ed448_keymgmt_functions,
-      PROV_DESCS_ED448 },
+      PROV_DESCS_ED448 }, */
 #endif
     { PROV_NAMES_TLS1_PRF, FIPS_DEFAULT_PROPERTIES, ossl_kdf_keymgmt_functions,
       PROV_DESCS_TLS1_PRF_SIGN },

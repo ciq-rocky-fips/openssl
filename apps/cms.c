@@ -20,6 +20,7 @@
 #include <openssl/x509_vfy.h>
 #include <openssl/x509v3.h>
 #include <openssl/cms.h>
+#include <openssl/fips.h>
 
 static int save_certs(char *signerfile, STACK_OF(X509) *signers);
 static int cms_cb(int ok, X509_STORE_CTX *ctx);
@@ -810,12 +811,16 @@ int cms_main(int argc, char **argv)
 
     if (operation == SMIME_ENCRYPT) {
         if (!cipher) {
+            if (FIPS_mode()) {
+                cipher = (EVP_CIPHER *)EVP_aes_128_cbc();
+            } else {
 #ifndef OPENSSL_NO_DES
-            cipher = (EVP_CIPHER *)EVP_des_ede3_cbc();
+                cipher = (EVP_CIPHER *)EVP_des_ede3_cbc();
 #else
-            BIO_printf(bio_err, "No cipher selected\n");
-            goto end;
+                BIO_printf(bio_err, "No cipher selected\n");
+                goto end;
 #endif
+           }
         }
 
         if (secret_key && !secret_keyid) {

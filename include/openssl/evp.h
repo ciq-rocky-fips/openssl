@@ -746,6 +746,10 @@ void EVP_CIPHER_CTX_set_flags(EVP_CIPHER_CTX *ctx, int flags);
 void EVP_CIPHER_CTX_clear_flags(EVP_CIPHER_CTX *ctx, int flags);
 int EVP_CIPHER_CTX_test_flags(const EVP_CIPHER_CTX *ctx, int flags);
 
+# define EVP_CIPHER_REDHAT_FIPS_INDICATOR_UNDETERMINED 0
+# define EVP_CIPHER_REDHAT_FIPS_INDICATOR_APPROVED     1
+# define EVP_CIPHER_REDHAT_FIPS_INDICATOR_NOT_APPROVED 2
+
 __owur int EVP_EncryptInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *cipher,
                            const unsigned char *key, const unsigned char *iv);
 /*__owur*/ int EVP_EncryptInit_ex(EVP_CIPHER_CTX *ctx,

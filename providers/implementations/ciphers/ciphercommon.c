@@ -149,6 +149,10 @@ static const OSSL_PARAM cipher_aead_known_gettable_ctx_params[] = {
     OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_AEAD_TAG, NULL, 0),
     OSSL_PARAM_size_t(OSSL_CIPHER_PARAM_AEAD_TLS1_AAD_PAD, NULL),
     OSSL_PARAM_octet_string(OSSL_CIPHER_PARAM_AEAD_TLS1_GET_IV_GEN, NULL, 0),
+    /* normally we would hide this under an #ifdef FIPS_MODULE, but that does
+     * not work in ciphercommon.c because it is compiled only once into
+     * libcommon.a */
+    OSSL_PARAM_int(OSSL_CIPHER_PARAM_REDHAT_FIPS_INDICATOR, NULL),
     OSSL_PARAM_END
 };
 const OSSL_PARAM *ossl_cipher_aead_gettable_ctx_params(

@@ -16,6 +16,71 @@
 #include "internal/numbers.h"   /* includes SIZE_MAX */
 #include "evp_local.h"
 
+typedef struct ossl_legacy_digest_signatures_st {
+    int allowed;
+} OSSL_LEGACY_DIGEST_SIGNATURES;
+
+static void ossl_ctx_legacy_digest_signatures_free(void *vldsigs)
+{
+    OSSL_LEGACY_DIGEST_SIGNATURES *ldsigs = vldsigs;
+
+    if (ldsigs != NULL) {
+        OPENSSL_free(ldsigs);
+    }
+}
+
+static void *ossl_ctx_legacy_digest_signatures_new(OSSL_LIB_CTX *ctx)
+{
+    return OPENSSL_zalloc(sizeof(OSSL_LEGACY_DIGEST_SIGNATURES));
+}
+
+static const OSSL_LIB_CTX_METHOD ossl_ctx_legacy_digest_signatures_method = {
+    OSSL_LIB_CTX_METHOD_DEFAULT_PRIORITY,
+    ossl_ctx_legacy_digest_signatures_new,
+    ossl_ctx_legacy_digest_signatures_free,
+};
+
+static OSSL_LEGACY_DIGEST_SIGNATURES *ossl_ctx_legacy_digest_signatures(
+        OSSL_LIB_CTX *libctx, int loadconfig)
+{
+#ifndef FIPS_MODULE
+    if (loadconfig && !OPENSSL_init_crypto(OPENSSL_INIT_LOAD_CONFIG, NULL))
+        return 0;
+#endif
+
+    return ossl_lib_ctx_get_data(libctx, OSSL_LIB_CTX_LEGACY_DIGEST_SIGNATURES,
+                                 &ossl_ctx_legacy_digest_signatures_method);
+}
+
+int ossl_ctx_legacy_digest_signatures_allowed(OSSL_LIB_CTX *libctx, int loadconfig)
+{
+    OSSL_LEGACY_DIGEST_SIGNATURES *ldsigs
+        = ossl_ctx_legacy_digest_signatures(libctx, loadconfig);
+
+#ifndef FIPS_MODULE
+    if (ossl_safe_getenv("OPENSSL_ENABLE_SHA1_SIGNATURES") != NULL)
+        /* used in tests */
+        return 1;
+#endif
+
+    return ldsigs != NULL ? ldsigs->allowed : 0;
+}
+
+int ossl_ctx_legacy_digest_signatures_allowed_set(OSSL_LIB_CTX *libctx, int allow,
+                                                  int loadconfig)
+{
+    OSSL_LEGACY_DIGEST_SIGNATURES *ldsigs
+        = ossl_ctx_legacy_digest_signatures(libctx, loadconfig);
+
+    if (ldsigs == NULL) {
+        ERR_raise(ERR_LIB_EVP, ERR_R_INTERNAL_ERROR);
+        return 0;
+    }
+
+    ldsigs->allowed = allow;
+    return 1;
+}
+
 #ifndef FIPS_MODULE
 
 static int update(EVP_MD_CTX *ctx, const void *data, size_t datalen)
@@ -255,6 +320,18 @@ static int do_sigver_init(EVP_MD_CTX *ctx, EVP_PKEY_CTX **pctx,
                 }
             }
             (void)ERR_pop_to_mark();
+        }
+    }
+
+    if (ctx->reqdigest != NULL
+            && !EVP_PKEY_is_a(locpctx->pkey, SN_hmac)
+            && !EVP_PKEY_is_a(locpctx->pkey, SN_tls1_prf)
+            && !EVP_PKEY_is_a(locpctx->pkey, SN_hkdf)) {
+        int mdnid = EVP_MD_nid(ctx->reqdigest);
+        if (!ossl_ctx_legacy_digest_signatures_allowed(locpctx->libctx, 0)
+                && (mdnid == NID_sha1 || mdnid == NID_md5_sha1)) {
+            ERR_raise(ERR_LIB_EVP, EVP_R_INVALID_DIGEST);
+            goto err;
         }
     }
 

@@ -15,6 +15,7 @@
 #include <openssl/obj_mac.h>
 #include "prov/securitycheck.h"
 #include "internal/nelem.h"
+#include "internal/sslconf.h"
 
 /* Disable the security checks in the default provider */
 int ossl_securitycheck_enabled(OSSL_LIB_CTX *libctx)
@@ -23,9 +24,10 @@ int ossl_securitycheck_enabled(OSSL_LIB_CTX *libctx)
 }
 
 int ossl_digest_rsa_sign_get_md_nid(OSSL_LIB_CTX *ctx, const EVP_MD *md,
-                                    ossl_unused int sha1_allowed)
+                                    int sha1_allowed)
 {
     int mdnid;
+    int ldsigs_allowed;
 
     static const OSSL_ITEM name_to_nid[] = {
         { NID_md5,       OSSL_DIGEST_NAME_MD5       },
@@ -36,8 +38,11 @@ int ossl_digest_rsa_sign_get_md_nid(OSSL_LIB_CTX *ctx, const EVP_MD *md,
         { NID_ripemd160, OSSL_DIGEST_NAME_RIPEMD160 },
     };
 
-    mdnid = ossl_digest_get_approved_nid_with_sha1(ctx, md, 1);
+    ldsigs_allowed = ossl_ctx_legacy_digest_signatures_allowed(ctx, 0);
+    mdnid = ossl_digest_get_approved_nid_with_sha1(ctx, md, sha1_allowed || ldsigs_allowed);
     if (mdnid == NID_undef)
         mdnid = ossl_digest_md_to_nid(md, name_to_nid, OSSL_NELEM(name_to_nid));
+    if (mdnid == NID_md5_sha1 && !ldsigs_allowed)
+        mdnid = -1;
     return mdnid;
 }

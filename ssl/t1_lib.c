@@ -20,6 +20,7 @@
 #include <openssl/bn.h>
 #include <openssl/provider.h>
 #include <openssl/param_build.h>
+#include "internal/sslconf.h"
 #include "internal/nelem.h"
 #include "internal/sizes.h"
 #include "internal/tlsgroups.h"
@@ -1150,11 +1151,13 @@ int ssl_setup_sig_algs(SSL_CTX *ctx)
         = OPENSSL_malloc(sizeof(*lu) * OSSL_NELEM(sigalg_lookup_tbl));
     EVP_PKEY *tmpkey = EVP_PKEY_new();
     int ret = 0;
+    int ldsigs_allowed;
 
     if (cache == NULL || tmpkey == NULL)
         goto err;
 
     ERR_set_mark();
+    ldsigs_allowed = ossl_ctx_legacy_digest_signatures_allowed(ctx->libctx, 0);
     for (i = 0, lu = sigalg_lookup_tbl;
          i < OSSL_NELEM(sigalg_lookup_tbl); lu++, i++) {
         EVP_PKEY_CTX *pctx;
@@ -1171,6 +1174,11 @@ int ssl_setup_sig_algs(SSL_CTX *ctx)
          */
         if (lu->hash != NID_undef
                 && ctx->ssl_digest_methods[lu->hash_idx] == NULL) {
+            cache[i].enabled = 0;
+            continue;
+        }
+        if ((lu->hash == NID_sha1 || lu->hash == NID_md5_sha1)
+                && !ldsigs_allowed) {
             cache[i].enabled = 0;
             continue;
         }

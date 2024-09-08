@@ -463,6 +463,9 @@ static int rsa_keygen(OSSL_LIB_CTX *libctx, RSA *rsa, int bits, int primes,
             rsa->dmp1 = NULL;
             rsa->dmq1 = NULL;
             rsa->iqmp = NULL;
+#ifdef FIPS_MODULE
+            abort();
+#endif /* defined(FIPS_MODULE) */
         }
     }
     return ok;

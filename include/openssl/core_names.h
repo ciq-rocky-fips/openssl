@@ -477,6 +477,7 @@ extern "C" {
 #ifdef FIPS_MODULE
 #define OSSL_ASYM_CIPHER_PARAM_REDHAT_KAT_OEAP_SEED     "redhat-kat-oaep-seed"
 #endif
+#define OSSL_ASYM_CIPHER_PARAM_REDHAT_FIPS_INDICATOR    "redhat-fips-indicator"
 
 /*
  * Encoder / decoder parameters
@@ -511,6 +512,7 @@ extern "C" {
 
 /* KEM parameters */
 #define OSSL_KEM_PARAM_OPERATION            "operation"
+#define OSSL_KEM_PARAM_REDHAT_FIPS_INDICATOR "redhat-fips-indicator" /* int */
 
 /* OSSL_KEM_PARAM_OPERATION values */
 #define OSSL_KEM_PARAM_OPERATION_RSASVE     "RSASVE"

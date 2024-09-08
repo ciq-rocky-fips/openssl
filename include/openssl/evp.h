@@ -1764,6 +1764,10 @@ OSSL_DEPRECATEDIN_3_0 size_t EVP_PKEY_meth_get_count(void);
 OSSL_DEPRECATEDIN_3_0 const EVP_PKEY_METHOD *EVP_PKEY_meth_get0(size_t idx);
 # endif
 
+# define EVP_PKEY_REDHAT_FIPS_INDICATOR_UNDETERMINED 0
+# define EVP_PKEY_REDHAT_FIPS_INDICATOR_APPROVED     1
+# define EVP_PKEY_REDHAT_FIPS_INDICATOR_NOT_APPROVED 2
+
 EVP_KEYMGMT *EVP_KEYMGMT_fetch(OSSL_LIB_CTX *ctx, const char *algorithm,
                                const char *properties);
 int EVP_KEYMGMT_up_ref(EVP_KEYMGMT *keymgmt);

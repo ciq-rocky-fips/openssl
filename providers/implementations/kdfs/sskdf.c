@@ -62,6 +62,10 @@ typedef struct {
     unsigned char *salt;
     size_t salt_len;
     size_t out_len; /* optional KMAC parameter */
+    int is_x963kdf;
+#ifdef FIPS_MODULE
+    int fips_indicator;
+#endif /* defined(FIPS_MODULE) */
 } KDF_SSKDF;
 
 #define SSKDF_MAX_INLEN (1<<30)
@@ -72,6 +76,7 @@ typedef struct {
 static const unsigned char kmac_custom_str[] = { 0x4B, 0x44, 0x46 };
 
 static OSSL_FUNC_kdf_newctx_fn sskdf_new;
+static OSSL_FUNC_kdf_newctx_fn x963kdf_new;
 static OSSL_FUNC_kdf_freectx_fn sskdf_free;
 static OSSL_FUNC_kdf_reset_fn sskdf_reset;
 static OSSL_FUNC_kdf_derive_fn sskdf_derive;
@@ -295,6 +300,16 @@ static void *sskdf_new(void *provctx)
     return ctx;
 }
 
+static void *x963kdf_new(void *provctx)
+{
+    KDF_SSKDF *ctx = sskdf_new(provctx);
+
+    if (ctx)
+        ctx->is_x963kdf = 1;
+
+    return ctx;
+}
+
 static void sskdf_reset(void *vctx)
 {
     KDF_SSKDF *ctx = (KDF_SSKDF *)vctx;
@@ -355,6 +370,11 @@ static int sskdf_derive(void *vctx, unsigned char *key, size_t keylen,
         return 0;
     }
     md = ossl_prov_digest_md(&ctx->digest);
+
+#ifdef FIPS_MODULE
+    if (keylen < EVP_KDF_FIPS_MIN_KEY_LEN)
+        ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+#endif /* defined(FIPS_MODULE) */
 
     if (ctx->macctx != NULL) {
         /* H(x) = KMAC or H(x) = HMAC */
@@ -438,6 +458,11 @@ static int x963kdf_derive(void *vctx, unsigned char *key, size_t keylen,
         return 0;
     }
 
+#ifdef FIPS_MODULE
+    if (keylen < EVP_KDF_FIPS_MIN_KEY_LEN)
+        ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+#endif /* defined(FIPS_MODULE) */
+
     return SSKDF_hash_kdm(md, ctx->secret, ctx->secret_len,
                           ctx->info, ctx->info_len, 1, key, keylen);
 }
@@ -502,10 +527,74 @@ static int sskdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
 {
     KDF_SSKDF *ctx = (KDF_SSKDF *)vctx;
     OSSL_PARAM *p;
+    int any_valid = 0; /* set to 1 when at least one parameter was valid */
 
-    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE)) != NULL)
-        return OSSL_PARAM_set_size_t(p, sskdf_size(ctx));
-    return -2;
+    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE)) != NULL) {
+        any_valid = 1;
+
+        if (!OSSL_PARAM_set_size_t(p, sskdf_size(ctx)))
+            return 0;
+    }
+
+#ifdef FIPS_MODULE
+    p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR);
+    if (p != NULL) {
+        int fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_APPROVED;
+
+        any_valid = 1;
+
+        /* According to NIST Special Publication 800-131Ar2, Section 8:
+         * Deriving Additional Keys from a Cryptographic Key, "[t]he length of
+         * the key-derivation key [i.e., the input key] shall be at least 112
+         * bits". */
+        if (ctx->secret_len < EVP_KDF_FIPS_MIN_KEY_LEN)
+            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+
+        /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+         * Verification Program, Section D.B and NIST Special Publication
+         * 800-131Ar2, Section 1.2.2 say that any algorithm at a security
+         * strength < 112 bits is legacy use only, so all derived keys should
+         * be longer than that. If a derived key has ever been shorter than
+         * that, ctx->output_keyelen_indicator will be NOT_APPROVED, and we
+         * should also set the returned FIPS indicator to unapproved. */
+        if (ctx->fips_indicator == EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED)
+            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+
+        /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+         * Validation Program, Section C.C: "The SHAKE128 and SHAKE256
+         * extendable-output functions may only be used as the standalone
+         * algorithms." */
+        if (ctx->macctx == NULL
+                || (ctx->macctx != NULL &&
+                    EVP_MAC_is_a(EVP_MAC_CTX_get0_mac(ctx->macctx), OSSL_MAC_NAME_HMAC))) {
+            if (ctx->digest.md != NULL
+                && (EVP_MD_is_a(ctx->digest.md, "SHAKE-128") ||
+                    EVP_MD_is_a(ctx->digest.md, "SHAKE-256"))) {
+                fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+            }
+
+            /* Table H-3 in ANS X9.63-2001 says that 160-bit hash functions
+             * should only be used for 80-bit key agreement, but FIPS 140-3
+             * requires a security strength of 112 bits, so SHA-1 cannot be
+             * used with X9.63. See the discussion in
+             * https://github.com/usnistgov/ACVP/issues/1403#issuecomment-1435300395.
+             */
+            if (ctx->is_x963kdf
+                    && ctx->digest.md != NULL
+                    && EVP_MD_is_a(ctx->digest.md, "SHA-1")) {
+                fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+            }
+        }
+
+        if (!OSSL_PARAM_set_int(p, fips_indicator))
+            return 0;
+    }
+#endif
+
+    if (!any_valid)
+        return -2;
+
+    return 1;
 }
 
 static const OSSL_PARAM *sskdf_gettable_ctx_params(ossl_unused void *ctx,
@@ -513,6 +602,9 @@ static const OSSL_PARAM *sskdf_gettable_ctx_params(ossl_unused void *ctx,
 {
     static const OSSL_PARAM known_gettable_ctx_params[] = {
         OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
+#ifdef FIPS_MODULE
+        OSSL_PARAM_int(OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR, 0),
+#endif /* defined(FIPS_MODULE) */
         OSSL_PARAM_END
     };
     return known_gettable_ctx_params;
@@ -533,7 +625,7 @@ const OSSL_DISPATCH ossl_kdf_sskdf_functions[] = {
 };
 
 const OSSL_DISPATCH ossl_kdf_x963_kdf_functions[] = {
-    { OSSL_FUNC_KDF_NEWCTX, (void(*)(void))sskdf_new },
+    { OSSL_FUNC_KDF_NEWCTX, (void(*)(void))x963kdf_new },
     { OSSL_FUNC_KDF_FREECTX, (void(*)(void))sskdf_free },
     { OSSL_FUNC_KDF_RESET, (void(*)(void))sskdf_reset },
     { OSSL_FUNC_KDF_DERIVE, (void(*)(void))x963kdf_derive },

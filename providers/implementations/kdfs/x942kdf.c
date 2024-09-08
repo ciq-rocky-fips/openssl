@@ -13,10 +13,13 @@
 #include <openssl/core_dispatch.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/kdf.h>
 #include <openssl/params.h>
 #include <openssl/proverr.h>
 #include "internal/packet.h"
 #include "internal/der.h"
+#include "internal/nelem.h"
+#include "crypto/evp.h"
 #include "prov/provider_ctx.h"
 #include "prov/providercommon.h"
 #include "prov/implementations.h"
@@ -47,6 +50,9 @@ typedef struct {
     const unsigned char *cek_oid;
     size_t cek_oid_len;
     int use_keybits;
+#ifdef FIPS_MODULE
+    int fips_indicator;
+#endif /* defined(FIPS_MODULE) */
 } KDF_X942;
 
 /*
@@ -460,6 +466,10 @@ static int x942kdf_derive(void *vctx, unsigned char *key, size_t keylen,
         ERR_raise(ERR_LIB_PROV, PROV_R_BAD_ENCODING);
         return 0;
     }
+#ifdef FIPS_MODULE
+    if (keylen < EVP_KDF_FIPS_MIN_KEY_LEN)
+        ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+#endif /* defined(FIPS_MODULE) */
     ret = x942kdf_hash_kdm(md, ctx->secret, ctx->secret_len,
                            der, der_len, ctr, key, keylen);
     OPENSSL_free(der);
@@ -563,10 +573,58 @@ static int x942kdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
 {
     KDF_X942 *ctx = (KDF_X942 *)vctx;
     OSSL_PARAM *p;
+    int any_valid = 0; /* set to 1 when at least one parameter was valid */
 
-    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE)) != NULL)
-        return OSSL_PARAM_set_size_t(p, x942kdf_size(ctx));
-    return -2;
+    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE)) != NULL) {
+        any_valid = 1;
+
+        if (!OSSL_PARAM_set_size_t(p, x942kdf_size(ctx)))
+            return 0;
+    }
+
+#ifdef FIPS_MODULE
+    p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR);
+    if (p != NULL) {
+        int fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_APPROVED;
+
+        any_valid = 1;
+
+        /* According to NIST Special Publication 800-131Ar2, Section 8:
+         * Deriving Additional Keys from a Cryptographic Key, "[t]he length of
+         * the key-derivation key [i.e., the input key] shall be at least 112
+         * bits". */
+        if (ctx->secret_len < EVP_KDF_FIPS_MIN_KEY_LEN)
+            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+
+        /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+         * Verification Program, Section D.B and NIST Special Publication
+         * 800-131Ar2, Section 1.2.2 say that any algorithm at a security
+         * strength < 112 bits is legacy use only, so all derived keys should
+         * be longer than that. If a derived key has ever been shorter than
+         * that, ctx->output_keyelen_indicator will be NOT_APPROVED, and we
+         * should also set the returned FIPS indicator to unapproved. */
+        if (ctx->fips_indicator == EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED)
+            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+
+        /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+         * Validation Program, Section C.C: "The SHAKE128 and SHAKE256
+         * extendable-output functions may only be used as the standalone
+         * algorithms." */
+        if (ctx->digest.md != NULL
+                && (EVP_MD_is_a(ctx->digest.md, "SHAKE-128") ||
+                    EVP_MD_is_a(ctx->digest.md, "SHAKE-256"))) {
+            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+        }
+
+        if (!OSSL_PARAM_set_int(p, fips_indicator))
+            return 0;
+    }
+#endif
+
+    if (!any_valid)
+        return -2;
+
+    return 1;
 }
 
 static const OSSL_PARAM *x942kdf_gettable_ctx_params(ossl_unused void *ctx,
@@ -574,6 +632,9 @@ static const OSSL_PARAM *x942kdf_gettable_ctx_params(ossl_unused void *ctx,
 {
     static const OSSL_PARAM known_gettable_ctx_params[] = {
         OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
+#ifdef FIPS_MODULE
+        OSSL_PARAM_int(OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR, 0),
+#endif /* defined(FIPS_MODULE) */
         OSSL_PARAM_END
     };
     return known_gettable_ctx_params;

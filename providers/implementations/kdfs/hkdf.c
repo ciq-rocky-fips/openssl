@@ -41,6 +41,7 @@ static OSSL_FUNC_kdf_settable_ctx_params_fn kdf_hkdf_settable_ctx_params;
 static OSSL_FUNC_kdf_set_ctx_params_fn kdf_hkdf_set_ctx_params;
 static OSSL_FUNC_kdf_gettable_ctx_params_fn kdf_hkdf_gettable_ctx_params;
 static OSSL_FUNC_kdf_get_ctx_params_fn kdf_hkdf_get_ctx_params;
+static OSSL_FUNC_kdf_newctx_fn kdf_tls1_3_new;
 static OSSL_FUNC_kdf_derive_fn kdf_tls1_3_derive;
 static OSSL_FUNC_kdf_settable_ctx_params_fn kdf_tls1_3_settable_ctx_params;
 static OSSL_FUNC_kdf_set_ctx_params_fn kdf_tls1_3_set_ctx_params;
@@ -84,6 +85,10 @@ typedef struct {
     size_t data_len;
     unsigned char info[HKDF_MAXBUF];
     size_t info_len;
+    int is_tls13;
+#ifdef FIPS_MODULE
+    int fips_indicator;
+#endif /* defined(FIPS_MODULE) */
 } KDF_HKDF;
 
 static void *kdf_hkdf_new(void *provctx)
@@ -168,6 +173,11 @@ static int kdf_hkdf_derive(void *vctx, unsigned char *key, size_t keylen,
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_KEY_LENGTH);
         return 0;
     }
+
+#ifdef FIPS_MODULE
+    if (keylen < EVP_KDF_FIPS_MIN_KEY_LEN)
+        ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+#endif /* defined(FIPS_MODULE) */
 
     switch (ctx->mode) {
     case EVP_KDF_HKDF_MODE_EXTRACT_AND_EXPAND:
@@ -290,15 +300,78 @@ static int kdf_hkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
 {
     KDF_HKDF *ctx = (KDF_HKDF *)vctx;
     OSSL_PARAM *p;
+    int any_valid = 0; /* set to 1 when at least one parameter was valid */
 
     if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE)) != NULL) {
         size_t sz = kdf_hkdf_size(ctx);
 
-        if (sz == 0)
+        any_valid = 1;
+
+        if (sz == 0 || !OSSL_PARAM_set_size_t(p, sz))
             return 0;
-        return OSSL_PARAM_set_size_t(p, sz);
     }
-    return -2;
+
+#ifdef FIPS_MODULE
+    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR))
+            != NULL) {
+        int fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_APPROVED;
+        const EVP_MD *md = ossl_prov_digest_md(&ctx->digest);
+
+        any_valid = 1;
+
+        /* According to NIST Special Publication 800-131Ar2, Section 8:
+         * Deriving Additional Keys from a Cryptographic Key, "[t]he length of
+         * the key-derivation key [i.e., the input key] shall be at least 112
+         * bits". */
+        if (ctx->key_len < EVP_KDF_FIPS_MIN_KEY_LEN)
+            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+
+        /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+         * Verification Program, Section D.B and NIST Special Publication
+         * 800-131Ar2, Section 1.2.2 say that any algorithm at a security
+         * strength < 112 bits is legacy use only, so all derived keys should
+         * be longer than that. If a derived key has ever been shorter than
+         * that, ctx->output_keyelen_indicator will be NOT_APPROVED, and we
+         * should also set the returned FIPS indicator to unapproved. */
+        if (ctx->fips_indicator == EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED)
+            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+
+        if (ctx->is_tls13) {
+            if (md != NULL
+                    && !EVP_MD_is_a(md, "SHA2-256")
+                    && !EVP_MD_is_a(md, "SHA2-384")) {
+                /* Implementation Guidance for FIPS 140-3 and the Cryptographic
+                 * Module Validation Program, Section 2.4.B, (5): "The TLS 1.3
+                 * key derivation function documented in Section 7.1 of RFC
+                 * 8446. This is considered an approved CVL because the
+                 * underlying functions performed within the TLS 1.3 KDF map to
+                 * NIST approved standards, namely: SP 800-133rev2 (Section 6.3
+                 * Option #3), SP 800-56Crev2, and SP 800-108."
+                 *
+                 * RFC 8446 appendix B.4 only lists SHA-256 and SHA-384. */
+                fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+            }
+        } else {
+            if (md != NULL
+                    && (EVP_MD_is_a(md, "SHAKE-128") ||
+                        EVP_MD_is_a(md, "SHAKE-256"))) {
+                /* HKDF is a SP 800-56Cr2 TwoStep KDF, for which all SHA-1,
+                 * SHA-2 and SHA-3 are approved. SHAKE is not approved, because
+                 * of FIPS 140-3 IG, section C.C: "The SHAKE128 and SHAKE256
+                 * extendable-output functions may only be used as the
+                 * standalone algorithms." */
+                fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+            }
+        }
+        if (!OSSL_PARAM_set_int(p, fips_indicator))
+            return 0;
+    }
+#endif /* defined(FIPS_MODULE) */
+
+    if (!any_valid)
+        return -2;
+
+    return 1;
 }
 
 static const OSSL_PARAM *kdf_hkdf_gettable_ctx_params(ossl_unused void *ctx,
@@ -306,6 +379,9 @@ static const OSSL_PARAM *kdf_hkdf_gettable_ctx_params(ossl_unused void *ctx,
 {
     static const OSSL_PARAM known_gettable_ctx_params[] = {
         OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
+#ifdef FIPS_MODULE
+        OSSL_PARAM_int(OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR, NULL),
+#endif /* defined(FIPS_MODULE) */
         OSSL_PARAM_END
     };
     return known_gettable_ctx_params;
@@ -635,6 +711,17 @@ static int prov_tls13_hkdf_generate_secret(OSSL_LIB_CTX *libctx,
     return ret;
 }
 
+static void *kdf_tls1_3_new(void *provctx)
+{
+    KDF_HKDF *hkdf = kdf_hkdf_new(provctx);
+
+    if (hkdf != NULL)
+        hkdf->is_tls13 = 1;
+
+    return hkdf;
+}
+
+
 static int kdf_tls1_3_derive(void *vctx, unsigned char *key, size_t keylen,
                              const OSSL_PARAM params[])
 {
@@ -649,6 +736,11 @@ static int kdf_tls1_3_derive(void *vctx, unsigned char *key, size_t keylen,
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
         return 0;
     }
+
+#ifdef FIPS_MODULE
+    if (keylen < EVP_KDF_FIPS_MIN_KEY_LEN)
+        ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+#endif /* defined(FIPS_MODULE) */
 
     switch (ctx->mode) {
     default:
@@ -727,7 +819,7 @@ static const OSSL_PARAM *kdf_tls1_3_settable_ctx_params(ossl_unused void *ctx,
 }
 
 const OSSL_DISPATCH ossl_kdf_tls1_3_kdf_functions[] = {
-    { OSSL_FUNC_KDF_NEWCTX, (void(*)(void))kdf_hkdf_new },
+    { OSSL_FUNC_KDF_NEWCTX, (void(*)(void))kdf_tls1_3_new },
     { OSSL_FUNC_KDF_FREECTX, (void(*)(void))kdf_hkdf_free },
     { OSSL_FUNC_KDF_RESET, (void(*)(void))kdf_hkdf_reset },
     { OSSL_FUNC_KDF_DERIVE, (void(*)(void))kdf_tls1_3_derive },

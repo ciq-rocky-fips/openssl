@@ -591,6 +591,9 @@ static int EVP_MAC_loop(int algindex, void *args)
     for (count = 0; COND(c[algindex][testnum]); count++) {
         size_t outl;
 
+        if (mctx == NULL)
+            return -1;
+
         if (!EVP_MAC_init(mctx, NULL, 0, NULL)
             || !EVP_MAC_update(mctx, buf, lengths[testnum])
             || !EVP_MAC_final(mctx, mac, &outl, sizeof(mac)))

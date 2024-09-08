@@ -196,6 +196,13 @@ const EVP_PKEY_METHOD *ossl_ed448_pkey_method(void);
 const EVP_PKEY_METHOD *ossl_rsa_pkey_method(void);
 const EVP_PKEY_METHOD *ossl_rsa_pss_pkey_method(void);
 
+#ifdef FIPS_MODULE
+/* NIST SP 800-131Ar2, Table 9: Approval Status of MAC Algorithms specifies key
+ * lengths < 112 bytes are disallowed for HMAC generation and legacy use for
+ * HMAC verification. */
+# define EVP_HMAC_GEN_FIPS_MIN_KEY_LEN (112 / 8)
+#endif
+
 struct evp_mac_st {
     OSSL_PROVIDER *prov;
     int name_id;

@@ -797,6 +797,10 @@ __owur int EVP_CipherFinal(EVP_CIPHER_CTX *ctx, unsigned char *outm,
 __owur int EVP_CipherFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *outm,
                               int *outl);
 
+# define EVP_SIGNATURE_REDHAT_FIPS_INDICATOR_UNDETERMINED 0
+# define EVP_SIGNATURE_REDHAT_FIPS_INDICATOR_APPROVED     1
+# define EVP_SIGNATURE_REDHAT_FIPS_INDICATOR_NOT_APPROVED 2
+
 __owur int EVP_SignFinal(EVP_MD_CTX *ctx, unsigned char *md, unsigned int *s,
                          EVP_PKEY *pkey);
 __owur int EVP_SignFinal_ex(EVP_MD_CTX *ctx, unsigned char *md, unsigned int *s,

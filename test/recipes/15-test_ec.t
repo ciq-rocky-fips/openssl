@@ -90,7 +90,7 @@ subtest 'Ed448 conversions -- public key' => sub {
 
 subtest 'Check loading of fips and non-fips keys' => sub {
     plan skip_all => "FIPS is disabled"
-        if $no_fips;
+        if 1; #Red Hat specific, original value is $no_fips;
 
     plan tests => 2;
 

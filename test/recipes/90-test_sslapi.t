@@ -48,7 +48,7 @@ unless ($no_fips) {
                              "recipes",
                              "90-test_sslapi_data",
                              "dhparams.pem")])),
-                 "running sslapitest");
+                 "running sslapitest - FIPS");
 }
 
 unlink $tmpfilename;

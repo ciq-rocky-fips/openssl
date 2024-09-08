@@ -602,10 +602,10 @@ my @smime_cms_param_tests = (
     ],
 
     [ "enveloped content test streaming S/MIME format, X9.42 DH",
-      [ "{cmd1}", @prov, "-encrypt", "-in", $smcont,
+      [ "{cmd1}", @defaultprov, "-encrypt", "-in", $smcont,
         "-stream", "-out", "{output}.cms",
         "-recip", catfile($smdir, "smdh.pem"), "-aes128" ],
-      [ "{cmd2}", @prov, "-decrypt", "-recip", catfile($smdir, "smdh.pem"),
+      [ "{cmd2}", @defaultprov, "-decrypt", "-recip", catfile($smdir, "smdh.pem"),
         "-in", "{output}.cms", "-out", "{output}.txt" ],
       \&final_compare
     ]

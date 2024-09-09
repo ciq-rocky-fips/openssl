@@ -1,0 +1,705 @@
+From 98642df4ba886818900ab7e6b23703544e6addd4 Mon Sep 17 00:00:00 2001
+From: Simo Sorce <simo@redhat.com>
+Date: Thu, 10 Nov 2022 10:46:32 -0500
+Subject: [PATCH 1/3] Propagate selection all the way on key export
+
+EVP_PKEY_eq() is used to check, among other things, if a certificate
+public key corresponds to a private key. When the private key belongs to
+a provider that does not allow to export private keys this currently
+fails as the internal functions used to import/export keys ignored the
+selection given (which specifies that only the public key needs to be
+considered) and instead tries to export everything.
+
+This patch allows to propagate the selection all the way down including
+adding it in the cache so that a following operation actually looking
+for other selection parameters does not mistakenly pick up an export
+containing only partial information.
+
+Signed-off-by: Simo Sorce <simo@redhat.com>
+
+Reviewed-by: Dmitry Belyavskiy <beldmit@gmail.com>
+Reviewed-by: Tomas Mraz <tomas@openssl.org>
+(Merged from https://github.com/openssl/openssl/pull/19648)
+
+diff --git a/crypto/evp/keymgmt_lib.c b/crypto/evp/keymgmt_lib.c
+index b06730dc7a..2d0238ee27 100644
+--- a/crypto/evp/keymgmt_lib.c
++++ b/crypto/evp/keymgmt_lib.c
+@@ -93,7 +93,8 @@ int evp_keymgmt_util_export(const EVP_PKEY *pk, int selection,
+                               export_cb, export_cbarg);
+ }
+ 
+-void *evp_keymgmt_util_export_to_provider(EVP_PKEY *pk, EVP_KEYMGMT *keymgmt)
++void *evp_keymgmt_util_export_to_provider(EVP_PKEY *pk, EVP_KEYMGMT *keymgmt,
++                                          int selection)
+ {
+     struct evp_keymgmt_util_try_import_data_st import_data;
+     OP_CACHE_ELEM *op;
+@@ -127,7 +128,7 @@ void *evp_keymgmt_util_export_to_provider(EVP_PKEY *pk, EVP_KEYMGMT *keymgmt)
+      */
+     if (pk->dirty_cnt == pk->dirty_cnt_copy) {
+         /* If this key is already exported to |keymgmt|, no more to do */
+-        op = evp_keymgmt_util_find_operation_cache(pk, keymgmt);
++        op = evp_keymgmt_util_find_operation_cache(pk, keymgmt, selection);
+         if (op != NULL && op->keymgmt != NULL) {
+             void *ret = op->keydata;
+ 
+@@ -157,13 +158,13 @@ void *evp_keymgmt_util_export_to_provider(EVP_PKEY *pk, EVP_KEYMGMT *keymgmt)
+     /* Setup for the export callback */
+     import_data.keydata = NULL;  /* evp_keymgmt_util_try_import will create it */
+     import_data.keymgmt = keymgmt;
+-    import_data.selection = OSSL_KEYMGMT_SELECT_ALL;
++    import_data.selection = selection;
+ 
+     /*
+      * The export function calls the callback (evp_keymgmt_util_try_import),
+      * which does the import for us.  If successful, we're done.
+      */
+-    if (!evp_keymgmt_util_export(pk, OSSL_KEYMGMT_SELECT_ALL,
++    if (!evp_keymgmt_util_export(pk, selection,
+                                  &evp_keymgmt_util_try_import, &import_data))
+         /* If there was an error, bail out */
+         return NULL;
+@@ -173,7 +174,7 @@ void *evp_keymgmt_util_export_to_provider(EVP_PKEY *pk, EVP_KEYMGMT *keymgmt)
+         return NULL;
+     }
+     /* Check to make sure some other thread didn't get there first */
+-    op = evp_keymgmt_util_find_operation_cache(pk, keymgmt);
++    op = evp_keymgmt_util_find_operation_cache(pk, keymgmt, selection);
+     if (op != NULL && op->keydata != NULL) {
+         void *ret = op->keydata;
+ 
+@@ -196,7 +197,8 @@ void *evp_keymgmt_util_export_to_provider(EVP_PKEY *pk, EVP_KEYMGMT *keymgmt)
+         evp_keymgmt_util_clear_operation_cache(pk, 0);
+ 
+     /* Add the new export to the operation cache */
+-    if (!evp_keymgmt_util_cache_keydata(pk, keymgmt, import_data.keydata)) {
++    if (!evp_keymgmt_util_cache_keydata(pk, keymgmt, import_data.keydata,
++                                        selection)) {
+         CRYPTO_THREAD_unlock(pk->lock);
+         evp_keymgmt_freedata(keymgmt, import_data.keydata);
+         return NULL;
+@@ -232,7 +234,8 @@ int evp_keymgmt_util_clear_operation_cache(EVP_PKEY *pk, int locking)
+ }
+ 
+ OP_CACHE_ELEM *evp_keymgmt_util_find_operation_cache(EVP_PKEY *pk,
+-                                                     EVP_KEYMGMT *keymgmt)
++                                                     EVP_KEYMGMT *keymgmt,
++                                                     int selection)
+ {
+     int i, end = sk_OP_CACHE_ELEM_num(pk->operation_cache);
+     OP_CACHE_ELEM *p;
+@@ -243,14 +246,14 @@ OP_CACHE_ELEM *evp_keymgmt_util_find_operation_cache(EVP_PKEY *pk,
+      */
+     for (i = 0; i < end; i++) {
+         p = sk_OP_CACHE_ELEM_value(pk->operation_cache, i);
+-        if (keymgmt == p->keymgmt)
++        if (keymgmt == p->keymgmt && (p->selection & selection) == selection)
+             return p;
+     }
+     return NULL;
+ }
+ 
+-int evp_keymgmt_util_cache_keydata(EVP_PKEY *pk,
+-                                   EVP_KEYMGMT *keymgmt, void *keydata)
++int evp_keymgmt_util_cache_keydata(EVP_PKEY *pk, EVP_KEYMGMT *keymgmt,
++                                   void *keydata, int selection)
+ {
+     OP_CACHE_ELEM *p = NULL;
+ 
+@@ -266,6 +269,7 @@ int evp_keymgmt_util_cache_keydata(EVP_PKEY *pk,
+             return 0;
+         p->keydata = keydata;
+         p->keymgmt = keymgmt;
++        p->selection = selection;
+ 
+         if (!EVP_KEYMGMT_up_ref(keymgmt)) {
+             OPENSSL_free(p);
+@@ -391,7 +395,8 @@ int evp_keymgmt_util_match(EVP_PKEY *pk1, EVP_PKEY *pk2, int selection)
+             ok = 1;
+             if (keydata1 != NULL) {
+                 tmp_keydata =
+-                    evp_keymgmt_util_export_to_provider(pk1, keymgmt2);
++                    evp_keymgmt_util_export_to_provider(pk1, keymgmt2,
++                                                        selection);
+                 ok = (tmp_keydata != NULL);
+             }
+             if (ok) {
+@@ -411,7 +416,8 @@ int evp_keymgmt_util_match(EVP_PKEY *pk1, EVP_PKEY *pk2, int selection)
+             ok = 1;
+             if (keydata2 != NULL) {
+                 tmp_keydata =
+-                    evp_keymgmt_util_export_to_provider(pk2, keymgmt1);
++                    evp_keymgmt_util_export_to_provider(pk2, keymgmt1,
++                                                        selection);
+                 ok = (tmp_keydata != NULL);
+             }
+             if (ok) {
+diff --git a/crypto/evp/p_lib.c b/crypto/evp/p_lib.c
+index 70d17ec37e..905e9c9ce4 100644
+--- a/crypto/evp/p_lib.c
++++ b/crypto/evp/p_lib.c
+@@ -1822,6 +1822,7 @@ void *evp_pkey_export_to_provider(EVP_PKEY *pk, OSSL_LIB_CTX *libctx,
+ {
+     EVP_KEYMGMT *allocated_keymgmt = NULL;
+     EVP_KEYMGMT *tmp_keymgmt = NULL;
++    int selection = OSSL_KEYMGMT_SELECT_ALL;
+     void *keydata = NULL;
+     int check;
+ 
+@@ -1883,7 +1884,8 @@ void *evp_pkey_export_to_provider(EVP_PKEY *pk, OSSL_LIB_CTX *libctx,
+         if (pk->ameth->dirty_cnt(pk) == pk->dirty_cnt_copy) {
+             if (!CRYPTO_THREAD_read_lock(pk->lock))
+                 goto end;
+-            op = evp_keymgmt_util_find_operation_cache(pk, tmp_keymgmt);
++            op = evp_keymgmt_util_find_operation_cache(pk, tmp_keymgmt,
++                                                       selection);
+ 
+             /*
+              * If |tmp_keymgmt| is present in the operation cache, it means
+@@ -1938,7 +1940,7 @@ void *evp_pkey_export_to_provider(EVP_PKEY *pk, OSSL_LIB_CTX *libctx,
+         EVP_KEYMGMT_free(tmp_keymgmt); /* refcnt-- */
+ 
+         /* Check to make sure some other thread didn't get there first */
+-        op = evp_keymgmt_util_find_operation_cache(pk, tmp_keymgmt);
++        op = evp_keymgmt_util_find_operation_cache(pk, tmp_keymgmt, selection);
+         if (op != NULL && op->keymgmt != NULL) {
+             void *tmp_keydata = op->keydata;
+ 
+@@ -1949,7 +1951,8 @@ void *evp_pkey_export_to_provider(EVP_PKEY *pk, OSSL_LIB_CTX *libctx,
+         }
+ 
+         /* Add the new export to the operation cache */
+-        if (!evp_keymgmt_util_cache_keydata(pk, tmp_keymgmt, keydata)) {
++        if (!evp_keymgmt_util_cache_keydata(pk, tmp_keymgmt, keydata,
++                                            selection)) {
+             CRYPTO_THREAD_unlock(pk->lock);
+             evp_keymgmt_freedata(tmp_keymgmt, keydata);
+             keydata = NULL;
+@@ -1964,7 +1967,7 @@ void *evp_pkey_export_to_provider(EVP_PKEY *pk, OSSL_LIB_CTX *libctx,
+     }
+ #endif  /* FIPS_MODULE */
+ 
+-    keydata = evp_keymgmt_util_export_to_provider(pk, tmp_keymgmt);
++    keydata = evp_keymgmt_util_export_to_provider(pk, tmp_keymgmt, selection);
+ 
+  end:
+     /*
+diff --git a/include/crypto/evp.h b/include/crypto/evp.h
+index f601b72807..dbbdcccbda 100644
+--- a/include/crypto/evp.h
++++ b/include/crypto/evp.h
+@@ -589,6 +589,7 @@ int evp_cipher_asn1_to_param_ex(EVP_CIPHER_CTX *c, ASN1_TYPE *type,
+ typedef struct {
+     EVP_KEYMGMT *keymgmt;
+     void *keydata;
++    int selection;
+ } OP_CACHE_ELEM;
+ 
+ DEFINE_STACK_OF(OP_CACHE_ELEM)
+@@ -778,12 +779,14 @@ EVP_PKEY *evp_keymgmt_util_make_pkey(EVP_KEYMGMT *keymgmt, void *keydata);
+ 
+ int evp_keymgmt_util_export(const EVP_PKEY *pk, int selection,
+                             OSSL_CALLBACK *export_cb, void *export_cbarg);
+-void *evp_keymgmt_util_export_to_provider(EVP_PKEY *pk, EVP_KEYMGMT *keymgmt);
++void *evp_keymgmt_util_export_to_provider(EVP_PKEY *pk, EVP_KEYMGMT *keymgmt,
++                                          int selection);
+ OP_CACHE_ELEM *evp_keymgmt_util_find_operation_cache(EVP_PKEY *pk,
+-                                                     EVP_KEYMGMT *keymgmt);
++                                                     EVP_KEYMGMT *keymgmt,
++                                                     int selection);
+ int evp_keymgmt_util_clear_operation_cache(EVP_PKEY *pk, int locking);
+-int evp_keymgmt_util_cache_keydata(EVP_PKEY *pk,
+-                                   EVP_KEYMGMT *keymgmt, void *keydata);
++int evp_keymgmt_util_cache_keydata(EVP_PKEY *pk, EVP_KEYMGMT *keymgmt,
++                                   void *keydata, int selection);
+ void evp_keymgmt_util_cache_keyinfo(EVP_PKEY *pk);
+ void *evp_keymgmt_util_fromdata(EVP_PKEY *target, EVP_KEYMGMT *keymgmt,
+                                 int selection, const OSSL_PARAM params[]);
+-- 
+2.38.1
+
+From 504427eb5f32108dd64ff7858012863fe47b369b Mon Sep 17 00:00:00 2001
+From: Simo Sorce <simo@redhat.com>
+Date: Thu, 10 Nov 2022 16:58:28 -0500
+Subject: [PATCH 2/3] Update documentation for keymgmt export utils
+
+Change function prototypes and explain how to use the selection
+argument.
+
+Signed-off-by: Simo Sorce <simo@redhat.com>
+
+Reviewed-by: Dmitry Belyavskiy <beldmit@gmail.com>
+Reviewed-by: Tomas Mraz <tomas@openssl.org>
+(Merged from https://github.com/openssl/openssl/pull/19648)
+
+diff --git a/doc/internal/man3/evp_keymgmt_util_export_to_provider.pod b/doc/internal/man3/evp_keymgmt_util_export_to_provider.pod
+index 1fee9f6ff9..7099e44964 100644
+--- a/doc/internal/man3/evp_keymgmt_util_export_to_provider.pod
++++ b/doc/internal/man3/evp_keymgmt_util_export_to_provider.pod
+@@ -20,12 +20,14 @@ OP_CACHE_ELEM
+ 
+  int evp_keymgmt_util_export(const EVP_PKEY *pk, int selection,
+                              OSSL_CALLBACK *export_cb, void *export_cbarg);
+- void *evp_keymgmt_util_export_to_provider(EVP_PKEY *pk, EVP_KEYMGMT *keymgmt);
++ void *evp_keymgmt_util_export_to_provider(EVP_PKEY *pk, EVP_KEYMGMT *keymgmt,
++                                           int selection);
+  OP_CACHE_ELEM *evp_keymgmt_util_find_operation_cache(EVP_PKEY *pk,
+-                                                      EVP_KEYMGMT *keymgmt);
++                                                      EVP_KEYMGMT *keymgmt,
++                                                      int selection);
+  int evp_keymgmt_util_clear_operation_cache(EVP_PKEY *pk, int locking);
+- int evp_keymgmt_util_cache_keydata(EVP_PKEY *pk,
+-                                    EVP_KEYMGMT *keymgmt, void *keydata);
++ int evp_keymgmt_util_cache_keydata(EVP_PKEY *pk, EVP_KEYMGMT *keymgmt,
++                                    void *keydata, int selection);
+  void evp_keymgmt_util_cache_keyinfo(EVP_PKEY *pk);
+  void *evp_keymgmt_util_fromdata(EVP_PKEY *target, EVP_KEYMGMT *keymgmt,
+                                  int selection, const OSSL_PARAM params[]);
+@@ -65,6 +67,11 @@ evp_keymgmt_util_fromdata() can be used to add key object data to a
+ given key I<target> via a B<EVP_KEYMGMT> interface.  This is used as a
+ helper for L<EVP_PKEY_fromdata(3)>.
+ 
++In all functions that take a I<selection> argument, the selection is used to
++constraint the information requested on export. It is also used in the cache
++so that key data is guaranteed to contain all the information requested in
++the selection.
++
+ =head1 RETURN VALUES
+ 
+ evp_keymgmt_export_to_provider() and evp_keymgmt_util_fromdata()
+-- 
+2.38.1
+
+From e5202fbd461cb6c067874987998e91c6093e5267 Mon Sep 17 00:00:00 2001
+From: Simo Sorce <simo@redhat.com>
+Date: Fri, 11 Nov 2022 12:18:26 -0500
+Subject: [PATCH 3/3] Add test for EVP_PKEY_eq
+
+This tests that the comparison work even if a provider can only return
+a public key.
+
+Signed-off-by: Simo Sorce <simo@redhat.com>
+
+Reviewed-by: Dmitry Belyavskiy <beldmit@gmail.com>
+Reviewed-by: Tomas Mraz <tomas@openssl.org>
+(Merged from https://github.com/openssl/openssl/pull/19648)
+
+diff --git a/test/fake_rsaprov.c b/test/fake_rsaprov.c
+index d556551bb6..5e92e72d4b 100644
+--- a/test/fake_rsaprov.c
++++ b/test/fake_rsaprov.c
+@@ -22,24 +22,34 @@ static OSSL_FUNC_keymgmt_has_fn fake_rsa_keymgmt_has;
+ static OSSL_FUNC_keymgmt_query_operation_name_fn fake_rsa_keymgmt_query;
+ static OSSL_FUNC_keymgmt_import_fn fake_rsa_keymgmt_import;
+ static OSSL_FUNC_keymgmt_import_types_fn fake_rsa_keymgmt_imptypes;
++static OSSL_FUNC_keymgmt_export_fn fake_rsa_keymgmt_export;
++static OSSL_FUNC_keymgmt_export_types_fn fake_rsa_keymgmt_exptypes;
+ static OSSL_FUNC_keymgmt_load_fn fake_rsa_keymgmt_load;
+ 
+ static int has_selection;
+ static int imptypes_selection;
++static int exptypes_selection;
+ static int query_id;
+ 
++struct fake_rsa_keydata {
++    int selection;
++    int status;
++};
++
+ static void *fake_rsa_keymgmt_new(void *provctx)
+ {
+-    unsigned char *keydata = OPENSSL_zalloc(1);
++    struct fake_rsa_keydata *key;
+ 
+-    TEST_ptr(keydata);
++    if (!TEST_ptr(key = OPENSSL_zalloc(sizeof(struct fake_rsa_keydata))))
++        return NULL;
+ 
+     /* clear test globals */
+     has_selection = 0;
+     imptypes_selection = 0;
++    exptypes_selection = 0;
+     query_id = 0;
+ 
+-    return keydata;
++    return key;
+ }
+ 
+ static void fake_rsa_keymgmt_free(void *keydata)
+@@ -67,14 +77,104 @@ static const char *fake_rsa_keymgmt_query(int id)
+ static int fake_rsa_keymgmt_import(void *keydata, int selection,
+                                    const OSSL_PARAM *p)
+ {
+-    unsigned char *fake_rsa_key = keydata;
++    struct fake_rsa_keydata *fake_rsa_key = keydata;
+ 
+     /* key was imported */
+-    *fake_rsa_key = 1;
++    fake_rsa_key->status = 1;
+ 
+     return 1;
+ }
+ 
++static unsigned char fake_rsa_n[] =
++   "\x00\xAA\x36\xAB\xCE\x88\xAC\xFD\xFF\x55\x52\x3C\x7F\xC4\x52\x3F"
++   "\x90\xEF\xA0\x0D\xF3\x77\x4A\x25\x9F\x2E\x62\xB4\xC5\xD9\x9C\xB5"
++   "\xAD\xB3\x00\xA0\x28\x5E\x53\x01\x93\x0E\x0C\x70\xFB\x68\x76\x93"
++   "\x9C\xE6\x16\xCE\x62\x4A\x11\xE0\x08\x6D\x34\x1E\xBC\xAC\xA0\xA1"
++   "\xF5";
++
++static unsigned char fake_rsa_e[] = "\x11";
++
++static unsigned char fake_rsa_d[] =
++    "\x0A\x03\x37\x48\x62\x64\x87\x69\x5F\x5F\x30\xBC\x38\xB9\x8B\x44"
++    "\xC2\xCD\x2D\xFF\x43\x40\x98\xCD\x20\xD8\xA1\x38\xD0\x90\xBF\x64"
++    "\x79\x7C\x3F\xA7\xA2\xCD\xCB\x3C\xD1\xE0\xBD\xBA\x26\x54\xB4\xF9"
++    "\xDF\x8E\x8A\xE5\x9D\x73\x3D\x9F\x33\xB3\x01\x62\x4A\xFD\x1D\x51";
++
++static unsigned char fake_rsa_p[] =
++    "\x00\xD8\x40\xB4\x16\x66\xB4\x2E\x92\xEA\x0D\xA3\xB4\x32\x04\xB5"
++    "\xCF\xCE\x33\x52\x52\x4D\x04\x16\xA5\xA4\x41\xE7\x00\xAF\x46\x12"
++    "\x0D";
++
++static unsigned char fake_rsa_q[] =
++    "\x00\xC9\x7F\xB1\xF0\x27\xF4\x53\xF6\x34\x12\x33\xEA\xAA\xD1\xD9"
++    "\x35\x3F\x6C\x42\xD0\x88\x66\xB1\xD0\x5A\x0F\x20\x35\x02\x8B\x9D"
++    "\x89";
++
++static unsigned char fake_rsa_dmp1[] =
++    "\x59\x0B\x95\x72\xA2\xC2\xA9\xC4\x06\x05\x9D\xC2\xAB\x2F\x1D\xAF"
++    "\xEB\x7E\x8B\x4F\x10\xA7\x54\x9E\x8E\xED\xF5\xB4\xFC\xE0\x9E\x05";
++
++static unsigned char fake_rsa_dmq1[] =
++    "\x00\x8E\x3C\x05\x21\xFE\x15\xE0\xEA\x06\xA3\x6F\xF0\xF1\x0C\x99"
++    "\x52\xC3\x5B\x7A\x75\x14\xFD\x32\x38\xB8\x0A\xAD\x52\x98\x62\x8D"
++    "\x51";
++
++static unsigned char fake_rsa_iqmp[] =
++    "\x36\x3F\xF7\x18\x9D\xA8\xE9\x0B\x1D\x34\x1F\x71\xD0\x9B\x76\xA8"
++    "\xA9\x43\xE1\x1D\x10\xB2\x4D\x24\x9F\x2D\xEA\xFE\xF8\x0C\x18\x26";
++
++OSSL_PARAM *fake_rsa_key_params(int priv)
++{
++    if (priv) {
++        OSSL_PARAM params[] = {
++            OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_N, fake_rsa_n,
++                          sizeof(fake_rsa_n) -1),
++            OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_E, fake_rsa_e,
++                          sizeof(fake_rsa_e) -1),
++            OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_D, fake_rsa_d,
++                          sizeof(fake_rsa_d) -1),
++            OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_FACTOR1, fake_rsa_p,
++                          sizeof(fake_rsa_p) -1),
++            OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_FACTOR2, fake_rsa_q,
++                          sizeof(fake_rsa_q) -1),
++            OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_EXPONENT1, fake_rsa_dmp1,
++                          sizeof(fake_rsa_dmp1) -1),
++            OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_EXPONENT2, fake_rsa_dmq1,
++                          sizeof(fake_rsa_dmq1) -1),
++            OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_COEFFICIENT1, fake_rsa_iqmp,
++                          sizeof(fake_rsa_iqmp) -1),
++            OSSL_PARAM_END
++        };
++        return OSSL_PARAM_dup(params);
++    } else {
++        OSSL_PARAM params[] = {
++            OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_N, fake_rsa_n,
++                          sizeof(fake_rsa_n) -1),
++            OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_E, fake_rsa_e,
++                          sizeof(fake_rsa_e) -1),
++            OSSL_PARAM_END
++        };
++        return OSSL_PARAM_dup(params);
++    }
++}
++
++static int fake_rsa_keymgmt_export(void *keydata, int selection,
++                                   OSSL_CALLBACK *param_callback, void *cbarg)
++{
++    OSSL_PARAM *params = NULL;
++    int ret;
++
++    if (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY)
++        return 0;
++
++    if (!TEST_ptr(params = fake_rsa_key_params(0)))
++        return 0;
++
++    ret = param_callback(params, cbarg);
++    OSSL_PARAM_free(params);
++    return ret;
++}
++
+ static const OSSL_PARAM fake_rsa_import_key_types[] = {
+     OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_N, NULL, 0),
+     OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_E, NULL, 0),
+@@ -95,19 +195,33 @@ static const OSSL_PARAM *fake_rsa_keymgmt_imptypes(int selection)
+     return fake_rsa_import_key_types;
+ }
+ 
++static const OSSL_PARAM fake_rsa_export_key_types[] = {
++    OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_N, NULL, 0),
++    OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_E, NULL, 0),
++    OSSL_PARAM_END
++};
++
++static const OSSL_PARAM *fake_rsa_keymgmt_exptypes(int selection)
++{
++    /* record global for checking */
++    exptypes_selection = selection;
++
++    return fake_rsa_export_key_types;
++}
++
+ static void *fake_rsa_keymgmt_load(const void *reference, size_t reference_sz)
+ {
+-    unsigned char *key = NULL;
++    struct fake_rsa_keydata *key = NULL;
+ 
+-    if (reference_sz != sizeof(key))
++    if (reference_sz != sizeof(*key))
+         return NULL;
+ 
+-    key = *(unsigned char **)reference;
+-    if (*key != 1)
++    key = *(struct fake_rsa_keydata **)reference;
++    if (key->status != 1)
+         return NULL;
+ 
+     /* detach the reference */
+-    *(unsigned char **)reference = NULL;
++    *(struct fake_rsa_keydata  **)reference = NULL;
+ 
+     return key;
+ }
+@@ -129,7 +243,7 @@ static void *fake_rsa_gen(void *genctx, OSSL_CALLBACK *osslcb, void *cbarg)
+ {
+     unsigned char *gctx = genctx;
+     static const unsigned char inited[] = { 1 };
+-    unsigned char *keydata;
++    struct fake_rsa_keydata *keydata;
+ 
+     if (!TEST_ptr(gctx)
+         || !TEST_mem_eq(gctx, sizeof(*gctx), inited, sizeof(inited)))
+@@ -138,7 +252,7 @@ static void *fake_rsa_gen(void *genctx, OSSL_CALLBACK *osslcb, void *cbarg)
+     if (!TEST_ptr(keydata = fake_rsa_keymgmt_new(NULL)))
+         return NULL;
+ 
+-    *keydata = 2;
++    keydata->status = 2;
+     return keydata;
+ }
+ 
+@@ -156,6 +270,9 @@ static const OSSL_DISPATCH fake_rsa_keymgmt_funcs[] = {
+     { OSSL_FUNC_KEYMGMT_IMPORT, (void (*)(void))fake_rsa_keymgmt_import },
+     { OSSL_FUNC_KEYMGMT_IMPORT_TYPES,
+         (void (*)(void))fake_rsa_keymgmt_imptypes },
++    { OSSL_FUNC_KEYMGMT_EXPORT, (void (*)(void))fake_rsa_keymgmt_export },
++    { OSSL_FUNC_KEYMGMT_EXPORT_TYPES,
++        (void (*)(void))fake_rsa_keymgmt_exptypes },
+     { OSSL_FUNC_KEYMGMT_LOAD, (void (*)(void))fake_rsa_keymgmt_load },
+     { OSSL_FUNC_KEYMGMT_GEN_INIT, (void (*)(void))fake_rsa_gen_init },
+     { OSSL_FUNC_KEYMGMT_GEN, (void (*)(void))fake_rsa_gen },
+@@ -191,14 +308,14 @@ static int fake_rsa_sig_sign_init(void *ctx, void *provkey,
+                                   const OSSL_PARAM params[])
+ {
+     unsigned char *sigctx = ctx;
+-    unsigned char *keydata = provkey;
++    struct fake_rsa_keydata *keydata = provkey;
+ 
+     /* we must have a ctx */
+     if (!TEST_ptr(sigctx))
+         return 0;
+ 
+     /* we must have some initialized key */
+-    if (!TEST_ptr(keydata) || !TEST_int_gt(keydata[0], 0))
++    if (!TEST_ptr(keydata) || !TEST_int_gt(keydata->status, 0))
+         return 0;
+ 
+     /* record that sign init was called */
+@@ -289,7 +406,7 @@ static int fake_rsa_st_load(void *loaderctx,
+     unsigned char *storectx = loaderctx;
+     OSSL_PARAM params[4];
+     int object_type = OSSL_OBJECT_PKEY;
+-    void *key = NULL;
++    struct fake_rsa_keydata *key = NULL;
+     int rv = 0;
+ 
+     switch (*storectx) {
+@@ -307,7 +424,7 @@ static int fake_rsa_st_load(void *loaderctx,
+         /* The address of the key becomes the octet string */
+         params[2] =
+             OSSL_PARAM_construct_octet_string(OSSL_OBJECT_PARAM_REFERENCE,
+-                                              &key, sizeof(key));
++                                              &key, sizeof(*key));
+         params[3] = OSSL_PARAM_construct_end();
+         rv = object_cb(params, object_cbarg);
+         *storectx = 1;
+diff --git a/test/fake_rsaprov.h b/test/fake_rsaprov.h
+index 57de1ecf8d..190c46a285 100644
+--- a/test/fake_rsaprov.h
++++ b/test/fake_rsaprov.h
+@@ -12,3 +12,4 @@
+ /* Fake RSA provider implementation */
+ OSSL_PROVIDER *fake_rsa_start(OSSL_LIB_CTX *libctx);
+ void fake_rsa_finish(OSSL_PROVIDER *p);
++OSSL_PARAM *fake_rsa_key_params(int priv);
+diff --git a/test/provider_pkey_test.c b/test/provider_pkey_test.c
+index 5c398398f4..3b190baa5e 100644
+--- a/test/provider_pkey_test.c
++++ b/test/provider_pkey_test.c
+@@ -176,6 +176,67 @@ end:
+     return ret;
+ }
+ 
++static int test_pkey_eq(void)
++{
++    OSSL_PROVIDER *deflt = NULL;
++    OSSL_PROVIDER *fake_rsa = NULL;
++    EVP_PKEY *pkey_fake = NULL;
++    EVP_PKEY *pkey_dflt = NULL;
++    EVP_PKEY_CTX *ctx = NULL;
++    OSSL_PARAM *params = NULL;
++    int ret = 0;
++
++    if (!TEST_ptr(fake_rsa = fake_rsa_start(libctx)))
++        return 0;
++
++    if (!TEST_ptr(deflt = OSSL_PROVIDER_load(libctx, "default")))
++        goto end;
++
++    /* Construct a public key for fake-rsa */
++    if (!TEST_ptr(params = fake_rsa_key_params(0))
++        || !TEST_ptr(ctx = EVP_PKEY_CTX_new_from_name(libctx, "RSA",
++                                                      "provider=fake-rsa"))
++        || !TEST_true(EVP_PKEY_fromdata_init(ctx))
++        || !TEST_true(EVP_PKEY_fromdata(ctx, &pkey_fake, EVP_PKEY_PUBLIC_KEY,
++                                        params))
++        || !TEST_ptr(pkey_fake))
++        goto end;
++
++    EVP_PKEY_CTX_free(ctx);
++    ctx = NULL;
++    OSSL_PARAM_free(params);
++    params = NULL;
++
++    /* Construct a public key for default */
++    if (!TEST_ptr(params = fake_rsa_key_params(0))
++        || !TEST_ptr(ctx = EVP_PKEY_CTX_new_from_name(libctx, "RSA",
++                                                      "provider=default"))
++        || !TEST_true(EVP_PKEY_fromdata_init(ctx))
++        || !TEST_true(EVP_PKEY_fromdata(ctx, &pkey_dflt, EVP_PKEY_PUBLIC_KEY,
++                                        params))
++        || !TEST_ptr(pkey_dflt))
++        goto end;
++
++    EVP_PKEY_CTX_free(ctx);
++    ctx = NULL;
++    OSSL_PARAM_free(params);
++    params = NULL;
++
++    /* now test for equality */
++    if (!TEST_int_eq(EVP_PKEY_eq(pkey_fake, pkey_dflt), 1))
++        goto end;
++
++    ret = 1;
++end:
++    fake_rsa_finish(fake_rsa);
++    OSSL_PROVIDER_unload(deflt);
++    EVP_PKEY_CTX_free(ctx);
++    EVP_PKEY_free(pkey_fake);
++    EVP_PKEY_free(pkey_dflt);
++    OSSL_PARAM_free(params);
++    return ret;
++}
++
+ static int test_pkey_store(int idx)
+ {
+     OSSL_PROVIDER *deflt = NULL;
+@@ -235,6 +296,7 @@ int setup_tests(void)
+ 
+     ADD_TEST(test_pkey_sig);
+     ADD_TEST(test_alternative_keygen_init);
++    ADD_TEST(test_pkey_eq);
+     ADD_ALL_TESTS(test_pkey_store, 2);
+ 
+     return 1;
+-- 
+2.38.1
+
+From 2fea56832780248af2aba2e4433ece2d18428515 Mon Sep 17 00:00:00 2001
+From: Simo Sorce <simo@redhat.com>
+Date: Mon, 14 Nov 2022 10:25:15 -0500
+Subject: [PATCH] Drop explicit check for engines in opt_legacy_okay
+
+The providers indication should always indicate that this is not a
+legacy request.
+This makes a check for engines redundant as the default return is that
+legacy is ok if there are no explicit providers.
+
+Fixes #19662
+
+Signed-off-by: Simo Sorce <simo@redhat.com>
+
+Reviewed-by: Dmitry Belyavskiy <beldmit@gmail.com>
+Reviewed-by: Paul Dale <pauli@openssl.org>
+Reviewed-by: Tomas Mraz <tomas@openssl.org>
+(Merged from https://github.com/openssl/openssl/pull/19671)
+---
+ apps/lib/apps.c                    |  8 --------
+ test/recipes/20-test_legacy_okay.t | 23 +++++++++++++++++++++++
+ 2 files changed, 23 insertions(+), 8 deletions(-)
+ create mode 100755 test/recipes/20-test_legacy_okay.t
+
+diff --git a/apps/lib/apps.c b/apps/lib/apps.c
+index 3d52e030ab7e258f9cd983b2d9755d954cb3aee5..bbe0d009efb35fcf1a902c86cbddc61e657e57f1 100644
+--- a/apps/lib/apps.c
++++ b/apps/lib/apps.c
+@@ -3405,14 +3405,6 @@ int opt_legacy_okay(void)
+ {
+     int provider_options = opt_provider_option_given();
+     int libctx = app_get0_libctx() != NULL || app_get0_propq() != NULL;
+-#ifndef OPENSSL_NO_ENGINE
+-    ENGINE *e = ENGINE_get_first();
+-
+-    if (e != NULL) {
+-        ENGINE_free(e);
+-        return 1;
+-    }
+-#endif
+     /*
+      * Having a provider option specified or a custom library context or
+      * property query, is a sure sign we're not using legacy.
+diff --git a/test/recipes/20-test_legacy_okay.t b/test/recipes/20-test_legacy_okay.t
+new file mode 100755
+index 0000000000000000000000000000000000000000..183499f3fd93f97e8a4a30681a9f383d2f6e0c56
+--- /dev/null
++++ b/test/recipes/20-test_legacy_okay.t
+@@ -0,0 +1,23 @@
++#! /usr/bin/env perl
++# Copyright 2020-2021 The OpenSSL Project Authors. All Rights Reserved.
++#
++# Licensed under the Apache License 2.0 (the "License").  You may not use
++# this file except in compliance with the License.  You can obtain a copy
++# in the file LICENSE in the source distribution or at
++# https://www.openssl.org/source/license.html
++
++use strict;
++use warnings;
++
++use OpenSSL::Test;
++
++setup("test_legacy");
++
++plan tests => 3;
++
++ok(run(app(['openssl', 'rand', '-out', 'rand.txt', '256'])), "Generate random file");
++
++ok(run(app(['openssl', 'dgst', '-sha256', 'rand.txt'])), "Generate a digest");
++
++ok(!run(app(['openssl', 'dgst', '-sha256', '-propquery', 'foo=1',
++             'rand.txt'])), "Fail to generate a digest");
+-- 
+2.38.1
+

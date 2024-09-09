@@ -1,0 +1,80 @@
+From fa96a2f493276e7a57512e8c3d535052586f1525 Mon Sep 17 00:00:00 2001
+From: Clemens Lang <cllang@redhat.com>
+Date: Mon, 6 Mar 2023 12:32:04 +0100
+Subject: [PATCH 2/2] pbdkf2: Set indicator if pkcs5 param disabled checks
+
+The pbkdf2 implementation in the FIPS provider supports the checks
+required by NIST, but allows disabling these checks by setting the
+OSSL_KDF_PARAM_PKCS5 parameter to 1. The implementation must indicate
+that the use of this configuration is not approved in FIPS mode. Add an
+explicit indicator to provide this indication.
+
+Resolves: rhbz#2175145
+Signed-off-by: Clemens Lang <cllang@redhat.com>
+---
+ providers/implementations/kdfs/pbkdf2.c | 40 +++++++++++++++++++++++--
+ 1 file changed, 37 insertions(+), 3 deletions(-)
+
+diff --git a/providers/implementations/kdfs/pbkdf2.c b/providers/implementations/kdfs/pbkdf2.c
+index aa0adce5e6..6df8c6d321 100644
+--- a/providers/implementations/kdfs/pbkdf2.c
++++ b/providers/implementations/kdfs/pbkdf2.c
+@@ -251,11 +251,42 @@ static const OSSL_PARAM *kdf_pbkdf2_settable_ctx_params(ossl_unused void *ctx,
+ 
+ static int kdf_pbkdf2_get_ctx_params(void *vctx, OSSL_PARAM params[])
+ {
++#ifdef FIPS_MODULE
++    KDF_PBKDF2 *ctx = (KDF_PBKDF2 *)vctx;
++#endif /* defined(FIPS_MODULE) */
+     OSSL_PARAM *p;
++    int any_valid = 0; /* set to 1 when at least one parameter was valid */
++
++    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE)) != NULL) {
++        any_valid = 1;
++
++        if (!OSSL_PARAM_set_size_t(p, SIZE_MAX))
++            return 0;
++    }
++
++#ifdef FIPS_MODULE
++    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR))
++            != NULL) {
++        int fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_APPROVED;
++
++        /* The lower_bound_checks parameter enables checks required by FIPS. If
++         * those checks are disabled, the PBKDF2 implementation will also
++         * support non-approved parameters (e.g., salt lengths < 16 bytes, see
++         * NIST SP 800-132 section 5.1). */
++        if (!ctx->lower_bound_checks)
++            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+ 
+-    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_SIZE)) != NULL)
+-        return OSSL_PARAM_set_size_t(p, SIZE_MAX);
+-    return -2;
++        if (!OSSL_PARAM_set_int(p, fips_indicator))
++            return 0;
++
++        any_valid = 1;
++    }
++#endif /* defined(FIPS_MODULE) */
++
++    if (!any_valid)
++        return -2;
++
++    return 1;
+ }
+ 
+ static const OSSL_PARAM *kdf_pbkdf2_gettable_ctx_params(ossl_unused void *ctx,
+@@ -263,6 +294,9 @@ static const OSSL_PARAM *kdf_pbkdf2_gettable_ctx_params(ossl_unused void *ctx,
+ {
+     static const OSSL_PARAM known_gettable_ctx_params[] = {
+         OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
++#ifdef FIPS_MODULE
++        OSSL_PARAM_int(OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR, NULL),
++#endif /* defined(FIPS_MODULE) */
+         OSSL_PARAM_END
+     };
+     return known_gettable_ctx_params;
+-- 
+2.39.2
+

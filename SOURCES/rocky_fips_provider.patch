@@ -1,0 +1,1714 @@
+From 2c5697f837c3ffff385866a323300fbc9dcdea3b Mon Sep 17 00:00:00 2001
+From: rpm-build <rpm-build>
+Date: Thu, 8 Feb 2024 15:59:12 -0500
+Subject: [PATCH] FIPS provider rebanding
+
+---
+ apps/fipsinstall.c                            |   2 +-
+ crypto/ec/ec_backend.c                        |   2 +-
+ crypto/ec/ecdsa_ossl.c                        |   4 +-
+ crypto/ec/ecp_s390x_nistp.c                   |   4 +-
+ crypto/rsa/rsa_local.h                        |   2 +-
+ crypto/rsa/rsa_oaep.c                         |   8 +-
+ doc/man1/openssl-fipsinstall.pod.in           |   4 +-
+ doc/man5/fips_config.pod                      |   4 +-
+ doc/man7/fips_module_indicators.pod           |  40 +++----
+ include/openssl/core_names.h                  |  16 +--
+ include/openssl/evp.h                         |  24 ++--
+ include/openssl/kdf.h                         |   6 +-
+ include/openssl/ssl.h.in                      |   2 +-
+ providers/common/securitycheck.c              |   2 +-
+ providers/fips/fipsprov.c                     | 112 +++++++++---------
+ providers/fips/indicator.h                    |  20 ++--
+ providers/fips/self_test_data.inc             |   2 +-
+ providers/fips/self_test_kats.c               |  14 +--
+ .../implementations/asymciphers/rsa_enc.c     |  24 ++--
+ .../implementations/ciphers/ciphercommon.c    |   2 +-
+ .../ciphers/ciphercommon_gcm.c                |   6 +-
+ providers/implementations/kdfs/hkdf.c         |  20 ++--
+ providers/implementations/kdfs/kbkdf.c        |  16 +--
+ providers/implementations/kdfs/pbkdf2.c       |   8 +-
+ providers/implementations/kdfs/sshkdf.c       |  16 +--
+ providers/implementations/kdfs/sskdf.c        |  20 ++--
+ providers/implementations/kdfs/tls1_prf.c     |  18 +--
+ providers/implementations/kdfs/x942kdf.c      |  16 +--
+ providers/implementations/kem/rsa_kem.c       |   6 +-
+ providers/implementations/keymgmt/ec_kmgmt.c  |   2 +-
+ providers/implementations/macs/hmac_prov.c    |   8 +-
+ providers/implementations/rands/drbg.c        |   2 +-
+ .../implementations/rands/seeding/rand_unix.c |   2 +-
+ providers/implementations/signature/rsa_sig.c |  12 +-
+ ssl/ssl_conf.c                                |   2 +-
+ ssl/statem/extensions_srvr.c                  |   2 +-
+ test/acvp_test.c                              |   2 +-
+ test/helpers/predefined_dhparams.c            |   2 +-
+ test/recipes/15-test_ec.t                     |   2 +-
+ test/recipes/80-test_cms.t                    |  28 ++---
+ test/recipes/80-test_ssl_old.t                |   6 +-
+ util/providers.num                            |   2 +-
+ 42 files changed, 246 insertions(+), 246 deletions(-)
+
+diff --git a/apps/fipsinstall.c b/apps/fipsinstall.c
+index e978057f..1564406a 100644
+--- a/apps/fipsinstall.c
++++ b/apps/fipsinstall.c
+@@ -311,7 +311,7 @@ int fipsinstall_main(int argc, char **argv)
+     EVP_MAC *mac = NULL;
+     CONF *conf = NULL;
+ 
+-    BIO_printf(bio_err, "This command is not enabled in the Red Hat Enterprise Linux OpenSSL build, please consult Red Hat documentation to learn how to enable FIPS mode\n");
++    BIO_printf(bio_err, "This command is not enabled in the Rocky Enterprise Linux OpenSSL build, please consult Rocky documentation to learn how to enable FIPS mode\n");
+     return 1;
+ 
+     if ((opts = sk_OPENSSL_STRING_new_null()) == NULL)
+diff --git a/crypto/ec/ec_backend.c b/crypto/ec/ec_backend.c
+index 2f8663f9..dc711ec8 100644
+--- a/crypto/ec/ec_backend.c
++++ b/crypto/ec/ec_backend.c
+@@ -419,7 +419,7 @@ int ossl_ec_key_fromdata(EC_KEY *ec, const OSSL_PARAM params[], int include_priv
+             OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PRIV_KEY);
+ #ifdef FIPS_MODULE
+     param_sign_kat_k =
+-        OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_REDHAT_SIGN_KAT_K);
++        OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_ROCKY_SIGN_KAT_K);
+ #endif
+     ctx = BN_CTX_new_ex(ossl_ec_key_get_libctx(ec));
+     if (ctx == NULL)
+diff --git a/crypto/ec/ecdsa_ossl.c b/crypto/ec/ecdsa_ossl.c
+index 620cd940..a7305aa9 100644
+--- a/crypto/ec/ecdsa_ossl.c
++++ b/crypto/ec/ecdsa_ossl.c
+@@ -21,7 +21,7 @@
+ #include "ec_local.h"
+ 
+ #ifdef FIPS_MODULE
+-extern int REDHAT_FIPS_signature_st;
++extern int ROCKY_FIPS_signature_st;
+ #endif
+ 
+ int ossl_ecdsa_sign_setup(EC_KEY *eckey, BN_CTX *ctx_in, BIGNUM **kinvp,
+@@ -131,7 +131,7 @@ static int ecdsa_sign_setup(EC_KEY *eckey, BN_CTX *ctx_in,
+ 
+     do {
+ #ifdef FIPS_MODULE
+-       if (REDHAT_FIPS_signature_st && eckey->sign_kat_k != NULL) {
++       if (ROCKY_FIPS_signature_st && eckey->sign_kat_k != NULL) {
+            BN_copy(k, eckey->sign_kat_k);
+        } else {
+ #endif
+diff --git a/crypto/ec/ecp_s390x_nistp.c b/crypto/ec/ecp_s390x_nistp.c
+index ea16e5b7..12b23ddf 100644
+--- a/crypto/ec/ecp_s390x_nistp.c
++++ b/crypto/ec/ecp_s390x_nistp.c
+@@ -45,7 +45,7 @@
+ #define S390X_OFF_Y(n)                  (4 * n)
+ 
+ #ifdef FIPS_MODULE
+-extern int REDHAT_FIPS_signature_st;
++extern int ROCKY_FIPS_signature_st;
+ #endif
+ 
+ static int ec_GFp_s390x_nistp_mul(const EC_GROUP *group, EC_POINT *r,
+@@ -188,7 +188,7 @@ static ECDSA_SIG *ecdsa_s390x_nistp_sign_sig(const unsigned char *dgst,
+          * internally implementing counter-measures for RNG weakness.
+          */
+ #ifdef FIPS_MODULE
+-       if (REDHAT_FIPS_signature_st && eckey->sign_kat_k != NULL) {
++       if (ROCKY_FIPS_signature_st && eckey->sign_kat_k != NULL) {
+            BN_bn2binpad(eckey->sign_kat_k, param + S390X_OFF_RN(len), len);
+            /* Turns KDSA internal nonce-generation off. */
+            fc |= S390X_KDSA_D;
+diff --git a/crypto/rsa/rsa_local.h b/crypto/rsa/rsa_local.h
+index dde57a1a..3d948b4b 100644
+--- a/crypto/rsa/rsa_local.h
++++ b/crypto/rsa/rsa_local.h
+@@ -199,6 +199,6 @@ int ossl_rsa_padding_add_PKCS1_OAEP_mgf1_ex2(OSSL_LIB_CTX *libctx,
+                                              const unsigned char *param,
+                                              int plen, const EVP_MD *md,
+                                              const EVP_MD *mgf1md,
+-                                             const char *redhat_st_seed);
++                                             const char *rocky_st_seed);
+ 
+ #endif /* OSSL_CRYPTO_RSA_LOCAL_H */
+diff --git a/crypto/rsa/rsa_oaep.c b/crypto/rsa/rsa_oaep.c
+index af2b0b02..bf5a0986 100644
+--- a/crypto/rsa/rsa_oaep.c
++++ b/crypto/rsa/rsa_oaep.c
+@@ -45,7 +45,7 @@ int RSA_padding_add_PKCS1_OAEP(unsigned char *to, int tlen,
+ }
+ 
+ #ifdef FIPS_MODULE
+-extern int REDHAT_FIPS_asym_cipher_st;
++extern int ROCKY_FIPS_asym_cipher_st;
+ #endif /* FIPS_MODULE */
+ 
+ /*
+@@ -61,7 +61,7 @@ int ossl_rsa_padding_add_PKCS1_OAEP_mgf1_ex2(OSSL_LIB_CTX *libctx,
+                                              const unsigned char *param,
+                                              int plen, const EVP_MD *md,
+                                              const EVP_MD *mgf1md,
+-                                             const char *redhat_st_seed)
++                                             const char *rocky_st_seed)
+ {
+     int rv = 0;
+     int i, emlen = tlen - 1;
+@@ -127,8 +127,8 @@ int ossl_rsa_padding_add_PKCS1_OAEP_mgf1_ex2(OSSL_LIB_CTX *libctx,
+     memcpy(db + emlen - flen - mdlen, from, (unsigned int)flen);
+     /* step 3d: generate random byte string */
+ #ifdef FIPS_MODULE
+-    if (redhat_st_seed != NULL && REDHAT_FIPS_asym_cipher_st) {
+-        memcpy(seed, redhat_st_seed, mdlen);
++    if (rocky_st_seed != NULL && ROCKY_FIPS_asym_cipher_st) {
++        memcpy(seed, rocky_st_seed, mdlen);
+     } else
+ #endif
+     if (RAND_bytes_ex(libctx, seed, mdlen, 0) <= 0)
+diff --git a/doc/man1/openssl-fipsinstall.pod.in b/doc/man1/openssl-fipsinstall.pod.in
+index 60676232..db12d117 100644
+--- a/doc/man1/openssl-fipsinstall.pod.in
++++ b/doc/man1/openssl-fipsinstall.pod.in
+@@ -11,8 +11,8 @@ B<openssl fipsinstall>
+ 
+ =head1 DESCRIPTION
+ This command is disabled.
+-Please consult Red Hat Enterprise Linux documentation to learn how to correctly
+-enable FIPS mode on Red Hat Enterprise
++Please consult Rocky Enterprise Linux documentation to learn how to correctly
++enable FIPS mode on Rocky Enterprise
+ 
+ =head1 COPYRIGHT
+ 
+diff --git a/doc/man5/fips_config.pod b/doc/man5/fips_config.pod
+index 811f5e02..05495188 100644
+--- a/doc/man5/fips_config.pod
++++ b/doc/man5/fips_config.pod
+@@ -6,12 +6,12 @@ fips_config - OpenSSL FIPS configuration
+ 
+ =head1 DESCRIPTION
+ 
+-This command is disabled in Red Hat Enterprise Linux. The FIPS provider is
++This command is disabled in Rocky Enterprise Linux. The FIPS provider is
+ automatically loaded when the system is booted in FIPS mode, or when the
+ environment variable B<OPENSSL_FORCE_FIPS_MODE> is set. See the documentation
+ for more information.
+ 
+-Red Hat Enterprise Linux uses a supplementary config for FIPS module located in
++Rocky Enterprise Linux uses a supplementary config for FIPS module located in
+ OpenSSL configuration directory and managed by crypto policies. If present, it
+ should have format
+ 
+diff --git a/doc/man7/fips_module_indicators.pod b/doc/man7/fips_module_indicators.pod
+index 23db2b39..dd508ae7 100644
+--- a/doc/man7/fips_module_indicators.pod
++++ b/doc/man7/fips_module_indicators.pod
+@@ -2,17 +2,17 @@
+ 
+ =head1 NAME
+ 
+-fips_module_indicators - Red Hat OpenSSL FIPS module indicators guide
++fips_module_indicators - Rocky OpenSSL FIPS module indicators guide
+ 
+ =head1 DESCRIPTION
+ 
+-This guide documents how the Red Hat Enterprise Linux 9 OpenSSL FIPS provider
++This guide documents how the Rocky Enterprise Linux 9 OpenSSL FIPS provider
+ implements Approved Security Service Indicators according to the FIPS 140-3
+ Implementation Guidelines, section 2.4.C. See
+ L<https://csrc.nist.gov/CSRC/media/Projects/cryptographic-module-validation-program/documents/fips%20140-3/FIPS%20140-3%20IG.pdf>
+ for the FIPS 140-3 Implementation Guidelines.
+ 
+-For all approved services except signatures, the Red Hat OpenSSL FIPS provider
++For all approved services except signatures, the Rocky OpenSSL FIPS provider
+ uses the return code as the indicator as understood by FIPS 140-3. That means
+ that every operation that succeeds denotes use of an approved security service.
+ Operations that do not succeed may not have been approved security services, or
+@@ -25,8 +25,8 @@ explicit indicator must claim it as approved, and it must succeed.
+ 
+ =head2 Querying the explicit indicator
+ 
+-The Red Hat OpenSSL FIPS provider exports a symbol named
+-I<redhat_ossl_query_fipsindicator> that provides information on which signature
++The Rocky OpenSSL FIPS provider exports a symbol named
++I<rocky_ossl_query_fipsindicator> that provides information on which signature
+ operations are approved security functions. To use this function, either link
+ against I<fips.so> directly, or load it at runtime using dlopen(3) and
+ dlsym(3).
+@@ -40,11 +40,11 @@ dlsym(3).
+         // handle error
+     }
+ 
+-    const OSSL_RH_FIPSINDICATOR_ALORITHM *(*redhat_ossl_query_fipsindicator)(int) \
++    const OSSL_RL_FIPSINDICATOR_ALORITHM *(*rocky_ossl_query_fipsindicator)(int) \
+         = dlsym(provider, "redhat_ossl_query_fipsindicator");
+     if (redhat_ossl_query_fipsindicator == NULL) {
+         fprintf(stderr, "%s\n", dlerror());
+-        fprintf(stderr, "Does your copy of fips.so have the required Red Hat"
++        fprintf(stderr, "Does your copy of fips.so have the required Rocky"
+                         " patches?\n");
+         // handle error
+     }
+@@ -57,28 +57,28 @@ I</usr/src/debug/openssl-3.*/> in the compiler's include path.
+ I<redhat_ossl_query_fipsindicator> expects an operation ID as its only
+ argument. Currently, the only supported operation ID is I<OSSL_OP_SIGNATURE> to
+ obtain the indicators for signature operations. On success, the return value is
+-a pointer to an array of I<OSSL_RH_FIPSINDICATOR_STRUCT>s. On failure, NULL is
++a pointer to an array of I<OSSL_RL_FIPSINDICATOR_STRUCT>s. On failure, NULL is
+ returned. The last entry in the array is indicated by I<algorithm_names> being
+ NULL.
+ 
+-    typedef struct ossl_rh_fipsindicator_algorithm_st {
++    typedef struct ossl_rl_fipsindicator_algorithm_st {
+         const char *algorithm_names;     /* key */
+         const char *property_definition; /* key */
+-        const OSSL_RH_FIPSINDICATOR_DISPATCH *indicators;
+-    } OSSL_RH_FIPSINDICATOR_ALGORITHM;
++        const OSSL_RL_FIPSINDICATOR_DISPATCH *indicators;
++    } OSSL_RL_FIPSINDICATOR_ALGORITHM;
+ 
+-    typedef struct ossl_rh_fipsindicator_dispatch_st {
++    typedef struct ossl_rl_fipsindicator_dispatch_st {
+         int function_id;
+         int approved;
+-    } OSSL_RH_FIPSINDICATOR_DISPATCH;
++    } OSSL_RL_FIPSINDICATOR_DISPATCH;
+ 
+ The I<algorithm_names> field is a colon-separated list of algorithm names from
+ one of the I<PROV_NAMES_...> constants, e.g., I<PROV_NAMES_RSA>. strtok(3) can
+ be used to locate the appropriate entry. See the example below, where
+ I<algorithm> contains the algorithm name to search for:
+ 
+-    const OSSL_RH_FIPSINDICATOR_DISPATCH *indicator_dispatch = NULL;
+-    const OSSL_RH_FIPSINDICATOR_ALGORITHM *indicator =
++    const OSSL_RL_FIPSINDICATOR_DISPATCH *indicator_dispatch = NULL;
++    const OSSL_RL_FIPSINDICATOR_ALGORITHM *indicator =
+         redhat_ossl_query_fipsindicator(operation_id);
+     if (indicator == NULL) {
+         fprintf(stderr, "No indicator for operation, probably using implicit"
+@@ -109,12 +109,12 @@ I<algorithm> contains the algorithm name to search for:
+         // handle error
+     }
+ 
+-If an appropriate I<OSSL_RH_FIPSINDICATOR_DISPATCH> array is available for the
++If an appropriate I<OSSL_RL_FIPSINDICATOR_DISPATCH> array is available for the
+ given algorithm name, it maps function IDs to their approval status. The last
+ entry is indicated by a zero I<function_id>. I<approved> is
+-I<OSSL_RH_FIPSINDICATOR_APPROVED> if the operation is an approved security
++I<OSSL_RL_FIPSINDICATOR_APPROVED> if the operation is an approved security
+ service, or part of an approved security service, or
+-I<OSSL_RH_FIPSINDICATOR_UNAPPROVED> otherwise. Any other value is invalid.
++I<OSSL_RL_FIPSINDICATOR_UNAPPROVED> otherwise. Any other value is invalid.
+ Function IDs are I<OSSL_FUNC_*> constants from I<openssl/core_dispatch.h>,
+ e.g., I<OSSL_FUNC_SIGNATURE_DIGEST_SIGN_UPDATE> or I<OSSL_FUNC_SIGNATURE_SIGN>.
+ 
+@@ -124,10 +124,10 @@ used to query the approval status:
+     for (; indicator_dispatch->function_id != 0; ++indicator_dispatch) {
+         if (indicator_dispatch->function_id == function_id) {
+             switch (indicator_dispatch->approved) {
+-                case OSSL_RH_FIPSINDICATOR_APPROVED:
++                case OSSL_RL_FIPSINDICATOR_APPROVED:
+                     // approved security service
+                     break;
+-                case OSSL_RH_FIPSINDICATOR_UNAPPROVED:
++                case OSSL_RL_FIPSINDICATOR_UNAPPROVED:
+                     // unapproved security service
+                     break;
+                 default:
+diff --git a/include/openssl/core_names.h b/include/openssl/core_names.h
+index 1484ed25..d5d74bdb 100644
+--- a/include/openssl/core_names.h
++++ b/include/openssl/core_names.h
+@@ -98,7 +98,7 @@ extern "C" {
+ #define OSSL_CIPHER_PARAM_CTS_MODE             "cts_mode"     /* utf8_string */
+ /* For passing the AlgorithmIdentifier parameter in DER form */
+ #define OSSL_CIPHER_PARAM_ALGORITHM_ID_PARAMS  "alg_id_param" /* octet_string */
+-#define OSSL_CIPHER_PARAM_REDHAT_FIPS_INDICATOR "redhat-fips-indicator" /* int */
++#define OSSL_CIPHER_PARAM_ROCKY_FIPS_INDICATOR "rocky-fips-indicator" /* int */
+ 
+ #define OSSL_CIPHER_PARAM_TLS1_MULTIBLOCK_MAX_SEND_FRAGMENT                    \
+     "tls1multi_maxsndfrag" /* uint */
+@@ -175,7 +175,7 @@ extern "C" {
+ #define OSSL_MAC_PARAM_SIZE             "size"                    /* size_t */
+ #define OSSL_MAC_PARAM_BLOCK_SIZE       "block-size"              /* size_t */
+ #define OSSL_MAC_PARAM_TLS_DATA_SIZE    "tls-data-size"           /* size_t */
+-#define OSSL_MAC_PARAM_REDHAT_FIPS_INDICATOR "redhat-fips-indicator"
++#define OSSL_MAC_PARAM_ROCKY_FIPS_INDICATOR "rocky-fips-indicator"
+ 
+ /* Known MAC names */
+ #define OSSL_MAC_NAME_BLAKE2BMAC    "BLAKE2BMAC"
+@@ -227,7 +227,7 @@ extern "C" {
+ #define OSSL_KDF_PARAM_X942_SUPP_PUBINFO    "supp-pubinfo"
+ #define OSSL_KDF_PARAM_X942_SUPP_PRIVINFO   "supp-privinfo"
+ #define OSSL_KDF_PARAM_X942_USE_KEYBITS     "use-keybits"
+-#define OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR "redhat-fips-indicator"
++#define OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR "rocky-fips-indicator"
+ 
+ /* Known KDF names */
+ #define OSSL_KDF_NAME_HKDF           "HKDF"
+@@ -298,7 +298,7 @@ extern "C" {
+ #define OSSL_PKEY_PARAM_PUB_KEY             "pub"
+ #define OSSL_PKEY_PARAM_PRIV_KEY            "priv"
+ #define OSSL_PKEY_PARAM_IMPLICIT_REJECTION  "implicit-rejection"
+-#define OSSL_PKEY_PARAM_REDHAT_SIGN_KAT_K   "rh_sign_kat_k"
++#define OSSL_PKEY_PARAM_ROCKY_SIGN_KAT_K   "rl_sign_kat_k"
+ 
+ /* Diffie-Hellman/DSA Parameters */
+ #define OSSL_PKEY_PARAM_FFC_P               "p"
+@@ -459,7 +459,7 @@ extern "C" {
+ #define OSSL_SIGNATURE_PARAM_MGF1_PROPERTIES    \
+     OSSL_PKEY_PARAM_MGF1_PROPERTIES
+ #define OSSL_SIGNATURE_PARAM_DIGEST_SIZE        OSSL_PKEY_PARAM_DIGEST_SIZE
+-#define OSSL_SIGNATURE_PARAM_REDHAT_FIPS_INDICATOR "redhat-fips-indicator"
++#define OSSL_SIGNATURE_PARAM_ROCKY_FIPS_INDICATOR "rocky-fips-indicator"
+ 
+ /* Asym cipher parameters */
+ #define OSSL_ASYM_CIPHER_PARAM_DIGEST                   OSSL_PKEY_PARAM_DIGEST
+@@ -478,9 +478,9 @@ extern "C" {
+ #define OSSL_ASYM_CIPHER_PARAM_TLS_NEGOTIATED_VERSION   "tls-negotiated-version"
+ #define OSSL_ASYM_CIPHER_PARAM_IMPLICIT_REJECTION       "implicit-rejection"
+ #ifdef FIPS_MODULE
+-#define OSSL_ASYM_CIPHER_PARAM_REDHAT_KAT_OEAP_SEED     "redhat-kat-oaep-seed"
++#define OSSL_ASYM_CIPHER_PARAM_ROCKY_KAT_OEAP_SEED     "rocky-kat-oaep-seed"
+ #endif
+-#define OSSL_ASYM_CIPHER_PARAM_REDHAT_FIPS_INDICATOR    "redhat-fips-indicator"
++#define OSSL_ASYM_CIPHER_PARAM_ROCKY_FIPS_INDICATOR    "rocky-fips-indicator"
+ 
+ /*
+  * Encoder / decoder parameters
+@@ -515,7 +515,7 @@ extern "C" {
+ 
+ /* KEM parameters */
+ #define OSSL_KEM_PARAM_OPERATION            "operation"
+-#define OSSL_KEM_PARAM_REDHAT_FIPS_INDICATOR "redhat-fips-indicator" /* int */
++#define OSSL_KEM_PARAM_ROCKY_FIPS_INDICATOR "rocky-fips-indicator" /* int */
+ 
+ /* OSSL_KEM_PARAM_OPERATION values */
+ #define OSSL_KEM_PARAM_OPERATION_RSASVE     "RSASVE"
+diff --git a/include/openssl/evp.h b/include/openssl/evp.h
+index ead5a8c5..3d231baf 100644
+--- a/include/openssl/evp.h
++++ b/include/openssl/evp.h
+@@ -746,9 +746,9 @@ void EVP_CIPHER_CTX_set_flags(EVP_CIPHER_CTX *ctx, int flags);
+ void EVP_CIPHER_CTX_clear_flags(EVP_CIPHER_CTX *ctx, int flags);
+ int EVP_CIPHER_CTX_test_flags(const EVP_CIPHER_CTX *ctx, int flags);
+ 
+-# define EVP_CIPHER_REDHAT_FIPS_INDICATOR_UNDETERMINED 0
+-# define EVP_CIPHER_REDHAT_FIPS_INDICATOR_APPROVED     1
+-# define EVP_CIPHER_REDHAT_FIPS_INDICATOR_NOT_APPROVED 2
++# define EVP_CIPHER_ROCKY_FIPS_INDICATOR_UNDETERMINED 0
++# define EVP_CIPHER_ROCKY_FIPS_INDICATOR_APPROVED     1
++# define EVP_CIPHER_ROCKY_FIPS_INDICATOR_NOT_APPROVED 2
+ 
+ __owur int EVP_EncryptInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *cipher,
+                            const unsigned char *key, const unsigned char *iv);
+@@ -801,9 +801,9 @@ __owur int EVP_CipherFinal(EVP_CIPHER_CTX *ctx, unsigned char *outm,
+ __owur int EVP_CipherFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *outm,
+                               int *outl);
+ 
+-# define EVP_SIGNATURE_REDHAT_FIPS_INDICATOR_UNDETERMINED 0
+-# define EVP_SIGNATURE_REDHAT_FIPS_INDICATOR_APPROVED     1
+-# define EVP_SIGNATURE_REDHAT_FIPS_INDICATOR_NOT_APPROVED 2
++# define EVP_SIGNATURE_ROCKY_FIPS_INDICATOR_UNDETERMINED 0
++# define EVP_SIGNATURE_ROCKY_FIPS_INDICATOR_APPROVED     1
++# define EVP_SIGNATURE_ROCKY_FIPS_INDICATOR_NOT_APPROVED 2
+ 
+ __owur int EVP_SignFinal(EVP_MD_CTX *ctx, unsigned char *md, unsigned int *s,
+                          EVP_PKEY *pkey);
+@@ -1200,9 +1200,9 @@ void EVP_MD_do_all_provided(OSSL_LIB_CTX *libctx,
+                             void *arg);
+ 
+ /* MAC stuff */
+-# define EVP_MAC_REDHAT_FIPS_INDICATOR_UNDETERMINED 0
+-# define EVP_MAC_REDHAT_FIPS_INDICATOR_APPROVED     1
+-# define EVP_MAC_REDHAT_FIPS_INDICATOR_NOT_APPROVED 2
++# define EVP_MAC_ROCKY_FIPS_INDICATOR_UNDETERMINED 0
++# define EVP_MAC_ROCKY_FIPS_INDICATOR_APPROVED     1
++# define EVP_MAC_ROCKY_FIPS_INDICATOR_NOT_APPROVED 2
+ 
+ EVP_MAC *EVP_MAC_fetch(OSSL_LIB_CTX *libctx, const char *algorithm,
+                        const char *properties);
+@@ -1764,9 +1764,9 @@ OSSL_DEPRECATEDIN_3_0 size_t EVP_PKEY_meth_get_count(void);
+ OSSL_DEPRECATEDIN_3_0 const EVP_PKEY_METHOD *EVP_PKEY_meth_get0(size_t idx);
+ # endif
+ 
+-# define EVP_PKEY_REDHAT_FIPS_INDICATOR_UNDETERMINED 0
+-# define EVP_PKEY_REDHAT_FIPS_INDICATOR_APPROVED     1
+-# define EVP_PKEY_REDHAT_FIPS_INDICATOR_NOT_APPROVED 2
++# define EVP_PKEY_ROCKY_FIPS_INDICATOR_UNDETERMINED 0
++# define EVP_PKEY_ROCKY_FIPS_INDICATOR_APPROVED     1
++# define EVP_PKEY_ROCKY_FIPS_INDICATOR_NOT_APPROVED 2
+ 
+ EVP_KEYMGMT *EVP_KEYMGMT_fetch(OSSL_LIB_CTX *ctx, const char *algorithm,
+                                const char *properties);
+diff --git a/include/openssl/kdf.h b/include/openssl/kdf.h
+index 86171635..e52739eb 100644
+--- a/include/openssl/kdf.h
++++ b/include/openssl/kdf.h
+@@ -63,9 +63,9 @@ int EVP_KDF_names_do_all(const EVP_KDF *kdf,
+ # define EVP_KDF_HKDF_MODE_EXTRACT_ONLY        1
+ # define EVP_KDF_HKDF_MODE_EXPAND_ONLY         2
+ 
+-# define EVP_KDF_REDHAT_FIPS_INDICATOR_UNDETERMINED 0
+-# define EVP_KDF_REDHAT_FIPS_INDICATOR_APPROVED     1
+-# define EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED 2
++# define EVP_KDF_ROCKY_FIPS_INDICATOR_UNDETERMINED 0
++# define EVP_KDF_ROCKY_FIPS_INDICATOR_APPROVED     1
++# define EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED 2
+ 
+ #define EVP_KDF_SSHKDF_TYPE_INITIAL_IV_CLI_TO_SRV     65
+ #define EVP_KDF_SSHKDF_TYPE_INITIAL_IV_SRV_TO_CLI     66
+diff --git a/include/openssl/ssl.h.in b/include/openssl/ssl.h.in
+index 651f66c7..3c93dfc9 100644
+--- a/include/openssl/ssl.h.in
++++ b/include/openssl/ssl.h.in
+@@ -412,7 +412,7 @@ typedef int (*SSL_async_callback_fn)(SSL *s, void *arg);
+      * interoperability with CryptoPro CSP 3.x
+      */
+ # define SSL_OP_CRYPTOPRO_TLSEXT_BUG                     SSL_OP_BIT(31)
+-# define SSL_OP_RH_PERMIT_NOEMS_FIPS                     SSL_OP_BIT(48)
++# define SSL_OP_RL_PERMIT_NOEMS_FIPS                     SSL_OP_BIT(48)
+ 
+ /*
+  * Option "collections."
+diff --git a/providers/common/securitycheck.c b/providers/common/securitycheck.c
+index c017c658..af6c2c74 100644
+--- a/providers/common/securitycheck.c
++++ b/providers/common/securitycheck.c
+@@ -27,7 +27,7 @@
+  * Set protect = 1 for encryption or signing operations, or 0 otherwise. See
+  * https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-131Ar2.pdf.
+  */
+-/* Red Hat build implements some extra limitations in providers/implementations/asymciphers/rsa_enc.c */
++/* Rocky build implements some extra limitations in providers/implementations/asymciphers/rsa_enc.c */
+ int ossl_rsa_check_key(OSSL_LIB_CTX *ctx, const RSA *rsa, int operation)
+ {
+     int protect = 0;
+diff --git a/providers/fips/fipsprov.c b/providers/fips/fipsprov.c
+index f164586a..8bf3a1ad 100644
+--- a/providers/fips/fipsprov.c
++++ b/providers/fips/fipsprov.c
+@@ -187,13 +187,13 @@ static int fips_get_params(void *provctx, OSSL_PARAM params[])
+                                               &fips_prov_ossl_ctx_method);
+ 
+     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_NAME);
+-    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, "Red Hat Enterprise Linux 9 - OpenSSL FIPS Provider"))
++    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, ROCKY_FIPS_NAME))
+         return 0;
+     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_VERSION);
+-    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, REDHAT_FIPS_VERSION))
++    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, ROCKY_FIPS_VERSION))
+         return 0;
+     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_BUILDINFO);
+-    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, REDHAT_FIPS_VERSION))
++    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, ROCKY_FIPS_VERSION))
+         return 0;
+     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_STATUS);
+     if (p != NULL && !OSSL_PARAM_set_int(p, ossl_prov_is_running()))
+@@ -425,64 +425,64 @@ static const OSSL_ALGORITHM fips_signature[] = {
+     { NULL, NULL, NULL }
+ };
+ 
+-static const OSSL_RH_FIPSINDICATOR_DISPATCH redhat_rsa_signature_indicators[] = {
+-    { OSSL_FUNC_SIGNATURE_NEWCTX, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_SIGN_INIT, OSSL_RH_FIPSINDICATOR_UNAPPROVED },
+-    { OSSL_FUNC_SIGNATURE_SIGN, OSSL_RH_FIPSINDICATOR_UNAPPROVED },
+-    { OSSL_FUNC_SIGNATURE_VERIFY_INIT, OSSL_RH_FIPSINDICATOR_UNAPPROVED },
+-    { OSSL_FUNC_SIGNATURE_VERIFY, OSSL_RH_FIPSINDICATOR_UNAPPROVED },
+-    { OSSL_FUNC_SIGNATURE_VERIFY_RECOVER_INIT, OSSL_RH_FIPSINDICATOR_UNAPPROVED },
+-    { OSSL_FUNC_SIGNATURE_VERIFY_RECOVER, OSSL_RH_FIPSINDICATOR_UNAPPROVED },
+-    { OSSL_FUNC_SIGNATURE_DIGEST_SIGN_INIT, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_DIGEST_SIGN_UPDATE, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_DIGEST_SIGN_FINAL, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_INIT, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_UPDATE, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_FINAL, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_FREECTX, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_DUPCTX, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_GET_CTX_PARAMS, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_GETTABLE_CTX_PARAMS, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_SET_CTX_PARAMS, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_SETTABLE_CTX_PARAMS, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_GET_CTX_MD_PARAMS, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_GETTABLE_CTX_MD_PARAMS, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_SET_CTX_MD_PARAMS, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_SETTABLE_CTX_MD_PARAMS, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { 0, OSSL_RH_FIPSINDICATOR_UNAPPROVED }
++static const OSSL_RL_FIPSINDICATOR_DISPATCH rocky_rsa_signature_indicators[] = {
++    { OSSL_FUNC_SIGNATURE_NEWCTX, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_SIGN_INIT, OSSL_RL_FIPSINDICATOR_UNAPPROVED },
++    { OSSL_FUNC_SIGNATURE_SIGN, OSSL_RL_FIPSINDICATOR_UNAPPROVED },
++    { OSSL_FUNC_SIGNATURE_VERIFY_INIT, OSSL_RL_FIPSINDICATOR_UNAPPROVED },
++    { OSSL_FUNC_SIGNATURE_VERIFY, OSSL_RL_FIPSINDICATOR_UNAPPROVED },
++    { OSSL_FUNC_SIGNATURE_VERIFY_RECOVER_INIT, OSSL_RL_FIPSINDICATOR_UNAPPROVED },
++    { OSSL_FUNC_SIGNATURE_VERIFY_RECOVER, OSSL_RL_FIPSINDICATOR_UNAPPROVED },
++    { OSSL_FUNC_SIGNATURE_DIGEST_SIGN_INIT, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_DIGEST_SIGN_UPDATE, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_DIGEST_SIGN_FINAL, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_INIT, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_UPDATE, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_FINAL, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_FREECTX, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_DUPCTX, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_GET_CTX_PARAMS, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_GETTABLE_CTX_PARAMS, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_SET_CTX_PARAMS, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_SETTABLE_CTX_PARAMS, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_GET_CTX_MD_PARAMS, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_GETTABLE_CTX_MD_PARAMS, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_SET_CTX_MD_PARAMS, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_SETTABLE_CTX_MD_PARAMS, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { 0, OSSL_RL_FIPSINDICATOR_UNAPPROVED }
+ };
+ 
+-static const OSSL_RH_FIPSINDICATOR_DISPATCH redhat_ecdsa_signature_indicators[] = {
+-    { OSSL_FUNC_SIGNATURE_NEWCTX, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_SIGN_INIT, OSSL_RH_FIPSINDICATOR_UNAPPROVED },
+-    { OSSL_FUNC_SIGNATURE_SIGN, OSSL_RH_FIPSINDICATOR_UNAPPROVED },
+-    { OSSL_FUNC_SIGNATURE_VERIFY_INIT, OSSL_RH_FIPSINDICATOR_UNAPPROVED },
+-    { OSSL_FUNC_SIGNATURE_VERIFY, OSSL_RH_FIPSINDICATOR_UNAPPROVED },
+-    { OSSL_FUNC_SIGNATURE_DIGEST_SIGN_INIT, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_DIGEST_SIGN_UPDATE, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_DIGEST_SIGN_FINAL, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_INIT, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_UPDATE, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_FINAL, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_FREECTX, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_DUPCTX, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_GET_CTX_PARAMS, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_GETTABLE_CTX_PARAMS, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_SET_CTX_PARAMS, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_SETTABLE_CTX_PARAMS, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_GET_CTX_MD_PARAMS, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_GETTABLE_CTX_MD_PARAMS, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_SET_CTX_MD_PARAMS, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { OSSL_FUNC_SIGNATURE_SETTABLE_CTX_MD_PARAMS, OSSL_RH_FIPSINDICATOR_APPROVED },
+-    { 0, OSSL_RH_FIPSINDICATOR_UNAPPROVED }
++static const OSSL_RL_FIPSINDICATOR_DISPATCH rocky_ecdsa_signature_indicators[] = {
++    { OSSL_FUNC_SIGNATURE_NEWCTX, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_SIGN_INIT, OSSL_RL_FIPSINDICATOR_UNAPPROVED },
++    { OSSL_FUNC_SIGNATURE_SIGN, OSSL_RL_FIPSINDICATOR_UNAPPROVED },
++    { OSSL_FUNC_SIGNATURE_VERIFY_INIT, OSSL_RL_FIPSINDICATOR_UNAPPROVED },
++    { OSSL_FUNC_SIGNATURE_VERIFY, OSSL_RL_FIPSINDICATOR_UNAPPROVED },
++    { OSSL_FUNC_SIGNATURE_DIGEST_SIGN_INIT, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_DIGEST_SIGN_UPDATE, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_DIGEST_SIGN_FINAL, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_INIT, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_UPDATE, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_FINAL, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_FREECTX, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_DUPCTX, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_GET_CTX_PARAMS, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_GETTABLE_CTX_PARAMS, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_SET_CTX_PARAMS, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_SETTABLE_CTX_PARAMS, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_GET_CTX_MD_PARAMS, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_GETTABLE_CTX_MD_PARAMS, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_SET_CTX_MD_PARAMS, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { OSSL_FUNC_SIGNATURE_SETTABLE_CTX_MD_PARAMS, OSSL_RL_FIPSINDICATOR_APPROVED },
++    { 0, OSSL_RL_FIPSINDICATOR_UNAPPROVED }
+ };
+ 
+-static const OSSL_RH_FIPSINDICATOR_ALGORITHM redhat_indicator_fips_signature[] = {
++static const OSSL_RL_FIPSINDICATOR_ALGORITHM rocky_indicator_fips_signature[] = {
+     { PROV_NAMES_RSA, FIPS_DEFAULT_PROPERTIES,
+-        redhat_rsa_signature_indicators },
++        rocky_rsa_signature_indicators },
+ #ifndef OPENSSL_NO_EC
+     { PROV_NAMES_ECDSA, FIPS_DEFAULT_PROPERTIES,
+-        redhat_ecdsa_signature_indicators },
++        rocky_ecdsa_signature_indicators },
+ #endif
+     { NULL, NULL, NULL }
+ };
+@@ -572,10 +572,10 @@ static const OSSL_ALGORITHM *fips_query(void *provctx, int operation_id,
+     return NULL;
+ }
+ 
+-const OSSL_RH_FIPSINDICATOR_ALGORITHM *redhat_ossl_query_fipsindicator(int operation_id) {
++const OSSL_RL_FIPSINDICATOR_ALGORITHM *rocky_ossl_query_fipsindicator(int operation_id) {
+     switch (operation_id) {
+     case OSSL_OP_SIGNATURE:
+-        return redhat_indicator_fips_signature;
++        return rocky_indicator_fips_signature;
+     }
+     return NULL;
+ }
+diff --git a/providers/fips/indicator.h b/providers/fips/indicator.h
+index b323efe4..9cda0602 100644
+--- a/providers/fips/indicator.h
++++ b/providers/fips/indicator.h
+@@ -15,8 +15,8 @@
+ extern "C" {
+ # endif
+ 
+-# define OSSL_RH_FIPSINDICATOR_UNAPPROVED (0)
+-# define OSSL_RH_FIPSINDICATOR_APPROVED (1)
++# define OSSL_RL_FIPSINDICATOR_UNAPPROVED (0)
++# define OSSL_RL_FIPSINDICATOR_APPROVED (1)
+ 
+ /*
+  * FIPS indicator dispatch table element.  function_id numbers and the
+@@ -25,10 +25,10 @@ extern "C" {
+  *
+  * An array of these is always terminated by function_id == 0
+  */
+-typedef struct ossl_rh_fipsindicator_dispatch_st {
++typedef struct ossl_rl_fipsindicator_dispatch_st {
+     int function_id;
+     int approved;
+-} OSSL_RH_FIPSINDICATOR_DISPATCH;
++} OSSL_RL_FIPSINDICATOR_DISPATCH;
+ 
+ /*
+  * Type to tie together algorithm names, property definition string and the
+@@ -37,27 +37,27 @@ typedef struct ossl_rh_fipsindicator_dispatch_st {
+  *
+  * An array of these is always terminated by algorithm_names == NULL
+  */
+-typedef struct ossl_rh_fipsindicator_algorithm_st {
++typedef struct ossl_rl_fipsindicator_algorithm_st {
+     const char *algorithm_names;     /* key */
+     const char *property_definition; /* key */
+-    const OSSL_RH_FIPSINDICATOR_DISPATCH *indicators;
+-} OSSL_RH_FIPSINDICATOR_ALGORITHM;
++    const OSSL_RL_FIPSINDICATOR_DISPATCH *indicators;
++} OSSL_RL_FIPSINDICATOR_ALGORITHM;
+ 
+ /**
+  * Query FIPS indicator status for the given operation.  Possible values for
+  * 'operation_id' are currently only OSSL_OP_SIGNATURE, as all other algorithms
+  * use implicit indicators.  The return value is an array of
+- * OSSL_RH_FIPSINDICATOR_ALGORITHMs, terminated by an entry with
++ * OSSL_RL_FIPSINDICATOR_ALGORITHMs, terminated by an entry with
+  * algorithm_names == NULL.  'algorithm_names' is a colon-separated list of
+  * algorithm names, 'property_definition' a comma-separated list of properties,
+- * and 'indicators' is a list of OSSL_RH_FIPSINDICATOR_DISPATCH structs.  This
++ * and 'indicators' is a list of OSSL_RL_FIPSINDICATOR_DISPATCH structs.  This
+  * list is terminated by function_id == 0.  'function_id' is one of the
+  * OSSL_FUNC_* constants, e.g., OSSL_FUNC_SIGNATURE_DIGEST_SIGN_FINAL.
+  *
+  * If there is no entry in the returned struct for the given operation_id,
+  * algorithm name, or function_id, the algorithm is unapproved.
+  */
+-const OSSL_RH_FIPSINDICATOR_ALGORITHM *redhat_ossl_query_fipsindicator(int operation_id);
++const OSSL_RL_FIPSINDICATOR_ALGORITHM *rocky_ossl_query_fipsindicator(int operation_id);
+ 
+ # ifdef __cplusplus
+ }
+diff --git a/providers/fips/self_test_data.inc b/providers/fips/self_test_data.inc
+index ad1ed978..cc10898b 100644
+--- a/providers/fips/self_test_data.inc
++++ b/providers/fips/self_test_data.inc
+@@ -1320,7 +1320,7 @@ static const char oaep_fixed_seed[] = {
+ 
+ static const ST_KAT_PARAM rsa_enc_params[] = {
+     ST_KAT_PARAM_UTF8STRING(OSSL_ASYM_CIPHER_PARAM_PAD_MODE, pad_mode_oaep),
+-    ST_KAT_PARAM_OCTET(OSSL_ASYM_CIPHER_PARAM_REDHAT_KAT_OEAP_SEED,
++    ST_KAT_PARAM_OCTET(OSSL_ASYM_CIPHER_PARAM_ROCKY_KAT_OEAP_SEED,
+                        oaep_fixed_seed),
+     ST_KAT_PARAM_END()
+ };
+diff --git a/providers/fips/self_test_kats.c b/providers/fips/self_test_kats.c
+index f4ac6110..169460ac 100644
+--- a/providers/fips/self_test_kats.c
++++ b/providers/fips/self_test_kats.c
+@@ -17,7 +17,7 @@
+ #include "self_test.h"
+ #include "self_test_data.inc"
+ 
+-int REDHAT_FIPS_signature_st = 0;
++int ROCKY_FIPS_signature_st = 0;
+ 
+ static int self_test_digest(const ST_KAT_DIGEST *t, OSSL_SELF_TEST *st,
+                             OSSL_LIB_CTX *libctx)
+@@ -479,7 +479,7 @@ static int self_test_sign(const ST_KAT_SIGN *t,
+     if (!add_params(bld, t->key, bnctx))
+         goto err;
+     /* set K for ECDSA KAT tests */
+-    if (!OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_REDHAT_SIGN_KAT_K, K))
++    if (!OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_ROCKY_SIGN_KAT_K, K))
+         goto err;
+     params = OSSL_PARAM_BLD_to_param(bld);
+ 
+@@ -656,20 +656,20 @@ static int self_test_ciphers(OSSL_SELF_TEST *st, OSSL_LIB_CTX *libctx)
+     return ret;
+ }
+ 
+-int REDHAT_FIPS_asym_cipher_st = 0;
++int ROCKY_FIPS_asym_cipher_st = 0;
+ 
+ static int self_test_asym_ciphers(OSSL_SELF_TEST *st, OSSL_LIB_CTX *libctx)
+ {
+     int i, ret = 1;
+ 
+-    REDHAT_FIPS_asym_cipher_st = 1;
++    ROCKY_FIPS_asym_cipher_st = 1;
+ 
+     for (i = 0; i < (int)OSSL_NELEM(st_kat_asym_cipher_tests); ++i) {
+         if (!self_test_asym_cipher(&st_kat_asym_cipher_tests[i], st, libctx))
+             ret = 0;
+     }
+ 
+-    REDHAT_FIPS_asym_cipher_st = 0;
++    ROCKY_FIPS_asym_cipher_st = 0;
+ 
+     return ret;
+ }
+@@ -714,13 +714,13 @@ static int self_test_kas(OSSL_SELF_TEST *st, OSSL_LIB_CTX *libctx)
+ static int self_test_signatures(OSSL_SELF_TEST *st, OSSL_LIB_CTX *libctx)
+ {
+     int i, ret = 1;
+-    REDHAT_FIPS_signature_st = 1;
++    ROCKY_FIPS_signature_st = 1;
+ 
+     for (i = 0; i < (int)OSSL_NELEM(st_kat_sign_tests); ++i) {
+         if (!self_test_sign(&st_kat_sign_tests[i], st, libctx))
+             ret = 0;
+     }
+-    REDHAT_FIPS_signature_st = 0;
++    ROCKY_FIPS_signature_st = 0;
+     return ret;
+ }
+ 
+diff --git a/providers/implementations/asymciphers/rsa_enc.c b/providers/implementations/asymciphers/rsa_enc.c
+index 411f86b9..17374bab 100644
+--- a/providers/implementations/asymciphers/rsa_enc.c
++++ b/providers/implementations/asymciphers/rsa_enc.c
+@@ -81,7 +81,7 @@ typedef struct {
+     /* PKCS#1 v1.5 decryption mode */
+     unsigned int implicit_rejection;
+ #ifdef FIPS_MODULE
+-    char *redhat_st_oaep_seed;
++    char *rocky_st_oaep_seed;
+ #endif /* FIPS_MODULE */
+ } PROV_RSA_CTX;
+ 
+@@ -211,7 +211,7 @@ static int rsa_encrypt(void *vprsactx, unsigned char *out, size_t *outlen,
+                                                     prsactx->oaep_md,
+                                                     prsactx->mgf1_md
+ #ifdef FIPS_MODULE
+-                                                    , prsactx->redhat_st_oaep_seed
++                                                    , prsactx->rocky_st_oaep_seed
+ #endif
+                                                     );
+ 
+@@ -350,7 +350,7 @@ static void rsa_freectx(void *vprsactx)
+     EVP_MD_free(prsactx->mgf1_md);
+     OPENSSL_free(prsactx->oaep_label);
+ #ifdef FIPS_MODULE
+-    OPENSSL_free(prsactx->redhat_st_oaep_seed);
++    OPENSSL_free(prsactx->rocky_st_oaep_seed);
+ #endif /* FIPS_MODULE */
+ 
+     OPENSSL_free(prsactx);
+@@ -461,7 +461,7 @@ static int rsa_get_ctx_params(void *vprsactx, OSSL_PARAM *params)
+         return 0;
+ 
+ #ifdef FIPS_MODULE
+-    p = OSSL_PARAM_locate(params, OSSL_ASYM_CIPHER_PARAM_REDHAT_FIPS_INDICATOR);
++    p = OSSL_PARAM_locate(params, OSSL_ASYM_CIPHER_PARAM_ROCKY_FIPS_INDICATOR);
+     if (p != NULL) {
+         /* NIST SP 800-56Br2 section 6.4.2.1 requires either explicit key
+          * confirmation (section 6.4.2.3.2), or assurance from a trusted third
+@@ -471,7 +471,7 @@ static int rsa_get_ctx_params(void *vprsactx, OSSL_PARAM *params)
+          * implement trusted third party validation, since it relies on its
+          * callers to do that. A request for guidance sent to NIST resulted in
+          * further clarification which allows OpenSSL to claim RSA-OAEP. */
+-        int fips_indicator = EVP_PKEY_REDHAT_FIPS_INDICATOR_APPROVED;
++        int fips_indicator = EVP_PKEY_ROCKY_FIPS_INDICATOR_APPROVED;
+ 
+         if (!OSSL_PARAM_set_int(p, fips_indicator))
+             return 0;
+@@ -495,8 +495,8 @@ static const OSSL_PARAM known_gettable_ctx_params[] = {
+     OSSL_PARAM_uint(OSSL_ASYM_CIPHER_PARAM_TLS_NEGOTIATED_VERSION, NULL),
+     OSSL_PARAM_uint(OSSL_ASYM_CIPHER_PARAM_IMPLICIT_REJECTION, NULL),
+ #ifdef FIPS_MODULE
+-    OSSL_PARAM_octet_string(OSSL_ASYM_CIPHER_PARAM_REDHAT_KAT_OEAP_SEED, NULL, 0),
+-    OSSL_PARAM_int(OSSL_ASYM_CIPHER_PARAM_REDHAT_FIPS_INDICATOR, NULL),
++    OSSL_PARAM_octet_string(OSSL_ASYM_CIPHER_PARAM_ROCKY_KAT_OEAP_SEED, NULL, 0),
++    OSSL_PARAM_int(OSSL_ASYM_CIPHER_PARAM_ROCKY_FIPS_INDICATOR, NULL),
+ #endif /* FIPS_MODULE */
+     OSSL_PARAM_END
+ };
+@@ -508,7 +508,7 @@ static const OSSL_PARAM *rsa_gettable_ctx_params(ossl_unused void *vprsactx,
+ }
+ 
+ #ifdef FIPS_MODULE
+-extern int REDHAT_FIPS_asym_cipher_st;
++extern int ROCKY_FIPS_asym_cipher_st;
+ #endif /* FIPS_MODULE */
+ 
+ static int rsa_set_ctx_params(void *vprsactx, const OSSL_PARAM params[])
+@@ -623,14 +623,14 @@ static int rsa_set_ctx_params(void *vprsactx, const OSSL_PARAM params[])
+     }
+ 
+ #ifdef FIPS_MODULE
+-    p = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_REDHAT_KAT_OEAP_SEED);
+-    if (p != NULL && REDHAT_FIPS_asym_cipher_st) {
++    p = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_ROCKY_KAT_OEAP_SEED);
++    if (p != NULL && ROCKY_FIPS_asym_cipher_st) {
+         void *tmp_oaep_seed = NULL;
+ 
+         if (!OSSL_PARAM_get_octet_string(p, &tmp_oaep_seed, 0, NULL))
+             return 0;
+-        OPENSSL_free(prsactx->redhat_st_oaep_seed);
+-        prsactx->redhat_st_oaep_seed = (char *)tmp_oaep_seed;
++        OPENSSL_free(prsactx->rocky_st_oaep_seed);
++        prsactx->rocky_st_oaep_seed = (char *)tmp_oaep_seed;
+     }
+ #endif /* FIPS_MODULE */
+ 
+diff --git a/providers/implementations/ciphers/ciphercommon.c b/providers/implementations/ciphers/ciphercommon.c
+index 716add73..11a15372 100644
+--- a/providers/implementations/ciphers/ciphercommon.c
++++ b/providers/implementations/ciphers/ciphercommon.c
+@@ -152,7 +152,7 @@ static const OSSL_PARAM cipher_aead_known_gettable_ctx_params[] = {
+     /* normally we would hide this under an #ifdef FIPS_MODULE, but that does
+      * not work in ciphercommon.c because it is compiled only once into
+      * libcommon.a */
+-    OSSL_PARAM_int(OSSL_CIPHER_PARAM_REDHAT_FIPS_INDICATOR, NULL),
++    OSSL_PARAM_int(OSSL_CIPHER_PARAM_ROCKY_FIPS_INDICATOR, NULL),
+     OSSL_PARAM_END
+ };
+ const OSSL_PARAM *ossl_cipher_aead_gettable_ctx_params(
+diff --git a/providers/implementations/ciphers/ciphercommon_gcm.c b/providers/implementations/ciphers/ciphercommon_gcm.c
+index db7910eb..5b9231d8 100644
+--- a/providers/implementations/ciphers/ciphercommon_gcm.c
++++ b/providers/implementations/ciphers/ciphercommon_gcm.c
+@@ -228,9 +228,9 @@ int ossl_gcm_get_ctx_params(void *vctx, OSSL_PARAM params[])
+     /* We would usually hide this under #ifdef FIPS_MODULE, but
+      * ciphercommon_gcm.c is only compiled once into libcommon.a, so ifdefs do
+      * not work here. */
+-    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_REDHAT_FIPS_INDICATOR);
++    p = OSSL_PARAM_locate(params, OSSL_CIPHER_PARAM_ROCKY_FIPS_INDICATOR);
+     if (p != NULL) {
+-        int fips_indicator = EVP_CIPHER_REDHAT_FIPS_INDICATOR_APPROVED;
++        int fips_indicator = EVP_CIPHER_ROCKY_FIPS_INDICATOR_APPROVED;
+ 
+         /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+          * Verification Program, Section C.H requires guarantees about the
+@@ -241,7 +241,7 @@ int ossl_gcm_get_ctx_params(void *vctx, OSSL_PARAM params[])
+          * 96 bits (per SP 800-38D)." We do not specically check for this
+          * condition here, because gcm_iv_generate will fail in this case. */
+         if (ctx->enc && !ctx->iv_gen_rand)
+-            fips_indicator = EVP_CIPHER_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++            fips_indicator = EVP_CIPHER_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ 
+         if (!OSSL_PARAM_set_int(p, fips_indicator)) {
+             ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
+diff --git a/providers/implementations/kdfs/hkdf.c b/providers/implementations/kdfs/hkdf.c
+index 9b39e7d2..23b08090 100644
+--- a/providers/implementations/kdfs/hkdf.c
++++ b/providers/implementations/kdfs/hkdf.c
+@@ -176,7 +176,7 @@ static int kdf_hkdf_derive(void *vctx, unsigned char *key, size_t keylen,
+ 
+ #ifdef FIPS_MODULE
+     if (keylen < EVP_KDF_FIPS_MIN_KEY_LEN)
+-        ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++        ctx->fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ #endif /* defined(FIPS_MODULE) */
+ 
+     switch (ctx->mode) {
+@@ -312,9 +312,9 @@ static int kdf_hkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+     }
+ 
+ #ifdef FIPS_MODULE
+-    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR))
++    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR))
+             != NULL) {
+-        int fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_APPROVED;
++        int fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_APPROVED;
+         const EVP_MD *md = ossl_prov_digest_md(&ctx->digest);
+ 
+         any_valid = 1;
+@@ -324,7 +324,7 @@ static int kdf_hkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+          * the key-derivation key [i.e., the input key] shall be at least 112
+          * bits". */
+         if (ctx->key_len < EVP_KDF_FIPS_MIN_KEY_LEN)
+-            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++            fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ 
+         /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+          * Verification Program, Section D.B and NIST Special Publication
+@@ -333,8 +333,8 @@ static int kdf_hkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+          * be longer than that. If a derived key has ever been shorter than
+          * that, ctx->output_keyelen_indicator will be NOT_APPROVED, and we
+          * should also set the returned FIPS indicator to unapproved. */
+-        if (ctx->fips_indicator == EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED)
+-            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++        if (ctx->fips_indicator == EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED)
++            fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ 
+         if (ctx->is_tls13) {
+             if (md != NULL
+@@ -349,7 +349,7 @@ static int kdf_hkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+                  * Option #3), SP 800-56Crev2, and SP 800-108."
+                  *
+                  * RFC 8446 appendix B.4 only lists SHA-256 and SHA-384. */
+-                fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++                fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+             }
+         } else {
+             if (md != NULL
+@@ -360,7 +360,7 @@ static int kdf_hkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+                  * of FIPS 140-3 IG, section C.C: "The SHAKE128 and SHAKE256
+                  * extendable-output functions may only be used as the
+                  * standalone algorithms." */
+-                fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++                fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+             }
+         }
+         if (!OSSL_PARAM_set_int(p, fips_indicator))
+@@ -380,7 +380,7 @@ static const OSSL_PARAM *kdf_hkdf_gettable_ctx_params(ossl_unused void *ctx,
+     static const OSSL_PARAM known_gettable_ctx_params[] = {
+         OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
+ #ifdef FIPS_MODULE
+-        OSSL_PARAM_int(OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR, NULL),
++        OSSL_PARAM_int(OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR, NULL),
+ #endif /* defined(FIPS_MODULE) */
+         OSSL_PARAM_END
+     };
+@@ -739,7 +739,7 @@ static int kdf_tls1_3_derive(void *vctx, unsigned char *key, size_t keylen,
+ 
+ #ifdef FIPS_MODULE
+     if (keylen < EVP_KDF_FIPS_MIN_KEY_LEN)
+-        ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++        ctx->fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ #endif /* defined(FIPS_MODULE) */
+ 
+     switch (ctx->mode) {
+diff --git a/providers/implementations/kdfs/kbkdf.c b/providers/implementations/kdfs/kbkdf.c
+index 2360772c..78eab078 100644
+--- a/providers/implementations/kdfs/kbkdf.c
++++ b/providers/implementations/kdfs/kbkdf.c
+@@ -252,7 +252,7 @@ static int kbkdf_derive(void *vctx, unsigned char *key, size_t keylen,
+ 
+ #ifdef FIPS_MODULE
+     if (keylen < EVP_KDF_FIPS_MIN_KEY_LEN)
+-        ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++        ctx->fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ #endif /* defined(FIPS_MODULE) */
+ 
+     h = EVP_MAC_CTX_get_mac_size(ctx->ctx_init);
+@@ -414,10 +414,10 @@ static int kbkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+     }
+ 
+ #ifdef FIPS_MODULE
+-    p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR);
++    p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR);
+     if (p != NULL) {
+         KBKDF *ctx = (KBKDF *)vctx;
+-        int fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_APPROVED;
++        int fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_APPROVED;
+ 
+         any_valid = 1;
+ 
+@@ -426,7 +426,7 @@ static int kbkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+          * the key-derivation key [i.e., the input key] shall be at least 112
+          * bits". */
+         if (ctx->ki_len < EVP_KDF_FIPS_MIN_KEY_LEN)
+-            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++            fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ 
+         /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+          * Verification Program, Section D.B and NIST Special Publication
+@@ -435,8 +435,8 @@ static int kbkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+          * be longer than that. If a derived key has ever been shorter than
+          * that, ctx->output_keyelen_indicator will be NOT_APPROVED, and we
+          * should also set the returned FIPS indicator to unapproved. */
+-        if (ctx->fips_indicator == EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED)
+-            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++        if (ctx->fips_indicator == EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED)
++            fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ 
+         /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+          * Validation Program, Section C.C: "The SHAKE128 and SHAKE256
+@@ -448,7 +448,7 @@ static int kbkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+             const EVP_MD *md = ossl_prov_digest_md(&ctx->digest);
+             if (md != NULL
+                     && (EVP_MD_is_a(md, "SHAKE-128") || EVP_MD_is_a(md, "SHAKE-256"))) {
+-                fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++                fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+             }
+         }
+ 
+@@ -469,7 +469,7 @@ static const OSSL_PARAM *kbkdf_gettable_ctx_params(ossl_unused void *ctx,
+     static const OSSL_PARAM known_gettable_ctx_params[] = {
+         OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
+ #ifdef FIPS_MODULE
+-        OSSL_PARAM_int(OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR, NULL),
++        OSSL_PARAM_int(OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR, NULL),
+ #endif /* defined(FIPS_MODULE) */
+         OSSL_PARAM_END
+     };
+diff --git a/providers/implementations/kdfs/pbkdf2.c b/providers/implementations/kdfs/pbkdf2.c
+index 58fbd6f2..cb75e5a2 100644
+--- a/providers/implementations/kdfs/pbkdf2.c
++++ b/providers/implementations/kdfs/pbkdf2.c
+@@ -265,16 +265,16 @@ static int kdf_pbkdf2_get_ctx_params(void *vctx, OSSL_PARAM params[])
+     }
+ 
+ #ifdef FIPS_MODULE
+-    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR))
++    if ((p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR))
+             != NULL) {
+-        int fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_APPROVED;
++        int fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_APPROVED;
+ 
+         /* The lower_bound_checks parameter enables checks required by FIPS. If
+          * those checks are disabled, the PBKDF2 implementation will also
+          * support non-approved parameters (e.g., salt lengths < 16 bytes, see
+          * NIST SP 800-132 section 5.1). */
+         if (!ctx->lower_bound_checks)
+-            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++            fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ 
+         if (!OSSL_PARAM_set_int(p, fips_indicator))
+             return 0;
+@@ -295,7 +295,7 @@ static const OSSL_PARAM *kdf_pbkdf2_gettable_ctx_params(ossl_unused void *ctx,
+     static const OSSL_PARAM known_gettable_ctx_params[] = {
+         OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
+ #ifdef FIPS_MODULE
+-        OSSL_PARAM_int(OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR, NULL),
++        OSSL_PARAM_int(OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR, NULL),
+ #endif /* defined(FIPS_MODULE) */
+         OSSL_PARAM_END
+     };
+diff --git a/providers/implementations/kdfs/sshkdf.c b/providers/implementations/kdfs/sshkdf.c
+index 548fd793..a91d942e 100644
+--- a/providers/implementations/kdfs/sshkdf.c
++++ b/providers/implementations/kdfs/sshkdf.c
+@@ -132,7 +132,7 @@ static int kdf_sshkdf_derive(void *vctx, unsigned char *key, size_t keylen,
+ 
+ #ifdef FIPS_MODULE
+     if (keylen < EVP_KDF_FIPS_MIN_KEY_LEN)
+-        ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++        ctx->fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ #endif /* defined(FIPS_MODULE) */
+ 
+     return SSHKDF(md, ctx->key, ctx->key_len,
+@@ -213,10 +213,10 @@ static int kdf_sshkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+     }
+ 
+ #ifdef FIPS_MODULE
+-    p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR);
++    p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR);
+     if (p != NULL) {
+         KDF_SSHKDF *ctx = vctx;
+-        int fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_APPROVED;
++        int fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_APPROVED;
+ 
+         any_valid = 1;
+ 
+@@ -225,7 +225,7 @@ static int kdf_sshkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+          * the key-derivation key [i.e., the input key] shall be at least 112
+          * bits". */
+         if (ctx->key_len < EVP_KDF_FIPS_MIN_KEY_LEN)
+-            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++            fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ 
+         /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+          * Verification Program, Section D.B and NIST Special Publication
+@@ -234,8 +234,8 @@ static int kdf_sshkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+          * be longer than that. If a derived key has ever been shorter than
+          * that, ctx->output_keyelen_indicator will be NOT_APPROVED, and we
+          * should also set the returned FIPS indicator to unapproved. */
+-        if (ctx->fips_indicator == EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED)
+-            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++        if (ctx->fips_indicator == EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED)
++            fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ 
+         /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+          * Validation Program, Section C.C: "The SHAKE128 and SHAKE256
+@@ -252,7 +252,7 @@ static int kdf_sshkdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+             && !EVP_MD_is_a(ctx->digest.md, "SHA2-256")
+             && !EVP_MD_is_a(ctx->digest.md, "SHA2-384")
+             && !EVP_MD_is_a(ctx->digest.md, "SHA2-512")) {
+-            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++            fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+         }
+ 
+         if (!OSSL_PARAM_set_int(p, fips_indicator))
+@@ -272,7 +272,7 @@ static const OSSL_PARAM *kdf_sshkdf_gettable_ctx_params(ossl_unused void *ctx,
+     static const OSSL_PARAM known_gettable_ctx_params[] = {
+         OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
+ #ifdef FIPS_MODULE
+-        OSSL_PARAM_int(OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR, NULL),
++        OSSL_PARAM_int(OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR, NULL),
+ #endif /* defined(FIPS_MODULE) */
+         OSSL_PARAM_END
+     };
+diff --git a/providers/implementations/kdfs/sskdf.c b/providers/implementations/kdfs/sskdf.c
+index 175e6c83..d1ea88d9 100644
+--- a/providers/implementations/kdfs/sskdf.c
++++ b/providers/implementations/kdfs/sskdf.c
+@@ -373,7 +373,7 @@ static int sskdf_derive(void *vctx, unsigned char *key, size_t keylen,
+ 
+ #ifdef FIPS_MODULE
+     if (keylen < EVP_KDF_FIPS_MIN_KEY_LEN)
+-        ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++        ctx->fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ #endif /* defined(FIPS_MODULE) */
+ 
+     if (ctx->macctx != NULL) {
+@@ -460,7 +460,7 @@ static int x963kdf_derive(void *vctx, unsigned char *key, size_t keylen,
+ 
+ #ifdef FIPS_MODULE
+     if (keylen < EVP_KDF_FIPS_MIN_KEY_LEN)
+-        ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++        ctx->fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ #endif /* defined(FIPS_MODULE) */
+ 
+     return SSKDF_hash_kdm(md, ctx->secret, ctx->secret_len,
+@@ -537,9 +537,9 @@ static int sskdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+     }
+ 
+ #ifdef FIPS_MODULE
+-    p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR);
++    p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR);
+     if (p != NULL) {
+-        int fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_APPROVED;
++        int fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_APPROVED;
+ 
+         any_valid = 1;
+ 
+@@ -548,7 +548,7 @@ static int sskdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+          * the key-derivation key [i.e., the input key] shall be at least 112
+          * bits". */
+         if (ctx->secret_len < EVP_KDF_FIPS_MIN_KEY_LEN)
+-            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++            fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ 
+         /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+          * Verification Program, Section D.B and NIST Special Publication
+@@ -557,8 +557,8 @@ static int sskdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+          * be longer than that. If a derived key has ever been shorter than
+          * that, ctx->output_keyelen_indicator will be NOT_APPROVED, and we
+          * should also set the returned FIPS indicator to unapproved. */
+-        if (ctx->fips_indicator == EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED)
+-            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++        if (ctx->fips_indicator == EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED)
++            fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ 
+         /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+          * Validation Program, Section C.C: "The SHAKE128 and SHAKE256
+@@ -570,7 +570,7 @@ static int sskdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+             if (ctx->digest.md != NULL
+                 && (EVP_MD_is_a(ctx->digest.md, "SHAKE-128") ||
+                     EVP_MD_is_a(ctx->digest.md, "SHAKE-256"))) {
+-                fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++                fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+             }
+ 
+             /* Table H-3 in ANS X9.63-2001 says that 160-bit hash functions
+@@ -582,7 +582,7 @@ static int sskdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+             if (ctx->is_x963kdf
+                     && ctx->digest.md != NULL
+                     && EVP_MD_is_a(ctx->digest.md, "SHA-1")) {
+-                fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++                fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+             }
+         }
+ 
+@@ -603,7 +603,7 @@ static const OSSL_PARAM *sskdf_gettable_ctx_params(ossl_unused void *ctx,
+     static const OSSL_PARAM known_gettable_ctx_params[] = {
+         OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
+ #ifdef FIPS_MODULE
+-        OSSL_PARAM_int(OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR, 0),
++        OSSL_PARAM_int(OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR, 0),
+ #endif /* defined(FIPS_MODULE) */
+         OSSL_PARAM_END
+     };
+diff --git a/providers/implementations/kdfs/tls1_prf.c b/providers/implementations/kdfs/tls1_prf.c
+index 5d7aee78..87ec1305 100644
+--- a/providers/implementations/kdfs/tls1_prf.c
++++ b/providers/implementations/kdfs/tls1_prf.c
+@@ -178,7 +178,7 @@ static int kdf_tls1_prf_derive(void *vctx, unsigned char *key, size_t keylen,
+     }
+ #ifdef FIPS_MODULE
+     if (keylen < EVP_KDF_FIPS_MIN_KEY_LEN)
+-        ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++        ctx->fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ #endif /* defined(FIPS_MODULE) */
+ 
+     /*
+@@ -191,7 +191,7 @@ static int kdf_tls1_prf_derive(void *vctx, unsigned char *key, size_t keylen,
+     if (ctx->seedlen >= TLS_MD_MASTER_SECRET_CONST_SIZE
+             && memcmp(ctx->seed, TLS_MD_MASTER_SECRET_CONST,
+                       TLS_MD_MASTER_SECRET_CONST_SIZE) == 0)
+-    ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++    ctx->fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ #endif /* defined(FIPS_MODULE) */
+     if (ossl_tls1_prf_ems_check_enabled(libctx)) {
+         if (ctx->seedlen >= TLS_MD_MASTER_SECRET_CONST_SIZE
+@@ -292,9 +292,9 @@ static int kdf_tls1_prf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+     }
+ 
+ #ifdef FIPS_MODULE
+-    p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR);
++    p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR);
+     if (p != NULL) {
+-        int fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_APPROVED;
++        int fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_APPROVED;
+ 
+         any_valid = 1;
+ 
+@@ -303,7 +303,7 @@ static int kdf_tls1_prf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+          * the key-derivation key [i.e., the input key] shall be at least 112
+          * bits". */
+         if (ctx->seclen < EVP_KDF_FIPS_MIN_KEY_LEN)
+-            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++            fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ 
+         /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+          * Verification Program, Section D.B and NIST Special Publication
+@@ -312,8 +312,8 @@ static int kdf_tls1_prf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+          * be longer than that. If a derived key has ever been shorter than
+          * that, ctx->output_keyelen_indicator will be NOT_APPROVED, and we
+          * should also set the returned FIPS indicator to unapproved. */
+-        if (ctx->fips_indicator == EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED)
+-            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++        if (ctx->fips_indicator == EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED)
++            fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ 
+         /* SP 800-135r1 section 4.2.2 says TLS 1.2 KDF is approved when "(3)
+          * P_HASH uses either SHA-256, SHA-384 or SHA-512." */
+@@ -321,7 +321,7 @@ static int kdf_tls1_prf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+                 && !EVP_MD_is_a(ctx->digest.md, "SHA2-256")
+                 && !EVP_MD_is_a(ctx->digest.md, "SHA2-384")
+                 && !EVP_MD_is_a(ctx->digest.md, "SHA2-512")) {
+-            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++            fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+         }
+ 
+         if (!OSSL_PARAM_set_int(p, fips_indicator))
+@@ -341,7 +341,7 @@ static const OSSL_PARAM *kdf_tls1_prf_gettable_ctx_params(
+     static const OSSL_PARAM known_gettable_ctx_params[] = {
+         OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
+ #ifdef FIPS_MODULE
+-        OSSL_PARAM_int(OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR, 0),
++        OSSL_PARAM_int(OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR, 0),
+ #endif /* defined(FIPS_MODULE) */
+         OSSL_PARAM_END
+     };
+diff --git a/providers/implementations/kdfs/x942kdf.c b/providers/implementations/kdfs/x942kdf.c
+index 6beaabbb..d63f8491 100644
+--- a/providers/implementations/kdfs/x942kdf.c
++++ b/providers/implementations/kdfs/x942kdf.c
+@@ -468,7 +468,7 @@ static int x942kdf_derive(void *vctx, unsigned char *key, size_t keylen,
+     }
+ #ifdef FIPS_MODULE
+     if (keylen < EVP_KDF_FIPS_MIN_KEY_LEN)
+-        ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++        ctx->fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ #endif /* defined(FIPS_MODULE) */
+     ret = x942kdf_hash_kdm(md, ctx->secret, ctx->secret_len,
+                            der, der_len, ctr, key, keylen);
+@@ -583,9 +583,9 @@ static int x942kdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+     }
+ 
+ #ifdef FIPS_MODULE
+-    p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR);
++    p = OSSL_PARAM_locate(params, OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR);
+     if (p != NULL) {
+-        int fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_APPROVED;
++        int fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_APPROVED;
+ 
+         any_valid = 1;
+ 
+@@ -594,7 +594,7 @@ static int x942kdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+          * the key-derivation key [i.e., the input key] shall be at least 112
+          * bits". */
+         if (ctx->secret_len < EVP_KDF_FIPS_MIN_KEY_LEN)
+-            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++            fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ 
+         /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+          * Verification Program, Section D.B and NIST Special Publication
+@@ -603,8 +603,8 @@ static int x942kdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+          * be longer than that. If a derived key has ever been shorter than
+          * that, ctx->output_keyelen_indicator will be NOT_APPROVED, and we
+          * should also set the returned FIPS indicator to unapproved. */
+-        if (ctx->fips_indicator == EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED)
+-            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++        if (ctx->fips_indicator == EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED)
++            fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+ 
+         /* Implementation Guidance for FIPS 140-3 and the Cryptographic Module
+          * Validation Program, Section C.C: "The SHAKE128 and SHAKE256
+@@ -613,7 +613,7 @@ static int x942kdf_get_ctx_params(void *vctx, OSSL_PARAM params[])
+         if (ctx->digest.md != NULL
+                 && (EVP_MD_is_a(ctx->digest.md, "SHAKE-128") ||
+                     EVP_MD_is_a(ctx->digest.md, "SHAKE-256"))) {
+-            fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++            fips_indicator = EVP_KDF_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+         }
+ 
+         if (!OSSL_PARAM_set_int(p, fips_indicator))
+@@ -633,7 +633,7 @@ static const OSSL_PARAM *x942kdf_gettable_ctx_params(ossl_unused void *ctx,
+     static const OSSL_PARAM known_gettable_ctx_params[] = {
+         OSSL_PARAM_size_t(OSSL_KDF_PARAM_SIZE, NULL),
+ #ifdef FIPS_MODULE
+-        OSSL_PARAM_int(OSSL_KDF_PARAM_REDHAT_FIPS_INDICATOR, 0),
++        OSSL_PARAM_int(OSSL_KDF_PARAM_ROCKY_FIPS_INDICATOR, 0),
+ #endif /* defined(FIPS_MODULE) */
+         OSSL_PARAM_END
+     };
+diff --git a/providers/implementations/kem/rsa_kem.c b/providers/implementations/kem/rsa_kem.c
+index b84eeea4..dfa31a60 100644
+--- a/providers/implementations/kem/rsa_kem.c
++++ b/providers/implementations/kem/rsa_kem.c
+@@ -159,7 +159,7 @@ static int rsakem_get_ctx_params(void *vprsactx, OSSL_PARAM *params)
+         return 0;
+ 
+ #ifdef FIPS_MODULE
+-    p = OSSL_PARAM_locate(params, OSSL_KEM_PARAM_REDHAT_FIPS_INDICATOR);
++    p = OSSL_PARAM_locate(params, OSSL_KEM_PARAM_ROCKY_FIPS_INDICATOR);
+     if (p != NULL) {
+         /* NIST SP 800-56Br2 section 6.4.2.1 requires either explicit key
+          * confirmation (section 6.4.2.3.2), or assurance from a trusted third
+@@ -169,7 +169,7 @@ static int rsakem_get_ctx_params(void *vprsactx, OSSL_PARAM *params)
+          * implement trusted third party validation, since it relies on its
+          * callers to do that. A request for guidance sent to NIST resulted in
+          * further clarification which allows OpenSSL to claim RSASVE. */
+-        int fips_indicator = EVP_PKEY_REDHAT_FIPS_INDICATOR_APPROVED;
++        int fips_indicator = EVP_PKEY_ROCKY_FIPS_INDICATOR_APPROVED;
+ 
+         if (!OSSL_PARAM_set_int(p, fips_indicator))
+             return 0;
+@@ -181,7 +181,7 @@ static int rsakem_get_ctx_params(void *vprsactx, OSSL_PARAM *params)
+ 
+ static const OSSL_PARAM known_gettable_rsakem_ctx_params[] = {
+ #ifdef FIPS_MODULE
+-    OSSL_PARAM_int(OSSL_KEM_PARAM_REDHAT_FIPS_INDICATOR, NULL),
++    OSSL_PARAM_int(OSSL_KEM_PARAM_ROCKY_FIPS_INDICATOR, NULL),
+ #endif /* defined(FIPS_MODULE) */
+     OSSL_PARAM_END
+ };
+diff --git a/providers/implementations/keymgmt/ec_kmgmt.c b/providers/implementations/keymgmt/ec_kmgmt.c
+index 8305ebba..9a11f0d3 100644
+--- a/providers/implementations/keymgmt/ec_kmgmt.c
++++ b/providers/implementations/keymgmt/ec_kmgmt.c
+@@ -532,7 +532,7 @@ end:
+     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_PUB_KEY, NULL, 0)
+ # define EC_IMEXPORTABLE_PRIVATE_KEY                                           \
+     OSSL_PARAM_BN(OSSL_PKEY_PARAM_PRIV_KEY, NULL, 0),                          \
+-    OSSL_PARAM_BN(OSSL_PKEY_PARAM_REDHAT_SIGN_KAT_K, NULL, 0)
++    OSSL_PARAM_BN(OSSL_PKEY_PARAM_ROCKY_SIGN_KAT_K, NULL, 0)
+ # define EC_IMEXPORTABLE_OTHER_PARAMETERS                                      \
+     OSSL_PARAM_int(OSSL_PKEY_PARAM_USE_COFACTOR_ECDH, NULL),                   \
+     OSSL_PARAM_int(OSSL_PKEY_PARAM_EC_INCLUDE_PUBLIC, NULL)
+diff --git a/providers/implementations/macs/hmac_prov.c b/providers/implementations/macs/hmac_prov.c
+index cf5c3ecb..f989691f 100644
+--- a/providers/implementations/macs/hmac_prov.c
++++ b/providers/implementations/macs/hmac_prov.c
+@@ -247,7 +247,7 @@ static const OSSL_PARAM known_gettable_ctx_params[] = {
+     OSSL_PARAM_size_t(OSSL_MAC_PARAM_SIZE, NULL),
+     OSSL_PARAM_size_t(OSSL_MAC_PARAM_BLOCK_SIZE, NULL),
+ #ifdef FIPS_MODULE
+-    OSSL_PARAM_int(OSSL_MAC_PARAM_REDHAT_FIPS_INDICATOR, NULL),
++    OSSL_PARAM_int(OSSL_MAC_PARAM_ROCKY_FIPS_INDICATOR, NULL),
+ #endif /* defined(FIPS_MODULE) */
+     OSSL_PARAM_END
+ };
+@@ -271,13 +271,13 @@ static int hmac_get_ctx_params(void *vmacctx, OSSL_PARAM params[])
+         return 0;
+ 
+ #ifdef FIPS_MODULE
+-    if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_REDHAT_FIPS_INDICATOR)) != NULL) {
+-        int fips_indicator = EVP_MAC_REDHAT_FIPS_INDICATOR_APPROVED;
++    if ((p = OSSL_PARAM_locate(params, OSSL_MAC_PARAM_ROCKY_FIPS_INDICATOR)) != NULL) {
++        int fips_indicator = EVP_MAC_ROCKY_FIPS_INDICATOR_APPROVED;
+         /* NIST SP 800-131Ar2, Table 9: Approval Status of MAC Algorithms
+          * specifies key lengths < 112 bytes are disallowed for HMAC generation
+          * and legacy use for HMAC verification. */
+         if (macctx->keylen < EVP_HMAC_GEN_FIPS_MIN_KEY_LEN)
+-            fips_indicator = EVP_MAC_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++            fips_indicator = EVP_MAC_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+         return OSSL_PARAM_set_int(p, fips_indicator);
+     }
+ #endif /* defined(FIPS_MODULE) */
+diff --git a/providers/implementations/rands/drbg.c b/providers/implementations/rands/drbg.c
+index b30c369e..172b6504 100644
+--- a/providers/implementations/rands/drbg.c
++++ b/providers/implementations/rands/drbg.c
+@@ -672,7 +672,7 @@ int ossl_prov_drbg_generate(PROV_DRBG *drbg, unsigned char *out, size_t outlen,
+     if (drbg->parent != NULL
+             && get_parent_reseed_count(drbg) != drbg->parent_reseed_counter) {
+ #ifdef FIPS_MODULE
+-        /* Red Hat patches provide chain reseeding when necessary so just sync counters*/
++        /* Rocky patches provide chain reseeding when necessary so just sync counters*/
+         drbg->parent_reseed_counter = get_parent_reseed_count(drbg);
+ #else
+         reseed_required = 1;
+diff --git a/providers/implementations/rands/seeding/rand_unix.c b/providers/implementations/rands/seeding/rand_unix.c
+index 6063eee1..06d15048 100644
+--- a/providers/implementations/rands/seeding/rand_unix.c
++++ b/providers/implementations/rands/seeding/rand_unix.c
+@@ -344,7 +344,7 @@ static ssize_t syscall_random(void *buf, size_t buflen)
+      * which is way below the OSSL_SSIZE_MAX limit. Therefore sign conversion
+      * between size_t and ssize_t is safe even without a range check.
+      */
+-    /* Red Hat uses downstream patch to always seed from getrandom() */
++    /* Rocky uses downstream patch to always seed from getrandom() */
+     return EVP_default_properties_is_fips_enabled(NULL) ? getrandom(buf, buflen, GRND_RANDOM) : getrandom(buf, buflen, 0);
+ }
+ #  endif    /* defined(OPENSSL_RAND_SEED_GETRANDOM) */
+diff --git a/providers/implementations/signature/rsa_sig.c b/providers/implementations/signature/rsa_sig.c
+index 525f6592..6dc5397d 100644
+--- a/providers/implementations/signature/rsa_sig.c
++++ b/providers/implementations/signature/rsa_sig.c
+@@ -1171,18 +1171,18 @@ static int rsa_get_ctx_params(void *vprsactx, OSSL_PARAM *params)
+     }
+ 
+ #ifdef FIPS_MODULE
+-    p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_REDHAT_FIPS_INDICATOR);
++    p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_ROCKY_FIPS_INDICATOR);
+     if (p != NULL) {
+-        int fips_indicator = EVP_SIGNATURE_REDHAT_FIPS_INDICATOR_APPROVED;
++        int fips_indicator = EVP_SIGNATURE_ROCKY_FIPS_INDICATOR_APPROVED;
+         if (prsactx->pad_mode == RSA_PKCS1_PSS_PADDING) {
+             if (prsactx->md == NULL) {
+-                fips_indicator = EVP_SIGNATURE_REDHAT_FIPS_INDICATOR_UNDETERMINED;
++                fips_indicator = EVP_SIGNATURE_ROCKY_FIPS_INDICATOR_UNDETERMINED;
+             } else if (rsa_pss_compute_saltlen(prsactx) > EVP_MD_get_size(prsactx->md)) {
+-                fips_indicator = EVP_SIGNATURE_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++                fips_indicator = EVP_SIGNATURE_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+             }
+         } else if (prsactx->pad_mode == RSA_NO_PADDING) {
+             if (prsactx->md == NULL) /* Should always be the case */
+-                fips_indicator = EVP_SIGNATURE_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++                fips_indicator = EVP_SIGNATURE_ROCKY_FIPS_INDICATOR_NOT_APPROVED;
+         }
+         return OSSL_PARAM_set_int(p, fips_indicator);
+     }
+@@ -1198,7 +1198,7 @@ static const OSSL_PARAM known_gettable_ctx_params[] = {
+     OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_MGF1_DIGEST, NULL, 0),
+     OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PSS_SALTLEN, NULL, 0),
+ #ifdef FIPS_MODULE
+-    OSSL_PARAM_int(OSSL_SIGNATURE_PARAM_REDHAT_FIPS_INDICATOR, NULL),
++    OSSL_PARAM_int(OSSL_SIGNATURE_PARAM_ROCKY_FIPS_INDICATOR, NULL),
+ #endif
+     OSSL_PARAM_END
+ };
+diff --git a/ssl/ssl_conf.c b/ssl/ssl_conf.c
+index 086db98c..2e97ac42 100644
+--- a/ssl/ssl_conf.c
++++ b/ssl/ssl_conf.c
+@@ -389,7 +389,7 @@ static int cmd_Options(SSL_CONF_CTX *cctx, const char *value)
+         SSL_FLAG_TBL("ClientRenegotiation",
+                      SSL_OP_ALLOW_CLIENT_RENEGOTIATION),
+         SSL_FLAG_TBL_INV("EncryptThenMac", SSL_OP_NO_ENCRYPT_THEN_MAC),
+-        SSL_FLAG_TBL("RHNoEnforceEMSinFIPS", SSL_OP_RH_PERMIT_NOEMS_FIPS),
++        SSL_FLAG_TBL("RHNoEnforceEMSinFIPS", SSL_OP_RL_PERMIT_NOEMS_FIPS),
+         SSL_FLAG_TBL("NoRenegotiation", SSL_OP_NO_RENEGOTIATION),
+         SSL_FLAG_TBL("AllowNoDHEKEX", SSL_OP_ALLOW_NO_DHE_KEX),
+         SSL_FLAG_TBL("PrioritizeChaCha", SSL_OP_PRIORITIZE_CHACHA),
+diff --git a/ssl/statem/extensions_srvr.c b/ssl/statem/extensions_srvr.c
+index e6b80f66..dc7c20bd 100644
+--- a/ssl/statem/extensions_srvr.c
++++ b/ssl/statem/extensions_srvr.c
+@@ -1554,7 +1554,7 @@ EXT_RETURN tls_construct_stoc_ems(SSL *s, WPACKET *pkt, unsigned int context,
+                                   X509 *x, size_t chainidx)
+ {
+     if ((s->s3.flags & TLS1_FLAGS_RECEIVED_EXTMS) == 0) {
+-        if (FIPS_mode() && !(SSL_get_options(s) & SSL_OP_RH_PERMIT_NOEMS_FIPS) ) {
++        if (FIPS_mode() && !(SSL_get_options(s) & SSL_OP_RL_PERMIT_NOEMS_FIPS) ) {
+             SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE, ERR_R_UNSUPPORTED);
+             return EXT_RETURN_FAIL;
+         }
+diff --git a/test/acvp_test.c b/test/acvp_test.c
+index 13d7a0ea..222f0b66 100644
+--- a/test/acvp_test.c
++++ b/test/acvp_test.c
+@@ -1476,7 +1476,7 @@ int setup_tests(void)
+                   OSSL_NELEM(dh_safe_prime_keyver_data));
+ #endif /* OPENSSL_NO_DH */
+ 
+-#if 0 /* Red Hat FIPS provider doesn't have fips=yes property on DSA */
++#if 0 /* Rocky FIPS provider doesn't have fips=yes property on DSA */
+ #ifndef OPENSSL_NO_DSA
+     ADD_ALL_TESTS(dsa_keygen_test, OSSL_NELEM(dsa_keygen_data));
+     ADD_ALL_TESTS(dsa_paramgen_test, OSSL_NELEM(dsa_paramgen_data));
+diff --git a/test/helpers/predefined_dhparams.c b/test/helpers/predefined_dhparams.c
+index e5186e4b..1b530f8e 100644
+--- a/test/helpers/predefined_dhparams.c
++++ b/test/helpers/predefined_dhparams.c
+@@ -118,7 +118,7 @@ EVP_PKEY *get_dhx512(OSSL_LIB_CTX *libctx)
+ 
+ EVP_PKEY *get_dhx_ffdhe2048(OSSL_LIB_CTX *libctx)
+ {
+-    /* This is RFC 7919 ffdhe2048, since Red Hat removes support for
++    /* This is RFC 7919 ffdhe2048, since Rocky removes support for
+      * non-well-known groups in FIPS mode. */
+     static unsigned char dhx_p[] = {
+         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xad, 0xf8, 0x54, 0x58,
+diff --git a/test/recipes/15-test_ec.t b/test/recipes/15-test_ec.t
+index c0efd776..2f2c6279 100644
+--- a/test/recipes/15-test_ec.t
++++ b/test/recipes/15-test_ec.t
+@@ -90,7 +90,7 @@ subtest 'Ed448 conversions -- public key' => sub {
+ 
+ subtest 'Check loading of fips and non-fips keys' => sub {
+     plan skip_all => "FIPS is disabled"
+-        if 1; #Red Hat specific, original value is $no_fips;
++        if 1; #Rocky specific, original value is $no_fips;
+ 
+     plan tests => 2;
+ 
+diff --git a/test/recipes/80-test_cms.t b/test/recipes/80-test_cms.t
+index 710c49b4..c664dcc5 100644
+--- a/test/recipes/80-test_cms.t
++++ b/test/recipes/80-test_cms.t
+@@ -95,7 +95,7 @@ my @smime_pkcs7_tests = (
+       \&final_compare
+     ],
+ 
+-    [ "signed content DER format, DSA key, no Red Hat FIPS",
++    [ "signed content DER format, DSA key, no Rocky FIPS",
+       [ "{cmd1}", @prov, "-sign", "-in", $smcont, "-outform", "DER", "-nodetach",
+         "-signer", catfile($smdir, "smdsa1.pem"), "-out", "{output}.cms" ],
+       [ "{cmd2}", @prov, "-verify", "-in", "{output}.cms", "-inform", "DER",
+@@ -103,7 +103,7 @@ my @smime_pkcs7_tests = (
+       \&final_compare
+     ],
+ 
+-    [ "signed detached content DER format, DSA key, no Red Hat FIPS",
++    [ "signed detached content DER format, DSA key, no Rocky FIPS",
+       [ "{cmd1}", @prov, "-sign", "-in", $smcont, "-outform", "DER",
+         "-signer", catfile($smdir, "smdsa1.pem"), "-out", "{output}.cms" ],
+       [ "{cmd2}", @prov, "-verify", "-in", "{output}.cms", "-inform", "DER",
+@@ -112,7 +112,7 @@ my @smime_pkcs7_tests = (
+       \&final_compare
+     ],
+ 
+-    [ "signed detached content DER format, add RSA signer (with DSA existing), no Red Hat FIPS",
++    [ "signed detached content DER format, add RSA signer (with DSA existing), no Rocky FIPS",
+       [ "{cmd1}", @prov, "-sign", "-in", $smcont, "-outform", "DER",
+         "-signer", catfile($smdir, "smdsa1.pem"), "-out", "{output}.cms" ],
+       [ "{cmd1}", @prov, "-resign", "-in", "{output}.cms", "-inform", "DER", "-outform", "DER",
+@@ -123,7 +123,7 @@ my @smime_pkcs7_tests = (
+       \&final_compare
+     ],
+ 
+-    [ "signed content test streaming BER format, DSA key, no Red Hat FIPS",
++    [ "signed content test streaming BER format, DSA key, no Rocky FIPS",
+       [ "{cmd1}", @prov, "-sign", "-in", $smcont, "-outform", "DER",
+         "-nodetach", "-stream",
+         "-signer", catfile($smdir, "smdsa1.pem"), "-out", "{output}.cms" ],
+@@ -132,7 +132,7 @@ my @smime_pkcs7_tests = (
+       \&final_compare
+     ],
+ 
+-    [ "signed content test streaming BER format, 2 DSA and 2 RSA keys, no Red Hat FIPS",
++    [ "signed content test streaming BER format, 2 DSA and 2 RSA keys, no Rocky FIPS",
+       [ "{cmd1}", @prov, "-sign", "-in", $smcont, "-outform", "DER",
+         "-nodetach", "-stream",
+         "-signer", $smrsa1,
+@@ -145,7 +145,7 @@ my @smime_pkcs7_tests = (
+       \&final_compare
+     ],
+ 
+-    [ "signed content test streaming BER format, 2 DSA and 2 RSA keys, no attributes, no Red Hat FIPS",
++    [ "signed content test streaming BER format, 2 DSA and 2 RSA keys, no attributes, no Rocky FIPS",
+       [ "{cmd1}", @prov, "-sign", "-in", $smcont, "-outform", "DER",
+         "-noattr", "-nodetach", "-stream",
+         "-signer", $smrsa1,
+@@ -175,7 +175,7 @@ my @smime_pkcs7_tests = (
+       \&zero_compare
+     ],
+ 
+-    [ "signed content test streaming S/MIME format, 2 DSA and 2 RSA keys, no Red Hat FIPS",
++    [ "signed content test streaming S/MIME format, 2 DSA and 2 RSA keys, no Rocky FIPS",
+       [ "{cmd1}", @prov, "-sign", "-in", $smcont, "-nodetach",
+         "-signer", $smrsa1,
+         "-signer", catfile($smdir, "smrsa2.pem"),
+@@ -187,7 +187,7 @@ my @smime_pkcs7_tests = (
+       \&final_compare
+     ],
+ 
+-    [ "signed content test streaming multipart S/MIME format, 2 DSA and 2 RSA keys, no Red Hat FIPS",
++    [ "signed content test streaming multipart S/MIME format, 2 DSA and 2 RSA keys, no Rocky FIPS",
+       [ "{cmd1}", @prov, "-sign", "-in", $smcont,
+         "-signer", $smrsa1,
+         "-signer", catfile($smdir, "smrsa2.pem"),
+@@ -232,7 +232,7 @@ my @smime_pkcs7_tests = (
+       \&final_compare
+     ],
+ 
+-    [ "enveloped content test streaming S/MIME format, AES-256 cipher, 3 recipients, no Red Hat FIPS",
++    [ "enveloped content test streaming S/MIME format, AES-256 cipher, 3 recipients, no Rocky FIPS",
+       [ "{cmd1}", @prov, "-encrypt", "-in", $smcont,
+         "-aes256", "-stream", "-out", "{output}.cms",
+         $smrsa1,
+@@ -247,7 +247,7 @@ my @smime_pkcs7_tests = (
+ 
+ my @smime_cms_tests = (
+ 
+-    [ "signed content test streaming BER format, 2 DSA and 2 RSA keys, keyid, no Red Hat FIPS",
++    [ "signed content test streaming BER format, 2 DSA and 2 RSA keys, keyid, no Rocky FIPS",
+       [ "{cmd1}", @prov, "-sign", "-in", $smcont, "-outform", "DER",
+         "-nodetach", "-keyid",
+         "-signer", $smrsa1,
+@@ -260,7 +260,7 @@ my @smime_cms_tests = (
+       \&final_compare
+     ],
+ 
+-    [ "signed content test streaming PEM format, 2 DSA and 2 RSA keys, no Red Hat FIPS",
++    [ "signed content test streaming PEM format, 2 DSA and 2 RSA keys, no Rocky FIPS",
+       [ "{cmd1}", @prov, "-sign", "-in", $smcont, "-outform", "PEM", "-nodetach",
+         "-signer", $smrsa1,
+         "-signer", catfile($smdir, "smrsa2.pem"),
+@@ -370,7 +370,7 @@ my @smime_cms_tests = (
+       \&final_compare
+     ],
+ 
+-    [ "encrypted content test streaming PEM format, triple DES key, no Red Hat FIPS",
++    [ "encrypted content test streaming PEM format, triple DES key, no Rocky FIPS",
+       [ "{cmd1}", @prov, "-EncryptedData_encrypt", "-in", $smcont, "-outform", "PEM",
+         "-des3", "-secretkey", "000102030405060708090A0B0C0D0E0F1011121314151617",
+         "-stream", "-out", "{output}.cms" ],
+@@ -876,8 +876,8 @@ sub check_availability {
+     return "$tnam: skipped, DSA disabled\n"
+         if ($no_dsa && $tnam =~ / DSA/);
+ 
+-    return "$tnam: skipped, Red Hat FIPS\n"
+-        if ($tnam =~ /no Red Hat FIPS/);
++    return "$tnam: skipped, Rocky FIPS\n"
++        if ($tnam =~ /no Rocky FIPS/);
+ 
+     return "";
+ }
+diff --git a/test/recipes/80-test_ssl_old.t b/test/recipes/80-test_ssl_old.t
+index 95be6dd0..cc60aa5d 100644
+--- a/test/recipes/80-test_ssl_old.t
++++ b/test/recipes/80-test_ssl_old.t
+@@ -500,7 +500,7 @@ sub testssl {
+             # the default choice if TLSv1.3 enabled
+             my $flag = $protocol eq "-tls1_3" ? "" : $protocol;
+             my $ciphersuites = "";
+-            my %redhat_skip_cipher = map {$_ => 1} qw(
++            my %rocky_skip_cipher = map {$_ => 1} qw(
+ AES256-GCM-SHA384:@SECLEVEL=0
+ AES256-CCM8:@SECLEVEL=0
+ AES256-CCM:@SECLEVEL=0
+@@ -523,8 +523,8 @@ AES128-SHA:@SECLEVEL=0
+                     } else {
+                         $cipher = $cipher.':@SECLEVEL=0';
+                     }
+-                    if ($provider eq "fips" && exists $redhat_skip_cipher{$cipher}) {
+-                        note "*****SKIPPING $cipher in Red Hat FIPS mode";
++                    if ($provider eq "fips" && exists $rocky_skip_cipher{$cipher}) {
++                        note "*****SKIPPING $cipher in Rocky FIPS mode";
+                         ok(1);
+                     } else {
+                         ok(run(test([@ssltest, @exkeys, "-cipher",
+diff --git a/util/providers.num b/util/providers.num
+index 77879d0e..7b0aab89 100644
+--- a/util/providers.num
++++ b/util/providers.num
+@@ -1,2 +1,2 @@
+ OSSL_provider_init                     1	*	EXIST::FUNCTION:
+-redhat_ossl_query_fipsindicator        1	*	EXIST::FUNCTION:ONLY_PROVIDERS/FIPS
++rocky_ossl_query_fipsindicator        1	*	EXIST::FUNCTION:ONLY_PROVIDERS/FIPS
+-- 
+2.42.0

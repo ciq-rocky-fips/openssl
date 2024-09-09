@@ -1,0 +1,40 @@
+diff -up openssl-3.0.0/test/recipes/90-test_sslapi.t.beldmit openssl-3.0.0/test/recipes/90-test_sslapi.t
+--- openssl-3.0.0/test/recipes/90-test_sslapi.t.beldmit	2021-09-22 11:56:49.452507975 +0200
++++ openssl-3.0.0/test/recipes/90-test_sslapi.t	2021-09-22 11:57:19.371764742 +0200
+@@ -40,7 +40,7 @@ unless ($no_fips) {
+                              "recipes",
+                              "90-test_sslapi_data",
+                              "dhparams.pem")])),
+-                 "running sslapitest");
++                 "running sslapitest - FIPS");
+ }
+ 
+ unlink $tmpfilename;
+diff --git a/test/sslapitest.c b/test/sslapitest.c
+index e95d2657f46c..7af0eab3fce0 100644
+--- a/test/sslapitest.c
++++ b/test/sslapitest.c
+@@ -1158,6 +1158,11 @@ static int execute_test_ktls(int cis_ktls, int sis_ktls,
+         goto end;
+     }
+ 
++    if (is_fips && strstr(cipher, "CHACHA") != NULL) {
++        testresult = TEST_skip("CHACHA is not supported in FIPS");
++        goto end;
++    }
++
+     /* Create a session based on SHA-256 */
+     if (!TEST_true(create_ssl_ctx_pair(libctx, TLS_server_method(),
+                                        TLS_client_method(),
+@@ -1292,6 +1297,11 @@ static int execute_test_ktls_sendfile(int tls_version, const char *cipher)
+         goto end;
+     }
+ 
++    if (is_fips && strstr(cipher, "CHACHA") != NULL) {
++        testresult = TEST_skip("CHACHA is not supported in FIPS");
++        goto end;
++    }
++
+     /* Create a session based on SHA-256 */
+     if (!TEST_true(create_ssl_ctx_pair(libctx, TLS_server_method(),
+                                        TLS_client_method(),

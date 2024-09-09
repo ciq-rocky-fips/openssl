@@ -1,0 +1,26 @@
+From 3d5755df8d09ca841c0aca2d7344db060f6cc97f Mon Sep 17 00:00:00 2001
+From: Tomas Mraz <tmraz@fedoraproject.org>
+Date: Thu, 24 Sep 2020 09:05:55 +0200
+Subject: Do not install html docs
+
+(was openssl-1.1.1-no-html.patch)
+---
+ Configurations/unix-Makefile.tmpl | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Configurations/unix-Makefile.tmpl b/Configurations/unix-Makefile.tmpl
+index 342e46d24d..9f369edf0e 100644
+--- a/Configurations/unix-Makefile.tmpl
++++ b/Configurations/unix-Makefile.tmpl
+@@ -554,7 +554,7 @@ install_sw: install_dev install_engines install_modules install_runtime
+ 
+ uninstall_sw: uninstall_runtime uninstall_modules uninstall_engines uninstall_dev
+ 
+-install_docs: install_man_docs install_html_docs
++install_docs: install_man_docs
+ 
+ uninstall_docs: uninstall_man_docs uninstall_html_docs
+ 	$(RM) -r $(DESTDIR)$(DOCDIR)
+-- 
+2.26.2
+

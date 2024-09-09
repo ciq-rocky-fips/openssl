@@ -1,0 +1,188 @@
+#Note: provider_conf_activate() is introduced in downstream only. It is a rewrite
+#(partial) of the function provider_conf_load() under the 'if (activate) section.
+#If there is any change to this section, after deleting it in provider_conf_load()
+#ensure that you also add those changes to the provider_conf_activate() function.
+#additionally please add this check for cnf explicitly as shown below.
+#'ok = cnf ? provider_conf_params(prov, NULL, NULL, value, cnf) : 1;'
+diff -up openssl-3.0.1/crypto/provider_conf.c.fipsact openssl-3.0.1/crypto/provider_conf.c
+--- openssl-3.0.1/crypto/provider_conf.c.fipsact	2022-05-12 12:44:31.199034948 +0200
++++ openssl-3.0.1/crypto/provider_conf.c	2022-05-12 12:49:17.468318373 +0200
+@@ -36,6 +36,8 @@ static int prov_already_activated(const
+ #include <string.h>
+ #include <openssl/trace.h>
+ #include <openssl/err.h>
++#include <openssl/evp.h>
++#include <unistd.h>
+ #include <openssl/conf.h>
+ #include <openssl/safestack.h>
+ #include <openssl/provider.h>
+@@ -136,58 +136,18 @@ static int prov_already_activated(const
+     return 0;
+ }
+ 
+-static int provider_conf_load(OSSL_LIB_CTX *libctx, const char *name,
+-                              const char *value, const CONF *cnf)
++static int provider_conf_activate(OSSL_LIB_CTX *libctx,const char *name,
++                                  const char *value, const char *path,
++                                  int soft, const CONF *cnf)
+ {
+-    int i;
+-    STACK_OF(CONF_VALUE) *ecmds;
+-    int soft = 0;
+-    OSSL_PROVIDER *prov = NULL, *actual = NULL;
+-    const char *path = NULL;
+-    long activate = 0;
+     int ok = 0;
+-
+-    name = skip_dot(name);
+-    OSSL_TRACE1(CONF, "Configuring provider %s\n", name);
+-    /* Value is a section containing PROVIDER commands */
+-    ecmds = NCONF_get_section(cnf, value);
+-
+-    if (!ecmds) {
+-        ERR_raise_data(ERR_LIB_CRYPTO, CRYPTO_R_PROVIDER_SECTION_ERROR,
+-                       "section=%s not found", value);
+-        return 0;
+-    }
+-
+-    /* Find the needed data first */
+-    for (i = 0; i < sk_CONF_VALUE_num(ecmds); i++) {
+-        CONF_VALUE *ecmd = sk_CONF_VALUE_value(ecmds, i);
+-        const char *confname = skip_dot(ecmd->name);
+-        const char *confvalue = ecmd->value;
+-
+-        OSSL_TRACE2(CONF, "Provider command: %s = %s\n",
+-                    confname, confvalue);
+-
+-        /* First handle some special pseudo confs */
+-
+-        /* Override provider name to use */
+-        if (strcmp(confname, "identity") == 0)
+-            name = confvalue;
+-        else if (strcmp(confname, "soft_load") == 0)
+-            soft = 1;
+-        /* Load a dynamic PROVIDER */
+-        else if (strcmp(confname, "module") == 0)
+-            path = confvalue;
+-        else if (strcmp(confname, "activate") == 0)
+-            activate = 1;
+-    }
+-
+-    if (activate) {
+-        PROVIDER_CONF_GLOBAL *pcgbl
+-            = ossl_lib_ctx_get_data(libctx, OSSL_LIB_CTX_PROVIDER_CONF_INDEX,
+-                                    &provider_conf_ossl_ctx_method);
++    OSSL_PROVIDER *prov = NULL, *actual = NULL;
++    PROVIDER_CONF_GLOBAL *pcgbl
++        = ossl_lib_ctx_get_data(libctx, OSSL_LIB_CTX_PROVIDER_CONF_INDEX,
++                                &provider_conf_ossl_ctx_method);
+ 
+         if (pcgbl == NULL || !CRYPTO_THREAD_write_lock(pcgbl->lock)) {
+-            ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
++           ERR_raise(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR);
+             return 0;
+         }
+         if (!prov_already_activated(name, pcgbl->activated_providers)) {
+@@ -216,7 +176,7 @@ static int provider_conf_load(OSSL_LIB_C
+             if (path != NULL)
+                 ossl_provider_set_module_path(prov, path);
+ 
+-            ok = provider_conf_params(prov, NULL, NULL, value, cnf);
++            ok = cnf ? provider_conf_params(prov, NULL, NULL, value, cnf) : 1;
+ 
+             if (ok) {
+                 if (!ossl_provider_activate(prov, 1, 0)) {
+@@ -244,8 +204,59 @@ static int provider_conf_load(OSSL_LIB_C
+             }
+             if (!ok)
+                 ossl_provider_free(prov);
++        } else { /* No reason to activate the provider twice, returning OK */
++            ok = 1;
+         }
+         CRYPTO_THREAD_unlock(pcgbl->lock);
++    return ok;
++}
++
++static int provider_conf_load(OSSL_LIB_CTX *libctx, const char *name,
++                              const char *value, const CONF *cnf)
++{
++    int i;
++    STACK_OF(CONF_VALUE) *ecmds;
++    int soft = 0;
++    const char *path = NULL;
++    long activate = 0;
++    int ok = 0;
++
++    name = skip_dot(name);
++    OSSL_TRACE1(CONF, "Configuring provider %s\n", name);
++    /* Value is a section containing PROVIDER commands */
++    ecmds = NCONF_get_section(cnf, value);
++
++    if (!ecmds) {
++        ERR_raise_data(ERR_LIB_CRYPTO, CRYPTO_R_PROVIDER_SECTION_ERROR,
++                       "section=%s not found", value);
++        return 0;
++    }
++
++    /* Find the needed data first */
++    for (i = 0; i < sk_CONF_VALUE_num(ecmds); i++) {
++        CONF_VALUE *ecmd = sk_CONF_VALUE_value(ecmds, i);
++        const char *confname = skip_dot(ecmd->name);
++        const char *confvalue = ecmd->value;
++
++        OSSL_TRACE2(CONF, "Provider command: %s = %s\n",
++                    confname, confvalue);
++
++        /* First handle some special pseudo confs */
++
++        /* Override provider name to use */
++        if (strcmp(confname, "identity") == 0)
++            name = confvalue;
++        else if (strcmp(confname, "soft_load") == 0)
++            soft = 1;
++        /* Load a dynamic PROVIDER */
++        else if (strcmp(confname, "module") == 0)
++            path = confvalue;
++        else if (strcmp(confname, "activate") == 0)
++            activate = 1;
++    }
++
++    if (activate) {
++       ok = provider_conf_activate(libctx, name, value, path, soft, cnf);
+     } else {
+         OSSL_PROVIDER_INFO entry;
+ 
+@@ -306,6 +317,33 @@ static int provider_conf_init(CONF_IMODU
+             return 0;
+     }
+ 
++    if (ossl_get_kernel_fips_flag() != 0) { /* XXX from provider_conf_load */
++        OSSL_LIB_CTX *libctx = NCONF_get0_libctx((CONF *)cnf);
++#  define FIPS_LOCAL_CONF           OPENSSLDIR "/fips_local.cnf"
++
++        if (access(FIPS_LOCAL_CONF, R_OK) == 0) {
++            CONF *fips_conf = NCONF_new_ex(libctx, NCONF_default());
++            if (NCONF_load(fips_conf, FIPS_LOCAL_CONF, NULL) <= 0)
++                return 0;
++
++            if (provider_conf_load(libctx, "fips", "fips_sect", fips_conf) != 1) {
++                NCONF_free(fips_conf);
++                return 0;
++            }
++            NCONF_free(fips_conf);
++        } else {
++            if (provider_conf_activate(libctx, "fips", NULL, NULL, 0, NULL) != 1)
++                return 0;
++        }
++        /* provider_conf_load can return 1 even wwhen the test is failed so check explicitly */
++        if (OSSL_PROVIDER_available(libctx, "fips") != 1)
++            return 0;
++        if (provider_conf_activate(libctx, "base", NULL, NULL, 0, NULL) != 1)
++            return 0;
++        if (EVP_default_properties_enable_fips(libctx, 1) != 1)
++            return 0;
++    }
++
+     return 1;
+ }
+ 

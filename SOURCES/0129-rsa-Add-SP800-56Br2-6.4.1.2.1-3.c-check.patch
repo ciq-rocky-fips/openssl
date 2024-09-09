@@ -1,0 +1,49 @@
+From 0d873f9f647764df147d818a6e998b1c318bac31 Mon Sep 17 00:00:00 2001
+From: Clemens Lang <cllang@redhat.com>
+Date: Mon, 16 Oct 2023 15:30:26 +0200
+Subject: [PATCH] rsa: Add SP800-56Br2 6.4.1.2.1 (3.c) check
+
+The code did not yet check that the length of the RSA key is positive
+and even.
+
+Signed-off-by: Clemens Lang <cllang@redhat.com>
+Upstream-Status: Backport [8b268541d9aabee51699aef22963407362830ef9]
+---
+ crypto/rsa/rsa_sp800_56b_check.c | 5 +++++
+ test/rsa_sp800_56b_test.c        | 4 ++++
+ 2 files changed, 9 insertions(+)
+
+diff --git a/crypto/rsa/rsa_sp800_56b_check.c b/crypto/rsa/rsa_sp800_56b_check.c
+index fc8f19b487..e6b79e953d 100644
+--- a/crypto/rsa/rsa_sp800_56b_check.c
++++ b/crypto/rsa/rsa_sp800_56b_check.c
+@@ -403,6 +403,11 @@ int ossl_rsa_sp800_56b_check_keypair(const RSA *rsa, const BIGNUM *efixed,
+         ERR_raise(ERR_LIB_RSA, RSA_R_INVALID_KEYPAIR);
+         return 0;
+     }
++    /* (Step 3.c): check that the modulus length is a positive even integer */
++    if (nbits <= 0 || (nbits & 0x1)) {
++        ERR_raise(ERR_LIB_RSA, RSA_R_INVALID_KEYPAIR);
++        return 0;
++    }
+ 
+     ctx = BN_CTX_new_ex(rsa->libctx);
+     if (ctx == NULL)
+diff --git a/test/rsa_sp800_56b_test.c b/test/rsa_sp800_56b_test.c
+index 7660019f47..aa58bbbe6c 100644
+--- a/test/rsa_sp800_56b_test.c
++++ b/test/rsa_sp800_56b_test.c
+@@ -458,6 +458,10 @@ static int test_invalid_keypair(void)
+           && TEST_true(BN_add_word(n, 1))
+           && TEST_false(ossl_rsa_sp800_56b_check_keypair(key, NULL, -1, 2048))
+           && TEST_true(BN_sub_word(n, 1))
++          /* check that validation fails if len(n) is not even */
++          && TEST_true(BN_lshift1(n, n))
++          && TEST_false(ossl_rsa_sp800_56b_check_keypair(key, NULL, -1, 2049))
++          && TEST_true(BN_rshift1(n, n))
+           /* check p  */
+           && TEST_true(BN_sub_word(p, 2))
+           && TEST_true(BN_mul(n, p, q, ctx))
+-- 
+2.41.0
+

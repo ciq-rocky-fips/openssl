@@ -1,0 +1,539 @@
+diff --git a/crypto/err/openssl.txt b/crypto/err/openssl.txt
+index e90e5dc03339..f391e756475c 100644
+--- a/crypto/err/openssl.txt
++++ b/crypto/err/openssl.txt
+@@ -1006,6 +1006,7 @@ PROV_R_BN_ERROR:160:bn error
+ PROV_R_CIPHER_OPERATION_FAILED:102:cipher operation failed
+ PROV_R_DERIVATION_FUNCTION_INIT_FAILED:205:derivation function init failed
+ PROV_R_DIGEST_NOT_ALLOWED:174:digest not allowed
++PROV_R_EMS_NOT_ENABLED:233:ems not enabled
+ PROV_R_ENTROPY_SOURCE_STRENGTH_TOO_WEAK:186:entropy source strength too weak
+ PROV_R_ERROR_INSTANTIATING_DRBG:188:error instantiating drbg
+ PROV_R_ERROR_RETRIEVING_ENTROPY:189:error retrieving entropy
+diff --git a/include/openssl/core_names.h b/include/openssl/core_names.h
+index 173a81d28bbe..5e5be567a578 100644
+--- a/include/openssl/core_names.h
++++ b/include/openssl/core_names.h
+@@ -21,11 +21,12 @@ extern "C" {
+ #define OSSL_PROV_PARAM_CORE_MODULE_FILENAME "module-filename" /* utf8_ptr */
+ 
+ /* Well known parameter names that Providers can define */
+-#define OSSL_PROV_PARAM_NAME            "name"                /* utf8_ptr */
+-#define OSSL_PROV_PARAM_VERSION         "version"             /* utf8_ptr */
+-#define OSSL_PROV_PARAM_BUILDINFO       "buildinfo"           /* utf8_ptr */
+-#define OSSL_PROV_PARAM_STATUS          "status"              /* uint */
+-#define OSSL_PROV_PARAM_SECURITY_CHECKS "security-checks"     /* uint */
++#define OSSL_PROV_PARAM_NAME               "name"                /* utf8_ptr */
++#define OSSL_PROV_PARAM_VERSION            "version"             /* utf8_ptr */
++#define OSSL_PROV_PARAM_BUILDINFO          "buildinfo"           /* utf8_ptr */
++#define OSSL_PROV_PARAM_STATUS             "status"              /* uint */
++#define OSSL_PROV_PARAM_SECURITY_CHECKS    "security-checks"     /* uint */
++#define OSSL_PROV_PARAM_TLS1_PRF_EMS_CHECK "tls1-prf-ems-check"  /* uint */
+ 
+ /* Self test callback parameters */
+ #define OSSL_PROV_PARAM_SELF_TEST_PHASE  "st-phase" /* utf8_string */
+diff --git a/include/openssl/fips_names.h b/include/openssl/fips_names.h
+index 0fdf5440c7cb..3f29369b3f92 100644
+--- a/include/openssl/fips_names.h
++++ b/include/openssl/fips_names.h
+@@ -53,6 +53,14 @@ extern "C" {
+  */
+ # define OSSL_PROV_FIPS_PARAM_SECURITY_CHECKS "security-checks"
+ 
++/*
++ * A boolean that determines if the runtime FIPS check for TLS1_PRF EMS is performed.
++ * This is disabled by default.
++ *
++ * Type: OSSL_PARAM_UTF8_STRING
++ */
++# define OSSL_PROV_FIPS_PARAM_TLS1_PRF_EMS_CHECK "tls1-prf-ems-check"
++
+ # ifdef __cplusplus
+ }
+ # endif
+diff --git a/include/openssl/proverr.h b/include/openssl/proverr.h
+index 3685430f5d3e..bf4dc135f592 100644
+--- a/include/openssl/proverr.h
++++ b/include/openssl/proverr.h
+@@ -32,6 +32,7 @@
+ # define PROV_R_CIPHER_OPERATION_FAILED                   102
+ # define PROV_R_DERIVATION_FUNCTION_INIT_FAILED           205
+ # define PROV_R_DIGEST_NOT_ALLOWED                        174
++# define PROV_R_EMS_NOT_ENABLED                           233
+ # define PROV_R_ENTROPY_SOURCE_STRENGTH_TOO_WEAK          186
+ # define PROV_R_ERROR_INSTANTIATING_DRBG                  188
+ # define PROV_R_ERROR_RETRIEVING_ENTROPY                  189
+diff --git a/providers/common/include/prov/securitycheck.h b/providers/common/include/prov/securitycheck.h
+index 4a7f85f71186..62e60cc0103f 100644
+--- a/providers/common/include/prov/securitycheck.h
++++ b/providers/common/include/prov/securitycheck.h
+@@ -28,3 +28,4 @@ int ossl_digest_get_approved_nid(const EVP_MD *md);
+ int ossl_digest_rsa_sign_get_md_nid(OSSL_LIB_CTX *ctx, const EVP_MD *md,
+                                     int sha1_allowed);
+ int ossl_securitycheck_enabled(OSSL_LIB_CTX *libctx);
++int ossl_tls1_prf_ems_check_enabled(OSSL_LIB_CTX *libctx);
+diff --git a/providers/common/provider_err.c b/providers/common/provider_err.c
+index f6144072aa04..954aabe80cfc 100644
+--- a/providers/common/provider_err.c
++++ b/providers/common/provider_err.c
+@@ -33,6 +33,7 @@ static const ERR_STRING_DATA PROV_str_reasons[] = {
+     "derivation function init failed"},
+     {ERR_PACK(ERR_LIB_PROV, 0, PROV_R_DIGEST_NOT_ALLOWED),
+     "digest not allowed"},
++    {ERR_PACK(ERR_LIB_PROV, 0, PROV_R_EMS_NOT_ENABLED), "ems not enabled"},
+     {ERR_PACK(ERR_LIB_PROV, 0, PROV_R_ENTROPY_SOURCE_STRENGTH_TOO_WEAK),
+     "entropy source strength too weak"},
+     {ERR_PACK(ERR_LIB_PROV, 0, PROV_R_ERROR_INSTANTIATING_DRBG),
+diff --git a/providers/common/securitycheck_default.c b/providers/common/securitycheck_default.c
+index de7f0d3a0a57..63c875ecd0b7 100644
+--- a/providers/common/securitycheck_default.c
++++ b/providers/common/securitycheck_default.c
+@@ -22,6 +22,12 @@ int ossl_securitycheck_enabled(OSSL_LIB_CTX *libctx)
+     return 0;
+ }
+ 
++/* Disable the ems check in the default provider */
++int ossl_tls1_prf_ems_check_enabled(OSSL_LIB_CTX *libctx)
++{
++    return 0;
++}
++
+ int ossl_digest_rsa_sign_get_md_nid(OSSL_LIB_CTX *ctx, const EVP_MD *md,
+                                     int sha1_allowed)
+ {
+diff --git a/providers/common/securitycheck_fips.c b/providers/common/securitycheck_fips.c
+index b7659bd395c3..2bc8a5992685 100644
+--- a/providers/common/securitycheck_fips.c
++++ b/providers/common/securitycheck_fips.c
+@@ -20,6 +20,7 @@
+ #include "prov/securitycheck.h"
+ 
+ int FIPS_security_check_enabled(OSSL_LIB_CTX *libctx);
++int FIPS_tls_prf_ems_check(OSSL_LIB_CTX *libctx);
+ 
+ int ossl_securitycheck_enabled(OSSL_LIB_CTX *libctx)
+ {
+@@ -30,6 +31,11 @@ int ossl_securitycheck_enabled(OSSL_LIB_CTX *libctx)
+ #endif /* OPENSSL_NO_FIPS_SECURITYCHECKS */
+ }
+ 
++int ossl_tls1_prf_ems_check_enabled(OSSL_LIB_CTX *libctx)
++{
++    return FIPS_tls_prf_ems_check(libctx);
++}
++
+ int ossl_digest_rsa_sign_get_md_nid(OSSL_LIB_CTX *ctx, const EVP_MD *md,
+                                     int sha1_allowed)
+ {
+diff --git a/providers/fips/fipsprov.c b/providers/fips/fipsprov.c
+index b86b27d236f3..b881f46f36ad 100644
+--- a/providers/fips/fipsprov.c
++++ b/providers/fips/fipsprov.c
+@@ -47,6 +47,7 @@ static OSSL_FUNC_provider_query_operation_fn fips_query;
+ #define ALG(NAMES, FUNC) ALGC(NAMES, FUNC, NULL)
+ extern OSSL_FUNC_core_thread_start_fn *c_thread_start;
+ int FIPS_security_check_enabled(OSSL_LIB_CTX *libctx);
++int FIPS_tls_prf_ems_check(OSSL_LIB_CTX *libctx);
+ 
+ /*
+  * Should these function pointers be stored in the provider side provctx? Could
+@@ -82,7 +83,9 @@ typedef struct fips_global_st {
+     const OSSL_CORE_HANDLE *handle;
+     SELF_TEST_POST_PARAMS selftest_params;
+     int fips_security_checks;
++    int fips_tls1_prf_ems_check;
+     const char *fips_security_check_option;
++    const char *fips_tls1_prf_ems_check_option;
+ } FIPS_GLOBAL;
+ 
+ static void *fips_prov_ossl_ctx_new(OSSL_LIB_CTX *libctx)
+@@ -94,6 +97,9 @@ void *ossl_fips_prov_ossl_ctx_new(OSSL_LIB_CTX *libctx)
+     fgbl->fips_security_checks = 1;
+     fgbl->fips_security_check_option = "1";
+ 
++    fgbl->fips_tls1_prf_ems_check = 1; /* Enabled by default */
++    fgbl->fips_tls1_prf_ems_check_option = "1";
++
+     return fgbl;
+ }
+ 
+@@ -109,6 +115,7 @@ static const OSSL_PARAM fips_param_types[] = {
+     OSSL_PARAM_DEFN(OSSL_PROV_PARAM_BUILDINFO, OSSL_PARAM_UTF8_PTR, NULL, 0),
+     OSSL_PARAM_DEFN(OSSL_PROV_PARAM_STATUS, OSSL_PARAM_INTEGER, NULL, 0),
+     OSSL_PARAM_DEFN(OSSL_PROV_PARAM_SECURITY_CHECKS, OSSL_PARAM_INTEGER, NULL, 0),
++    OSSL_PARAM_DEFN(OSSL_PROV_PARAM_TLS1_PRF_EMS_CHECK, OSSL_PARAM_INTEGER, NULL, 0),
+     OSSL_PARAM_END
+ };
+ 
+@@ -119,9 +126,10 @@ static int fips_get_params_from_core(FIPS_GLOBAL *fgbl)
+     * NOTE: inside core_get_params() these will be loaded from config items
+     * stored inside prov->parameters (except for
+     * OSSL_PROV_PARAM_CORE_MODULE_FILENAME).
+-    * OSSL_PROV_FIPS_PARAM_SECURITY_CHECKS is not a self test parameter.
++    * OSSL_PROV_FIPS_PARAM_SECURITY_CHECKS and
++    * OSSL_PROV_FIPS_PARAM_TLS1_PRF_EMS_CHECK are not self test parameters.
+     */
+-    OSSL_PARAM core_params[8], *p = core_params;
++    OSSL_PARAM core_params[9], *p = core_params;
+ 
+     *p++ = OSSL_PARAM_construct_utf8_ptr(
+             OSSL_PROV_PARAM_CORE_MODULE_FILENAME,
+@@ -151,6 +159,10 @@ static int fips_get_params_from_core(FIPS_GLOBAL *fgbl)
+             OSSL_PROV_FIPS_PARAM_SECURITY_CHECKS,
+             (char **)&fgbl->fips_security_check_option,
+             sizeof(fgbl->fips_security_check_option));
++    *p++ = OSSL_PARAM_construct_utf8_ptr(
++            OSSL_PROV_FIPS_PARAM_TLS1_PRF_EMS_CHECK,
++            (char **)&fgbl->fips_tls1_prf_ems_check_option,
++            sizeof(fgbl->fips_tls1_prf_ems_check_option));
+     *p = OSSL_PARAM_construct_end();
+ 
+     if (!c_get_params(fgbl->handle, core_params)) {
+@@ -187,6 +199,9 @@ static int fips_get_params(void *provctx, OSSL_PARAM params[])
+     p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_SECURITY_CHECKS);
+     if (p != NULL && !OSSL_PARAM_set_int(p, fgbl->fips_security_checks))
+         return 0;
++    p = OSSL_PARAM_locate(params, OSSL_PROV_PARAM_TLS1_PRF_EMS_CHECK);
++    if (p != NULL && !OSSL_PARAM_set_int(p, fgbl->fips_tls1_prf_ems_check))
++        return 0;
+     return 1;
+ }
+ 
+@@ -703,6 +718,11 @@ int OSSL_provider_init_int(const OSSL_CORE_HANDLE *handle,
+         && strcmp(fgbl->fips_security_check_option, "0") == 0)
+         fgbl->fips_security_checks = 0;
+ 
++    /* Disable the ems check if it's disabled in the fips config file. */
++    if (fgbl->fips_tls1_prf_ems_check_option != NULL
++        && strcmp(fgbl->fips_tls1_prf_ems_check_option, "0") == 0)
++        fgbl->fips_tls1_prf_ems_check = 0;
++
+     ossl_prov_cache_exported_algorithms(fips_ciphers, exported_fips_ciphers);
+ 
+     if (!SELF_TEST_post(&fgbl->selftest_params, 0)) {
+@@ -898,6 +918,15 @@ int FIPS_security_check_enabled(OSSL_LIB_CTX *libctx)
+     return fgbl->fips_security_checks;
+ }
+ 
++int FIPS_tls_prf_ems_check(OSSL_LIB_CTX *libctx)
++{
++    FIPS_GLOBAL *fgbl = ossl_lib_ctx_get_data(libctx,
++                                              OSSL_LIB_CTX_FIPS_PROV_INDEX,
++                                              &fips_prov_ossl_ctx_method);
++
++    return fgbl->fips_tls1_prf_ems_check;
++}
++
+ void OSSL_SELF_TEST_get_callback(OSSL_LIB_CTX *libctx, OSSL_CALLBACK **cb,
+                                  void **cbarg)
+ {
+diff --git a/providers/implementations/kdfs/tls1_prf.c b/providers/implementations/kdfs/tls1_prf.c
+index 8a3807308408..2c2dbf31cc0b 100644
+--- a/providers/implementations/kdfs/tls1_prf.c
++++ b/providers/implementations/kdfs/tls1_prf.c
+@@ -45,6 +45,13 @@
+  *     A(0) = seed
+  *     A(i) = HMAC_<hash>(secret, A(i-1))
+  */
++
++/*
++ * Low level APIs (such as DH) are deprecated for public use, but still ok for
++ * internal use.
++ */
++#include "internal/deprecated.h"
++
+ #include <stdio.h>
+ #include <stdarg.h>
+ #include <string.h>
+@@ -60,6 +67,7 @@
+ #include "prov/providercommon.h"
+ #include "prov/implementations.h"
+ #include "prov/provider_util.h"
++#include "prov/securitycheck.h"
+ #include "e_os.h"
+ 
+ static OSSL_FUNC_kdf_newctx_fn kdf_tls1_prf_new;
+@@ -78,6 +86,8 @@ static int tls1_prf_alg(EVP_MAC_CTX *mdctx, EVP_MAC_CTX *sha1ctx,
+                         unsigned char *out, size_t olen);
+ 
+ #define TLS1_PRF_MAXBUF 1024
++#define TLS_MD_MASTER_SECRET_CONST        "\x6d\x61\x73\x74\x65\x72\x20\x73\x65\x63\x72\x65\x74"
++#define TLS_MD_MASTER_SECRET_CONST_SIZE   13
+ 
+ /* TLS KDF kdf context structure */
+ typedef struct {
+@@ -160,6 +170,7 @@ static int kdf_tls1_prf_derive(void *vctx, unsigned char *key, size_t keylen,
+                                const OSSL_PARAM params[])
+ {
+     TLS1_PRF *ctx = (TLS1_PRF *)vctx;
++    OSSL_LIB_CTX *libctx = PROV_LIBCTX_OF(ctx->provctx);
+ 
+     if (!ossl_prov_is_running() || !kdf_tls1_prf_set_ctx_params(ctx, params))
+         return 0;
+@@ -181,6 +192,27 @@ static int kdf_tls1_prf_derive(void *vctx, unsigned char *key, size_t keylen,
+         ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+ #endif /* defined(FIPS_MODULE) */
+ 
++    /*
++     * The seed buffer is prepended with a label.
++     * If EMS mode is enforced then the label "master secret" is not allowed,
++     * We do the check this way since the PRF is used for other purposes, as well
++     * as "extended master secret".
++     */
++#ifdef FIPS_MODULE
++    if (ctx->seedlen >= TLS_MD_MASTER_SECRET_CONST_SIZE
++            && memcmp(ctx->seed, TLS_MD_MASTER_SECRET_CONST,
++                      TLS_MD_MASTER_SECRET_CONST_SIZE) == 0)
++    ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
++#endif /* defined(FIPS_MODULE) */
++    if (ossl_tls1_prf_ems_check_enabled(libctx)) {
++        if (ctx->seedlen >= TLS_MD_MASTER_SECRET_CONST_SIZE
++                && memcmp(ctx->seed, TLS_MD_MASTER_SECRET_CONST,
++                          TLS_MD_MASTER_SECRET_CONST_SIZE) == 0) {
++            ERR_raise(ERR_LIB_PROV, PROV_R_EMS_NOT_ENABLED);
++            return 0;
++        }
++    }
++
+     return tls1_prf_alg(ctx->P_hash, ctx->P_sha1,
+                         ctx->sec, ctx->seclen,
+                         ctx->seed, ctx->seedlen,
+diff --git a/test/sslapitest.c b/test/sslapitest.c
+index 3a8242d2d8c8..b0fbb504689e 100644
+--- a/test/sslapitest.c
++++ b/test/sslapitest.c
+@@ -99,6 +99,7 @@ static char *tmpfilename = NULL;
+ static char *dhfile = NULL;
+ 
+ static int is_fips = 0;
++static int fips_ems_check = 0;
+ 
+ #define LOG_BUFFER_SIZE 2048
+ static char server_log_buffer[LOG_BUFFER_SIZE + 1] = {0};
+@@ -796,7 +797,7 @@ static int test_no_ems(void)
+ {
+     SSL_CTX *cctx = NULL, *sctx = NULL;
+     SSL *clientssl = NULL, *serverssl = NULL;
+-    int testresult = 0;
++    int testresult = 0, status;
+ 
+     if (!create_ssl_ctx_pair(libctx, TLS_server_method(), TLS_client_method(),
+                              TLS1_VERSION, TLS1_2_VERSION,
+@@ -812,19 +813,25 @@ static int test_no_ems(void)
+         goto end;
+     }
+ 
+-    if (!create_ssl_connection(serverssl, clientssl, SSL_ERROR_NONE)) {
+-        printf("Creating SSL connection failed\n");
+-        goto end;
+-    }
+-
+-    if (SSL_get_extms_support(serverssl)) {
+-        printf("Server reports Extended Master Secret support\n");
+-        goto end;
+-    }
+-
+-    if (SSL_get_extms_support(clientssl)) {
+-        printf("Client reports Extended Master Secret support\n");
+-        goto end;
++    status = create_ssl_connection(serverssl, clientssl, SSL_ERROR_NONE);
++    if (fips_ems_check) {
++        if (status == 1) {
++            printf("When FIPS uses the EMS check a connection that doesnt use EMS should fail\n");
++            goto end;
++        }
++    } else {
++        if (!status) {
++            printf("Creating SSL connection failed\n");
++            goto end;
++        }
++        if (SSL_get_extms_support(serverssl)) {
++            printf("Server reports Extended Master Secret support\n");
++            goto end;
++        }
++        if (SSL_get_extms_support(clientssl)) {
++            printf("Client reports Extended Master Secret support\n");
++            goto end;
++        }
+     }
+     testresult = 1;
+ 
+@@ -10740,9 +10747,24 @@ int setup_tests(void)
+             && !TEST_false(OSSL_PROVIDER_available(libctx, "default")))
+         return 0;
+ 
+-    if (strcmp(modulename, "fips") == 0)
++    if (strcmp(modulename, "fips") == 0) {
++        OSSL_PROVIDER *prov = NULL;
++        OSSL_PARAM params[2];
++
+         is_fips = 1;
+ 
++        prov = OSSL_PROVIDER_load(libctx, "fips");
++        if (prov != NULL) {
++            /* Query the fips provider to check if the check ems option is enabled */
++            params[0] =
++                OSSL_PARAM_construct_int(OSSL_PROV_PARAM_TLS1_PRF_EMS_CHECK,
++                                         &fips_ems_check);
++            params[1] = OSSL_PARAM_construct_end();
++            OSSL_PROVIDER_get_params(prov, params);
++            OSSL_PROVIDER_unload(prov);
++        }
++    }
++
+     /*
+      * We add, but don't load the test "tls-provider". We'll load it when we
+      * need it.
+@@ -10816,6 +10838,12 @@ int setup_tests(void)
+     if (privkey8192 == NULL)
+         goto err;
+ 
++    if (fips_ems_check) {
++#ifndef OPENSSL_NO_TLS1_2
++        ADD_TEST(test_no_ems);
++#endif
++        return 1;
++    }
+ #if !defined(OPENSSL_NO_KTLS) && !defined(OPENSSL_NO_SOCK)
+ # if !defined(OPENSSL_NO_TLS1_2) || !defined(OSSL_NO_USABLE_TLS1_3)
+     ADD_ALL_TESTS(test_ktls, NUM_KTLS_TEST_CIPHERS * 4);
+diff -up openssl-3.0.7/test/recipes/30-test_evp_data/evpkdf_tls12_prf.txt.xxx openssl-3.0.7/test/recipes/30-test_evp_data/evpkdf_tls12_prf.txt
+--- openssl-3.0.7/test/recipes/30-test_evp_data/evpkdf_tls12_prf.txt.xxx	2023-04-17 13:04:21.078501747 +0200
++++ openssl-3.0.7/test/recipes/30-test_evp_data/evpkdf_tls12_prf.txt	2023-04-17 13:11:03.189059638 +0200
+@@ -13,6 +13,7 @@
+ 
+ Title = TLS12 PRF tests (from NIST test vectors)
+ 
++Availablein = default
+ KDF = TLS1-PRF
+ Ctrl.digest = digest:SHA256
+ Ctrl.Secret = hexsecret:f8938ecc9edebc5030c0c6a441e213cd24e6f770a50dda07876f8d55da062bcadb386b411fd4fe4313a604fce6c17fbc
+@@ -21,6 +22,16 @@ Ctrl.client_random = hexseed:36c129d01a3
+ Ctrl.server_random = hexseed:f6c9575ed7ddd73e1f7d16eca115415812a43c2b747daaaae043abfb50053fce
+ Output = 202c88c00f84a17a20027079604787461176455539e705be730890602c289a5001e34eeb3a043e5d52a65e66125188bf
+ 
++Availablein = fips
++KDF = TLS1-PRF
++Ctrl.digest = digest:SHA256
++Ctrl.Secret = hexsecret:f8938ecc9edebc5030c0c6a441e213cd24e6f770a50dda07876f8d55da062bcadb386b411fd4fe4313a604fce6c17fbc
++Ctrl.label = seed:master secret
++Ctrl.client_random = hexseed:36c129d01a3200894b9179faac589d9835d58775f9b5ea3587cb8fd0364cae8c
++Ctrl.server_random = hexseed:f6c9575ed7ddd73e1f7d16eca115415812a43c2b747daaaae043abfb50053fce
++Output = 202c88c00f84a17a20027079604787461176455539e705be730890602c289a5001e34eeb3a043e5d52a65e66125188bf
++Result = KDF_DERIVE_ERROR
++
+ KDF = TLS1-PRF
+ Ctrl.digest = digest:SHA256
+ Ctrl.Secret = hexsecret:202c88c00f84a17a20027079604787461176455539e705be730890602c289a5001e34eeb3a043e5d52a65e66125188bf
+diff -up openssl-3.0.7/ssl/t1_enc.c.noems openssl-3.0.7/ssl/t1_enc.c
+--- openssl-3.0.7/ssl/t1_enc.c.noems	2023-05-05 11:15:57.934415272 +0200
++++ openssl-3.0.7/ssl/t1_enc.c	2023-05-05 11:39:03.578163778 +0200
+@@ -20,6 +20,7 @@
+ #include <openssl/obj_mac.h>
+ #include <openssl/core_names.h>
+ #include <openssl/trace.h>
++#include <openssl/fips.h>
+ 
+ /* seed1 through seed5 are concatenated */
+ static int tls1_PRF(SSL *s,
+@@ -75,8 +76,14 @@ static int tls1_PRF(SSL *s,
+     }
+ 
+  err:
+-    if (fatal)
+-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
++    if (fatal) {
++        /* The calls to this function are local so it's safe to implement the check */
++        if (FIPS_mode() && seed1_len >= TLS_MD_MASTER_SECRET_CONST_SIZE
++            && memcmp(seed1, TLS_MD_MASTER_SECRET_CONST, TLS_MD_MASTER_SECRET_CONST_SIZE) == 0)
++            SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE, ERR_R_UNSUPPORTED);
++	else
++            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
++    }
+     else
+         ERR_raise(ERR_LIB_SSL, ERR_R_INTERNAL_ERROR);
+     EVP_KDF_CTX_free(kctx);
+diff -up openssl-3.0.7/ssl/statem/extensions_srvr.c.noems openssl-3.0.7/ssl/statem/extensions_srvr.c
+--- openssl-3.0.7/ssl/statem/extensions_srvr.c.noems	2023-05-05 17:14:04.663800271 +0200
++++ openssl-3.0.7/ssl/statem/extensions_srvr.c	2023-05-05 17:20:33.764599507 +0200
+@@ -11,6 +11,7 @@
+ #include "../ssl_local.h"
+ #include "statem_local.h"
+ #include "internal/cryptlib.h"
++#include <openssl/fips.h>
+ 
+ #define COOKIE_STATE_FORMAT_VERSION     1
+ 
+@@ -1552,8 +1553,13 @@ EXT_RETURN tls_construct_stoc_etm(SSL *s
+ EXT_RETURN tls_construct_stoc_ems(SSL *s, WPACKET *pkt, unsigned int context,
+                                   X509 *x, size_t chainidx)
+ {
+-    if ((s->s3.flags & TLS1_FLAGS_RECEIVED_EXTMS) == 0)
++    if ((s->s3.flags & TLS1_FLAGS_RECEIVED_EXTMS) == 0) {
++        if (FIPS_mode() && !(SSL_get_options(s) & SSL_OP_RH_PERMIT_NOEMS_FIPS) ) {
++            SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE, ERR_R_UNSUPPORTED);
++            return EXT_RETURN_FAIL;
++        }
+         return EXT_RETURN_NOT_SENT;
++    }
+ 
+     if (!WPACKET_put_bytes_u16(pkt, TLSEXT_TYPE_extended_master_secret)
+             || !WPACKET_put_bytes_u16(pkt, 0)) {
+diff -up openssl-3.0.7/include/openssl/ssl.h.in.fipsems openssl-3.0.7/include/openssl/ssl.h.in
+--- openssl-3.0.7/include/openssl/ssl.h.in.fipsems	2023-07-11 12:35:27.951610366 +0200
++++ openssl-3.0.7/include/openssl/ssl.h.in	2023-07-11 12:36:25.234754680 +0200
+@@ -412,6 +412,7 @@ typedef int (*SSL_async_callback_fn)(SSL
+      * interoperability with CryptoPro CSP 3.x
+      */
+ # define SSL_OP_CRYPTOPRO_TLSEXT_BUG                     SSL_OP_BIT(31)
++# define SSL_OP_RH_PERMIT_NOEMS_FIPS                     SSL_OP_BIT(48)
+ 
+ /*
+  * Option "collections."
+diff -up openssl-3.0.7/ssl/ssl_conf.c.fipsems openssl-3.0.7/ssl/ssl_conf.c
+--- openssl-3.0.7/ssl/ssl_conf.c.fipsems	2023-07-11 12:36:51.465278672 +0200
++++ openssl-3.0.7/ssl/ssl_conf.c	2023-07-11 12:44:53.365675720 +0200
+@@ -387,6 +387,7 @@ static const ssl_conf_cmd_tbl ssl_conf_c
+         SSL_FLAG_TBL("ClientRenegotiation",
+                      SSL_OP_ALLOW_CLIENT_RENEGOTIATION),
+         SSL_FLAG_TBL_INV("EncryptThenMac", SSL_OP_NO_ENCRYPT_THEN_MAC),
++        SSL_FLAG_TBL("RHNoEnforceEMSinFIPS", SSL_OP_RH_PERMIT_NOEMS_FIPS),
+         SSL_FLAG_TBL("NoRenegotiation", SSL_OP_NO_RENEGOTIATION),
+         SSL_FLAG_TBL("AllowNoDHEKEX", SSL_OP_ALLOW_NO_DHE_KEX),
+         SSL_FLAG_TBL("PrioritizeChaCha", SSL_OP_PRIORITIZE_CHACHA),
+diff -up openssl-3.0.7/doc/man3/SSL_CONF_cmd.pod.fipsems openssl-3.0.7/doc/man3/SSL_CONF_cmd.pod
+--- openssl-3.0.7/doc/man3/SSL_CONF_cmd.pod.fipsems	2023-07-12 13:54:22.508235187 +0200
++++ openssl-3.0.7/doc/man3/SSL_CONF_cmd.pod	2023-07-12 13:56:51.089613902 +0200
+@@ -524,6 +524,9 @@ B<ExtendedMasterSecret>: use extended ma
+ default. Inverse of B<SSL_OP_NO_EXTENDED_MASTER_SECRET>: that is,
+ B<-ExtendedMasterSecret> is the same as setting B<SSL_OP_NO_EXTENDED_MASTER_SECRET>.
+ 
++B<RHNoEnforceEMSinFIPS>: allow establishing connections without EMS in FIPS mode.
++This is a RedHat-based OS specific option, and normally it should be set up via crypto policies.
++
+ B<CANames>: use CA names extension, enabled by
+ default. Inverse of B<SSL_OP_DISABLE_TLSEXT_CA_NAMES>: that is,
+ B<-CANames> is the same as setting B<SSL_OP_DISABLE_TLSEXT_CA_NAMES>.
+diff -up openssl-3.0.7/doc/man5/fips_config.pod.fipsems openssl-3.0.7/doc/man5/fips_config.pod
+--- openssl-3.0.7/doc/man5/fips_config.pod.fipsems	2023-07-12 15:39:57.732206731 +0200
++++ openssl-3.0.7/doc/man5/fips_config.pod	2023-07-12 15:53:45.722885419 +0200
+@@ -11,6 +11,19 @@ automatically loaded when the system is
+ environment variable B<OPENSSL_FORCE_FIPS_MODE> is set. See the documentation
+ for more information.
+ 
++Red Hat Enterprise Linux uses a supplementary config for FIPS module located in
++OpenSSL configuration directory and managed by crypto policies. If present, it
++should have format
++
++ [fips_sect]
++ tls1-prf-ems-check = 0
++ activate = 1
++
++The B<tls1-prf-ems-check> option specifies whether FIPS module will require the
++presence of extended master secret or not.
++
++The B<activate> option enforces FIPS provider activation.
++
+ =head1 COPYRIGHT
+ 
+ Copyright 2019-2021 The OpenSSL Project Authors. All Rights Reserved.

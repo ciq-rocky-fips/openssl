@@ -1,0 +1,390 @@
+diff -up openssl-3.0.1/crypto/dh/dh_key.c.fips3 openssl-3.0.1/crypto/dh/dh_key.c
+--- openssl-3.0.1/crypto/dh/dh_key.c.fips3	2022-07-18 16:01:41.159543735 +0200
++++ openssl-3.0.1/crypto/dh/dh_key.c	2022-07-18 16:24:30.251388248 +0200
+@@ -43,6 +43,9 @@ int ossl_dh_compute_key(unsigned char *k
+     BN_MONT_CTX *mont = NULL;
+     BIGNUM *z = NULL, *pminus1;
+     int ret = -1;
++#ifdef FIPS_MODULE
++    int validate = 0;
++#endif
+ 
+     if (BN_num_bits(dh->params.p) > OPENSSL_DH_MAX_MODULUS_BITS) {
+         ERR_raise(ERR_LIB_DH, DH_R_MODULUS_TOO_LARGE);
+@@ -54,6 +57,13 @@ int ossl_dh_compute_key(unsigned char *k
+         return 0;
+     }
+ 
++#ifdef FIPS_MODULE
++    if (DH_check_pub_key(dh, pub_key, &validate) <= 0) {
++        ERR_raise(ERR_LIB_DH, DH_R_CHECK_PUBKEY_INVALID);
++        return 0;
++    }
++#endif
++
+     ctx = BN_CTX_new_ex(dh->libctx);
+     if (ctx == NULL)
+         goto err;
+@@ -262,6 +272,9 @@ static int generate_key(DH *dh)
+ #endif
+     BN_CTX *ctx = NULL;
+     BIGNUM *pub_key = NULL, *priv_key = NULL;
++#ifdef FIPS_MODULE
++    int validate = 0;
++#endif
+ 
+     if (BN_num_bits(dh->params.p) > OPENSSL_DH_MAX_MODULUS_BITS) {
+         ERR_raise(ERR_LIB_DH, DH_R_MODULUS_TOO_LARGE);
+@@ -354,8 +367,21 @@ static int generate_key(DH *dh)
+     if (!ossl_dh_generate_public_key(ctx, dh, priv_key, pub_key))
+         goto err;
+ 
++#ifdef FIPS_MODULE
++    if (DH_check_pub_key(dh, pub_key, &validate) <= 0) {
++        ERR_raise(ERR_LIB_DH, DH_R_CHECK_PUBKEY_INVALID);
++        goto err;
++    }
++#endif
++
+     dh->pub_key = pub_key;
+     dh->priv_key = priv_key;
++#ifdef FIPS_MODULE
++    if (ossl_dh_check_pairwise(dh) <= 0) {
++        abort();
++    }
++#endif
++
+     dh->dirty_cnt++;
+     ok = 1;
+  err:
+diff -up openssl-3.0.7/crypto/ec/ec_key.c.f188 openssl-3.0.7/crypto/ec/ec_key.c
+--- openssl-3.0.7/crypto/ec/ec_key.c.f188	2023-11-08 10:58:05.910031253 +0100
++++ openssl-3.0.7/crypto/ec/ec_key.c	2023-11-08 10:59:42.338526883 +0100
+@@ -326,6 +326,11 @@ static int ec_generate_key(EC_KEY *eckey
+     eckey->dirty_cnt++;
+ 
+ #ifdef FIPS_MODULE
++    if (ossl_ec_key_public_check(eckey, ctx) <= 0) {
++        ERR_raise(ERR_LIB_EC, EC_R_INVALID_KEY);
++        goto err;
++    }
++
+     pairwise_test = 1;
+ #endif /* FIPS_MODULE */
+ 
+diff -up openssl-3.0.1/providers/implementations/exchange/ecdh_exch.c.fips3 openssl-3.0.1/providers/implementations/exchange/ecdh_exch.c
+--- openssl-3.0.1/providers/implementations/exchange/ecdh_exch.c.fips3	2022-07-25 13:42:46.814952053 +0200
++++ openssl-3.0.1/providers/implementations/exchange/ecdh_exch.c	2022-07-25 13:52:12.292065706 +0200
+@@ -488,6 +488,25 @@ int ecdh_plain_derive(void *vpecdhctx, u
+     }
+ 
+     ppubkey = EC_KEY_get0_public_key(pecdhctx->peerk);
++#ifdef FIPS_MODULE
++    {
++        BN_CTX *bn_ctx = BN_CTX_new_ex(ossl_ec_key_get_libctx(privk));
++        int check = 0;
++
++        if (bn_ctx == NULL) {
++            ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
++            goto end;
++        }
++
++        check = ossl_ec_key_public_check(pecdhctx->peerk, bn_ctx);
++        BN_CTX_free(bn_ctx);
++
++        if (check <= 0) {
++            ERR_raise(ERR_LIB_PROV, EC_R_INVALID_PEER_KEY);
++            goto end;
++        }
++    }
++#endif
+ 
+     retlen = ECDH_compute_key(secret, size, ppubkey, privk, NULL);
+ 
+diff -up openssl-3.0.7/providers/implementations/keymgmt/ec_kmgmt.c.pairwise openssl-3.0.7/providers/implementations/keymgmt/ec_kmgmt.c
+--- openssl-3.0.7/providers/implementations/keymgmt/ec_kmgmt.c.pairwise	2023-02-20 11:44:18.451884117 +0100
++++ openssl-3.0.7/providers/implementations/keymgmt/ec_kmgmt.c	2023-02-20 12:39:46.037063842 +0100
+@@ -982,8 +982,17 @@ struct ec_gen_ctx {
+     int selection;
+     int ecdh_mode;
+     EC_GROUP *gen_group;
++#ifdef FIPS_MODULE
++    void *ecdsa_sig_ctx;
++#endif
+ };
+ 
++#ifdef FIPS_MODULE
++void *ecdsa_newctx(void *provctx, const char *propq);
++void ecdsa_freectx(void *vctx);
++int do_ec_pct(void *, const char *, void *);
++#endif
++
+ static void *ec_gen_init(void *provctx, int selection,
+                          const OSSL_PARAM params[])
+ {
+@@ -1002,6 +1011,10 @@ static void *ec_gen_init(void *provctx,
+         OPENSSL_free(gctx);
+         gctx = NULL;
+     }
++#ifdef FIPS_MODULE
++    if (gctx != NULL)
++        gctx->ecdsa_sig_ctx = ecdsa_newctx(provctx, NULL);
++#endif
+     return gctx;
+ }
+ 
+@@ -1272,6 +1285,12 @@ static void *ec_gen(void *genctx, OSSL_C
+ 
+     if (gctx->ecdh_mode != -1)
+         ret = ret && ossl_ec_set_ecdh_cofactor_mode(ec, gctx->ecdh_mode);
++#ifdef FIPS_MODULE
++    /* Pairwise consistency test */
++    if ((gctx->selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0
++        && do_ec_pct(gctx->ecdsa_sig_ctx, "sha256", ec) != 1)
++        abort();
++#endif
+ 
+     if (gctx->group_check != NULL)
+         ret = ret && ossl_ec_set_check_group_type_from_name(ec, gctx->group_check);
+@@ -1341,7 +1359,10 @@ static void ec_gen_cleanup(void *genctx)
+ 
+     if (gctx == NULL)
+         return;
+-
++#ifdef FIPS_MODULE
++    ecdsa_freectx(gctx->ecdsa_sig_ctx);
++    gctx->ecdsa_sig_ctx = NULL;
++#endif
+     EC_GROUP_free(gctx->gen_group);
+     BN_free(gctx->p);
+     BN_free(gctx->a);
+diff -up openssl-3.0.7/providers/implementations/signature/ecdsa_sig.c.pairwise openssl-3.0.7/providers/implementations/signature/ecdsa_sig.c
+--- openssl-3.0.7/providers/implementations/signature/ecdsa_sig.c.pairwise	2023-02-20 11:50:23.035194347 +0100
++++ openssl-3.0.7/providers/implementations/signature/ecdsa_sig.c	2023-02-20 12:19:10.809768979 +0100
+@@ -32,7 +32,7 @@
+ #include "crypto/ec.h"
+ #include "prov/der_ec.h"
+ 
+-static OSSL_FUNC_signature_newctx_fn ecdsa_newctx;
++OSSL_FUNC_signature_newctx_fn ecdsa_newctx;
+ static OSSL_FUNC_signature_sign_init_fn ecdsa_sign_init;
+ static OSSL_FUNC_signature_verify_init_fn ecdsa_verify_init;
+ static OSSL_FUNC_signature_sign_fn ecdsa_sign;
+@@ -43,7 +43,7 @@ static OSSL_FUNC_signature_digest_sign_f
+ static OSSL_FUNC_signature_digest_verify_init_fn ecdsa_digest_verify_init;
+ static OSSL_FUNC_signature_digest_verify_update_fn ecdsa_digest_signverify_update;
+ static OSSL_FUNC_signature_digest_verify_final_fn ecdsa_digest_verify_final;
+-static OSSL_FUNC_signature_freectx_fn ecdsa_freectx;
++OSSL_FUNC_signature_freectx_fn ecdsa_freectx;
+ static OSSL_FUNC_signature_dupctx_fn ecdsa_dupctx;
+ static OSSL_FUNC_signature_get_ctx_params_fn ecdsa_get_ctx_params;
+ static OSSL_FUNC_signature_gettable_ctx_params_fn ecdsa_gettable_ctx_params;
+@@ -104,7 +104,7 @@ typedef struct {
+ #endif
+ } PROV_ECDSA_CTX;
+ 
+-static void *ecdsa_newctx(void *provctx, const char *propq)
++void *ecdsa_newctx(void *provctx, const char *propq)
+ {
+     PROV_ECDSA_CTX *ctx;
+ 
+@@ -370,7 +370,7 @@ int ecdsa_digest_verify_final(void *vctx
+     return ecdsa_verify(ctx, sig, siglen, digest, (size_t)dlen);
+ }
+ 
+-static void ecdsa_freectx(void *vctx)
++void ecdsa_freectx(void *vctx)
+ {
+     PROV_ECDSA_CTX *ctx = (PROV_ECDSA_CTX *)vctx;
+ 
+@@ -581,6 +581,35 @@ static const OSSL_PARAM *ecdsa_settable_
+     return EVP_MD_settable_ctx_params(ctx->md);
+ }
+ 
++#ifdef FIPS_MODULE
++int do_ec_pct(void *vctx, const char *mdname, void *ec)
++{
++    static const unsigned char data[32];
++    unsigned char sigbuf[256];
++    size_t siglen = sizeof(sigbuf);
++
++    if (ecdsa_digest_sign_init(vctx, mdname, ec, NULL) <= 0)
++        return 0;
++
++    if (ecdsa_digest_signverify_update(vctx, data, sizeof(data)) <= 0)
++        return 0;
++
++    if (ecdsa_digest_sign_final(vctx, sigbuf, &siglen, sizeof(sigbuf)) <= 0)
++        return 0;
++
++    if (ecdsa_digest_verify_init(vctx, mdname, ec, NULL) <= 0)
++        return 0;
++
++    if (ecdsa_digest_signverify_update(vctx, data, sizeof(data)) <= 0)
++        return 0;
++
++    if (ecdsa_digest_verify_final(vctx, sigbuf, siglen) <= 0)
++        return 0;
++
++    return 1;
++}
++#endif
++
+ const OSSL_DISPATCH ossl_ecdsa_signature_functions[] = {
+     { OSSL_FUNC_SIGNATURE_NEWCTX, (void (*)(void))ecdsa_newctx },
+     { OSSL_FUNC_SIGNATURE_SIGN_INIT, (void (*)(void))ecdsa_sign_init },
+diff -up openssl-3.0.7/providers/implementations/keymgmt/rsa_kmgmt.c.pairwise openssl-3.0.7/providers/implementations/keymgmt/rsa_kmgmt.c
+--- openssl-3.0.7/providers/implementations/keymgmt/rsa_kmgmt.c.pairwise	2023-02-20 16:04:27.103364713 +0100
++++ openssl-3.0.7/providers/implementations/keymgmt/rsa_kmgmt.c	2023-02-20 16:14:13.848119419 +0100
+@@ -434,6 +434,7 @@ struct rsa_gen_ctx {
+ #if defined(FIPS_MODULE) && !defined(OPENSSL_NO_ACVP_TESTS)
+     /* ACVP test parameters */
+     OSSL_PARAM *acvp_test_params;
++    void *prov_rsa_ctx;
+ #endif
+ };
+ 
+@@ -447,6 +448,12 @@ static int rsa_gencb(int p, int n, BN_GE
+     return gctx->cb(params, gctx->cbarg);
+ }
+ 
++#ifdef FIPS_MODULE
++void *rsa_newctx(void *provctx, const char *propq);
++void rsa_freectx(void *vctx);
++int do_rsa_pct(void *, const char *, void *);
++#endif
++
+ static void *gen_init(void *provctx, int selection, int rsa_type,
+                       const OSSL_PARAM params[])
+ {
+@@ -474,6 +481,10 @@ static void *gen_init(void *provctx, int
+ 
+     if (!rsa_gen_set_params(gctx, params))
+         goto err;
++#ifdef FIPS_MODULE
++    if (gctx != NULL)
++        gctx->prov_rsa_ctx = rsa_newctx(provctx, NULL);
++#endif
+     return gctx;
+ 
+ err:
+@@ -630,6 +641,11 @@ static void *rsa_gen(void *genctx, OSSL_
+ 
+     rsa = rsa_tmp;
+     rsa_tmp = NULL;
++#ifdef FIPS_MODULE
++    /* Pairwise consistency test */
++    if (do_rsa_pct(gctx->prov_rsa_ctx, "sha256", rsa) != 1)
++        abort();
++#endif
+  err:
+     BN_GENCB_free(gencb);
+     RSA_free(rsa_tmp);
+@@ -645,6 +662,8 @@ static void rsa_gen_cleanup(void *genctx
+ #if defined(FIPS_MODULE) && !defined(OPENSSL_NO_ACVP_TESTS)
+     ossl_rsa_acvp_test_gen_params_free(gctx->acvp_test_params);
+     gctx->acvp_test_params = NULL;
++    rsa_freectx(gctx->prov_rsa_ctx);
++    gctx->prov_rsa_ctx = NULL;
+ #endif
+     BN_clear_free(gctx->pub_exp);
+     OPENSSL_free(gctx);
+diff -up openssl-3.0.7/providers/implementations/signature/rsa_sig.c.pairwise openssl-3.0.7/providers/implementations/signature/rsa_sig.c
+--- openssl-3.0.7/providers/implementations/signature/rsa_sig.c.pairwise	2023-02-20 16:04:22.548327811 +0100
++++ openssl-3.0.7/providers/implementations/signature/rsa_sig.c	2023-02-20 16:17:50.064871695 +0100
+@@ -36,7 +36,7 @@
+ 
+ #define RSA_DEFAULT_DIGEST_NAME OSSL_DIGEST_NAME_SHA1
+ 
+-static OSSL_FUNC_signature_newctx_fn rsa_newctx;
++OSSL_FUNC_signature_newctx_fn rsa_newctx;
+ static OSSL_FUNC_signature_sign_init_fn rsa_sign_init;
+ static OSSL_FUNC_signature_verify_init_fn rsa_verify_init;
+ static OSSL_FUNC_signature_verify_recover_init_fn rsa_verify_recover_init;
+@@ -49,7 +49,7 @@ static OSSL_FUNC_signature_digest_sign_f
+ static OSSL_FUNC_signature_digest_verify_init_fn rsa_digest_verify_init;
+ static OSSL_FUNC_signature_digest_verify_update_fn rsa_digest_signverify_update;
+ static OSSL_FUNC_signature_digest_verify_final_fn rsa_digest_verify_final;
+-static OSSL_FUNC_signature_freectx_fn rsa_freectx;
++OSSL_FUNC_signature_freectx_fn rsa_freectx;
+ static OSSL_FUNC_signature_dupctx_fn rsa_dupctx;
+ static OSSL_FUNC_signature_get_ctx_params_fn rsa_get_ctx_params;
+ static OSSL_FUNC_signature_gettable_ctx_params_fn rsa_gettable_ctx_params;
+@@ -172,7 +172,7 @@ static int rsa_check_parameters(PROV_RSA
+     return 1;
+ }
+ 
+-static void *rsa_newctx(void *provctx, const char *propq)
++void *rsa_newctx(void *provctx, const char *propq)
+ {
+     PROV_RSA_CTX *prsactx = NULL;
+     char *propq_copy = NULL;
+@@ -990,7 +990,7 @@ int rsa_digest_verify_final(void *vprsac
+     return rsa_verify(vprsactx, sig, siglen, digest, (size_t)dlen);
+ }
+ 
+-static void rsa_freectx(void *vprsactx)
++void rsa_freectx(void *vprsactx)
+ {
+     PROV_RSA_CTX *prsactx = (PROV_RSA_CTX *)vprsactx;
+ 
+@@ -1504,6 +1504,45 @@ static const OSSL_PARAM *rsa_settable_ct
+     return EVP_MD_settable_ctx_params(prsactx->md);
+ }
+ 
++#ifdef FIPS_MODULE
++int do_rsa_pct(void *vctx, const char *mdname, void *rsa)
++{
++    static const unsigned char data[32];
++    unsigned char *sigbuf = NULL;
++    size_t siglen = 0;
++    int ret = 0;
++
++    if (rsa_digest_sign_init(vctx, mdname, rsa, NULL) <= 0)
++        return 0;
++
++    if (rsa_digest_signverify_update(vctx, data, sizeof(data)) <= 0)
++        return 0;
++
++    if (rsa_digest_sign_final(vctx, NULL, &siglen, 0) <= 0)
++        return 0;
++
++    if ((sigbuf = OPENSSL_malloc(siglen)) == NULL)
++        return 0;
++
++    if (rsa_digest_sign_final(vctx, sigbuf, &siglen, siglen) <= 0)
++        goto err;
++
++    if (rsa_digest_verify_init(vctx, mdname, rsa, NULL) <= 0)
++        goto err;
++
++    if (rsa_digest_signverify_update(vctx, data, sizeof(data)) <= 0)
++        goto err;
++
++    if (rsa_digest_verify_final(vctx, sigbuf, siglen) <= 0)
++        goto err;
++    ret = 1;
++
++ err:
++    OPENSSL_free(sigbuf);
++    return ret;
++}
++#endif
++
+ const OSSL_DISPATCH ossl_rsa_signature_functions[] = {
+     { OSSL_FUNC_SIGNATURE_NEWCTX, (void (*)(void))rsa_newctx },
+     { OSSL_FUNC_SIGNATURE_SIGN_INIT, (void (*)(void))rsa_sign_init },
+diff --git a/crypto/rsa/rsa_gen.c b/crypto/rsa/rsa_gen.c
+index e0d139d..35f23b2 100644
+--- a/crypto/rsa/rsa_gen.c
++++ b/crypto/rsa/rsa_gen.c
+@@ -463,6 +463,9 @@ static int rsa_keygen(OSSL_LIB_CTX *libctx, RSA *rsa, int bits, int primes,
+             rsa->dmp1 = NULL;
+             rsa->dmq1 = NULL;
+             rsa->iqmp = NULL;
++#ifdef FIPS_MODULE
++            abort();
++#endif /* defined(FIPS_MODULE) */
+         }
+     }
+     return ok;

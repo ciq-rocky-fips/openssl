@@ -1,0 +1,26 @@
+From 9dbc6069665690bd238caa7622647ea8ac94124f Mon Sep 17 00:00:00 2001
+From: Clemens Lang <cllang@redhat.com>
+Date: Mon, 13 Feb 2023 11:01:44 +0100
+Subject: fips: Zeroize `out` in fips selftest
+
+Signed-off-by: Clemens Lang <cllang@redhat.com>
+Resolves: rhbz#2169314
+---
+ providers/fips/self_test.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/providers/fips/self_test.c b/providers/fips/self_test.c
+index 80d048a847..11a989209c 100644
+--- a/providers/fips/self_test.c
++++ b/providers/fips/self_test.c
+@@ -221,6 +221,7 @@ static int verify_integrity(OSSL_CORE_BIO *bio, OSSL_FUNC_BIO_read_ex_fn read_ex
+         goto err;
+     ret = 1;
+ err:
++    OPENSSL_cleanse(out, sizeof(out));
+     OSSL_SELF_TEST_onend(ev, ret);
+     EVP_MAC_CTX_free(ctx);
+     EVP_MAC_free(mac);
+-- 
+2.39.1
+

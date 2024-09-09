@@ -1,0 +1,77 @@
+From 5b2ec9a54037d7b007324bf53e067e73511cdfe4 Mon Sep 17 00:00:00 2001
+From: Tomas Mraz <tmraz@fedoraproject.org>
+Date: Thu, 26 Nov 2020 14:00:16 +0100
+Subject: Add FIPS_mode() compatibility macro
+
+The macro calls EVP_default_properties_is_fips_enabled() on the
+default context.
+---
+ include/openssl/crypto.h.in |  1 +
+ include/openssl/fips.h      | 25 +++++++++++++++++++++++++
+ test/property_test.c        | 13 +++++++++++++
+ 3 files changed, 39 insertions(+)
+ create mode 100644 include/openssl/fips.h
+
+diff --git a/include/openssl/fips.h b/include/openssl/fips.h
+new file mode 100644
+index 0000000000..c64f0f8e8f
+--- /dev/null
++++ b/include/openssl/fips.h
+@@ -0,0 +1,26 @@
++/*
++ * Copyright 2016-2020 The OpenSSL Project Authors. All Rights Reserved.
++ *
++ * Licensed under the Apache License 2.0 (the "License").  You may not use
++ * this file except in compliance with the License.  You can obtain a copy
++ * in the file LICENSE in the source distribution or at
++ * https://www.openssl.org/source/license.html
++ */
++
++#ifndef OPENSSL_FIPS_H
++# define OPENSSL_FIPS_H
++# pragma once
++
++# include <openssl/evp.h>
++# include <openssl/macros.h>
++
++# ifdef __cplusplus
++extern "C" {
++# endif
++
++# define FIPS_mode() EVP_default_properties_is_fips_enabled(NULL)
++
++# ifdef __cplusplus
++}
++# endif
++#endif
+diff -up openssl-3.0.0-beta1/test/property_test.c.fips-macro openssl-3.0.0-beta1/test/property_test.c
+--- openssl-3.0.0-beta1/test/property_test.c.fips-macro	2021-06-29 12:14:58.851557698 +0200
++++ openssl-3.0.0-beta1/test/property_test.c	2021-06-29 12:17:14.630143832 +0200
+@@ -488,6 +488,19 @@ static int test_property_list_to_string(
+     return ret;
+ }
+
++#include <openssl/fips.h>
++static int test_downstream_FIPS_mode(void)
++{
++    int ret = 0;
++
++    ret = TEST_true(EVP_set_default_properties(NULL, "fips=yes"))
++          && TEST_true(FIPS_mode())
++          && TEST_true(EVP_set_default_properties(NULL, "fips=no"))
++          && TEST_false(FIPS_mode());
++
++    return ret;
++}
++
+ int setup_tests(void)
+ {
+     ADD_TEST(test_property_string);
+@@ -500,6 +512,7 @@ int setup_tests(void)
+     ADD_TEST(test_property);
+     ADD_TEST(test_query_cache_stochastic);
+     ADD_TEST(test_fips_mode);
++    ADD_TEST(test_downstream_FIPS_mode);
+     ADD_ALL_TESTS(test_property_list_to_string, OSSL_NELEM(to_string_tests));
+     return 1;
+ }

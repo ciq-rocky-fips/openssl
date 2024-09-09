@@ -1,0 +1,420 @@
+diff -up openssl-3.0.1/crypto/ec/ec_backend.c.fips_kat_signature openssl-3.0.1/crypto/ec/ec_backend.c
+--- openssl-3.0.1/crypto/ec/ec_backend.c.fips_kat_signature	2022-04-04 15:49:24.786455707 +0200
++++ openssl-3.0.1/crypto/ec/ec_backend.c	2022-04-04 16:06:13.250271963 +0200
+@@ -393,6 +393,10 @@ int ossl_ec_key_fromdata(EC_KEY *ec, con
+     const OSSL_PARAM *param_priv_key = NULL, *param_pub_key = NULL;
+     BN_CTX *ctx = NULL;
+     BIGNUM *priv_key = NULL;
++#ifdef FIPS_MODULE
++    const OSSL_PARAM *param_sign_kat_k = NULL;
++    BIGNUM *sign_kat_k = NULL;
++#endif
+     unsigned char *pub_key = NULL;
+     size_t pub_key_len;
+     const EC_GROUP *ecg = NULL;
+@@ -408,7 +412,10 @@ int ossl_ec_key_fromdata(EC_KEY *ec, con
+     if (include_private)
+         param_priv_key =
+             OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PRIV_KEY);
+-
++#ifdef FIPS_MODULE
++    param_sign_kat_k =
++        OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_REDHAT_SIGN_KAT_K);
++#endif
+     ctx = BN_CTX_new_ex(ossl_ec_key_get_libctx(ec));
+     if (ctx == NULL)
+         goto err;
+@@ -481,6 +489,17 @@ int ossl_ec_key_fromdata(EC_KEY *ec, con
+         && !EC_KEY_set_public_key(ec, pub_point))
+         goto err;
+ 
++#ifdef FIPS_MODULE
++    if (param_sign_kat_k) {
++        if ((sign_kat_k = BN_secure_new()) == NULL)
++            goto err;
++        BN_set_flags(sign_kat_k, BN_FLG_CONSTTIME);
++
++        if (!OSSL_PARAM_get_BN(param_sign_kat_k, &sign_kat_k))
++            goto err;
++        ec->sign_kat_k = sign_kat_k;
++    }
++#endif
+     ok = 1;
+ 
+  err:
+diff -up openssl-3.0.1/crypto/ec/ecdsa_ossl.c.fips_kat_signature openssl-3.0.1/crypto/ec/ecdsa_ossl.c
+--- openssl-3.0.1/crypto/ec/ecdsa_ossl.c.fips_kat_signature	2022-04-04 17:01:35.725323127 +0200
++++ openssl-3.0.1/crypto/ec/ecdsa_ossl.c	2022-04-04 17:03:42.000427050 +0200
+@@ -20,6 +20,10 @@
+ #include "crypto/bn.h"
+ #include "ec_local.h"
+ 
++#ifdef FIPS_MODULE
++extern int REDHAT_FIPS_signature_st;
++#endif
++
+ int ossl_ecdsa_sign_setup(EC_KEY *eckey, BN_CTX *ctx_in, BIGNUM **kinvp,
+                           BIGNUM **rp)
+ {
+@@ -126,6 +130,11 @@ static int ecdsa_sign_setup(EC_KEY *ecke
+         goto err;
+ 
+     do {
++#ifdef FIPS_MODULE
++       if (REDHAT_FIPS_signature_st && eckey->sign_kat_k != NULL) {
++           BN_copy(k, eckey->sign_kat_k);
++       } else {
++#endif
+         /* get random k */
+         do {
+             if (dgst != NULL) {
+@@ -141,7 +150,9 @@ static int ecdsa_sign_setup(EC_KEY *ecke
+                 }
+             }
+         } while (BN_is_zero(k));
+-
++#ifdef FIPS_MODULE
++        }
++#endif
+         /* compute r the x-coordinate of generator * k */
+         if (!EC_POINT_mul(group, tmp_point, k, NULL, NULL, ctx)) {
+             ERR_raise(ERR_LIB_EC, ERR_R_EC_LIB);
+diff -up openssl-3.0.1/crypto/ec/ec_key.c.fips_kat_signature openssl-3.0.1/crypto/ec/ec_key.c
+--- openssl-3.0.1/crypto/ec/ec_key.c.fips_kat_signature	2022-04-04 13:48:52.231172299 +0200
++++ openssl-3.0.1/crypto/ec/ec_key.c	2022-04-04 14:00:35.077368605 +0200
+@@ -97,6 +97,9 @@ void EC_KEY_free(EC_KEY *r)
+     EC_GROUP_free(r->group);
+     EC_POINT_free(r->pub_key);
+     BN_clear_free(r->priv_key);
++#ifdef FIPS_MODULE
++    BN_clear_free(r->sign_kat_k);
++#endif
+     OPENSSL_free(r->propq);
+ 
+     OPENSSL_clear_free((void *)r, sizeof(EC_KEY));
+diff -up openssl-3.0.1/crypto/ec/ec_local.h.fips_kat_signature openssl-3.0.1/crypto/ec/ec_local.h
+--- openssl-3.0.1/crypto/ec/ec_local.h.fips_kat_signature	2022-04-04 13:46:57.576161867 +0200
++++ openssl-3.0.1/crypto/ec/ec_local.h	2022-04-04 13:48:07.827780835 +0200
+@@ -298,6 +298,9 @@ struct ec_key_st {
+ #ifndef FIPS_MODULE
+     CRYPTO_EX_DATA ex_data;
+ #endif
++#ifdef FIPS_MODULE
++    BIGNUM *sign_kat_k;
++#endif
+     CRYPTO_RWLOCK *lock;
+     OSSL_LIB_CTX *libctx;
+     char *propq;
+diff -up openssl-3.0.1/include/openssl/core_names.h.fips_kat_signature openssl-3.0.1/include/openssl/core_names.h
+--- openssl-3.0.1/include/openssl/core_names.h.fips_kat_signature	2022-04-04 14:06:15.717370014 +0200
++++ openssl-3.0.1/include/openssl/core_names.h	2022-04-04 14:07:35.376071229 +0200
+@@ -293,6 +293,7 @@ extern "C" {
+ #define OSSL_PKEY_PARAM_DIST_ID             "distid"
+ #define OSSL_PKEY_PARAM_PUB_KEY             "pub"
+ #define OSSL_PKEY_PARAM_PRIV_KEY            "priv"
++#define OSSL_PKEY_PARAM_REDHAT_SIGN_KAT_K   "rh_sign_kat_k"
+ 
+ /* Diffie-Hellman/DSA Parameters */
+ #define OSSL_PKEY_PARAM_FFC_P               "p"
+diff -up openssl-3.0.1/providers/implementations/keymgmt/ec_kmgmt.c.fips_kat_signature openssl-3.0.1/providers/implementations/keymgmt/ec_kmgmt.c
+--- openssl-3.0.1/providers/implementations/keymgmt/ec_kmgmt.c.fips_kat_signature	2022-04-04 14:21:03.043180906 +0200
++++ openssl-3.0.1/providers/implementations/keymgmt/ec_kmgmt.c	2022-04-04 14:38:33.949406645 +0200
+@@ -530,7 +530,8 @@ end:
+ # define EC_IMEXPORTABLE_PUBLIC_KEY                                            \
+     OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_PUB_KEY, NULL, 0)
+ # define EC_IMEXPORTABLE_PRIVATE_KEY                                           \
+-    OSSL_PARAM_BN(OSSL_PKEY_PARAM_PRIV_KEY, NULL, 0)
++    OSSL_PARAM_BN(OSSL_PKEY_PARAM_PRIV_KEY, NULL, 0),                          \
++    OSSL_PARAM_BN(OSSL_PKEY_PARAM_REDHAT_SIGN_KAT_K, NULL, 0)
+ # define EC_IMEXPORTABLE_OTHER_PARAMETERS                                      \
+     OSSL_PARAM_int(OSSL_PKEY_PARAM_USE_COFACTOR_ECDH, NULL),                   \
+     OSSL_PARAM_int(OSSL_PKEY_PARAM_EC_INCLUDE_PUBLIC, NULL)
+diff -up openssl-3.0.1/providers/fips/self_test_kats.c.kat openssl-3.0.1/providers/fips/self_test_kats.c
+--- openssl-3.0.1/providers/fips/self_test_kats.c.kat	2022-05-10 15:10:32.502185265 +0200
++++ openssl-3.0.1/providers/fips/self_test_kats.c	2022-05-10 15:13:21.465653720 +0200
+@@ -17,6 +17,8 @@
+ #include "self_test.h"
+ #include "self_test_data.inc"
+ 
++int REDHAT_FIPS_signature_st = 0;
++
+ static int self_test_digest(const ST_KAT_DIGEST *t, OSSL_SELF_TEST *st,
+                             OSSL_LIB_CTX *libctx)
+ {
+@@ -446,6 +448,7 @@ static int self_test_sign(const ST_KAT_S
+     EVP_PKEY *pkey = NULL;
+     unsigned char sig[256];
+     BN_CTX *bnctx = NULL;
++    BIGNUM *K = NULL;
+     size_t siglen = sizeof(sig);
+     static const unsigned char dgst[] = {
+         0x7f, 0x83, 0xb1, 0x65, 0x7f, 0xf1, 0xfc, 0x53, 0xb9, 0x2d, 0xc1, 0x81,
+@@ -462,6 +465,9 @@ static int self_test_sign(const ST_KAT_S
+     bnctx = BN_CTX_new_ex(libctx);
+     if (bnctx == NULL)
+         goto err;
++    K = BN_CTX_get(bnctx);
++    if (K == NULL || BN_bin2bn(dgst, sizeof(dgst), K) == NULL)
++        goto err;
+ 
+     bld = OSSL_PARAM_BLD_new();
+     if (bld == NULL)
+@@ -469,6 +475,9 @@ static int self_test_sign(const ST_KAT_S
+ 
+     if (!add_params(bld, t->key, bnctx))
+         goto err;
++    /* set K for ECDSA KAT tests */
++    if (!OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_REDHAT_SIGN_KAT_K, K))
++        goto err;
+     params = OSSL_PARAM_BLD_to_param(bld);
+ 
+     /* Create a EVP_PKEY_CTX to load the DSA key into */
+@@ -689,11 +698,13 @@ static int self_test_kas(OSSL_SELF_TEST
+ static int self_test_signatures(OSSL_SELF_TEST *st, OSSL_LIB_CTX *libctx)
+ {
+     int i, ret = 1;
++    REDHAT_FIPS_signature_st = 1;
+ 
+     for (i = 0; i < (int)OSSL_NELEM(st_kat_sign_tests); ++i) {
+         if (!self_test_sign(&st_kat_sign_tests[i], st, libctx))
+             ret = 0;
+     }
++    REDHAT_FIPS_signature_st = 0;
+     return ret;
+ }
+ 
+diff -up openssl-3.0.1/providers/fips/self_test_data.inc.kat openssl-3.0.1/providers/fips/self_test_data.inc
+--- openssl-3.0.1/providers/fips/self_test_data.inc.kat	2022-05-16 17:37:34.962807400 +0200
++++ openssl-3.0.1/providers/fips/self_test_data.inc	2022-05-16 17:48:10.709376779 +0200
+@@ -1399,7 +1399,151 @@ static const ST_KAT_PARAM ecdsa_prime_ke
+     ST_KAT_PARAM_BIGNUM(OSSL_PKEY_PARAM_PRIV_KEY, ecd_prime_priv),
+     ST_KAT_PARAM_END()
+ };
++static const unsigned char ec224r1_kat_sig[] = {
++0x30, 0x3c, 0x02, 0x1c, 0x2f, 0x24, 0x30, 0x96, 0x3b, 0x39, 0xe0, 0xab, 0xe2, 0x5a, 0x6f, 0xe0,
++0x40, 0x7e, 0x19, 0x30, 0x6e, 0x6a, 0xfd, 0x7a, 0x2b, 0x5d, 0xaa, 0xc2, 0x34, 0x6c, 0xc8, 0xce,
++0x02, 0x1c, 0x47, 0xe1, 0xac, 0xfd, 0xb4, 0xb8, 0x2b, 0x8c, 0x49, 0xb6, 0x36, 0xcd, 0xdd, 0x22,
++0x2a, 0x2d, 0x29, 0x64, 0x70, 0x61, 0xc3, 0x3e, 0x18, 0x51, 0xec, 0xf2, 0xad, 0x3c
++};
+ 
++static const char ecd_prime_curve_name384[] = "secp384r1";
++/*
++priv:
++    58:12:2b:94:be:29:23:13:83:f5:c4:20:e8:22:34:
++    54:73:49:91:10:05:e9:10:e9:d7:2d:72:9c:5e:6a:
++    ba:8f:6d:d6:e4:a7:eb:e0:ae:e3:d4:c9:aa:33:87:
++    4c:91:87
++pub:
++    04:d1:86:8b:f5:c4:a2:f7:a5:92:e6:85:2a:d2:92:
++    81:97:0a:8d:fa:09:3f:84:6c:17:43:03:43:49:23:
++    77:c4:31:f4:0a:a4:de:87:ac:5c:c0:d1:bc:e4:43:
++    7f:8d:44:e1:3b:5f:bc:27:c8:79:0f:d0:31:9f:a7:
++    6d:de:fb:f7:da:19:40:fd:aa:83:dc:69:ce:a6:f3:
++    4d:65:20:1c:66:82:80:03:f7:7b:2e:f3:b3:7c:1f:
++    11:f2:a3:bf:e8:0e:88
++*/
++static const unsigned char ecd_prime_priv384[] = {
++    0x58, 0x12, 0x2b, 0x94, 0xbe, 0x29, 0x23, 0x13, 0x83, 0xf5, 0xc4, 0x20, 0xe8, 0x22, 0x34,
++    0x54, 0x73, 0x49, 0x91, 0x10, 0x05, 0xe9, 0x10, 0xe9, 0xd7, 0x2d, 0x72, 0x9c, 0x5e, 0x6a,
++    0xba, 0x8f, 0x6d, 0xd6, 0xe4, 0xa7, 0xeb, 0xe0, 0xae, 0xe3, 0xd4, 0xc9, 0xaa, 0x33, 0x87,
++    0x4c, 0x91, 0x87
++};
++static const unsigned char ecd_prime_pub384[] = {
++    0x04, 0xd1, 0x86, 0x8b, 0xf5, 0xc4, 0xa2, 0xf7, 0xa5, 0x92, 0xe6, 0x85, 0x2a, 0xd2, 0x92,
++    0x81, 0x97, 0x0a, 0x8d, 0xfa, 0x09, 0x3f, 0x84, 0x6c, 0x17, 0x43, 0x03, 0x43, 0x49, 0x23,
++    0x77, 0xc4, 0x31, 0xf4, 0x0a, 0xa4, 0xde, 0x87, 0xac, 0x5c, 0xc0, 0xd1, 0xbc, 0xe4, 0x43,
++    0x7f, 0x8d, 0x44, 0xe1, 0x3b, 0x5f, 0xbc, 0x27, 0xc8, 0x79, 0x0f, 0xd0, 0x31, 0x9f, 0xa7,
++    0x6d, 0xde, 0xfb, 0xf7, 0xda, 0x19, 0x40, 0xfd, 0xaa, 0x83, 0xdc, 0x69, 0xce, 0xa6, 0xf3,
++    0x4d, 0x65, 0x20, 0x1c, 0x66, 0x82, 0x80, 0x03, 0xf7, 0x7b, 0x2e, 0xf3, 0xb3, 0x7c, 0x1f,
++    0x11, 0xf2, 0xa3, 0xbf, 0xe8, 0x0e, 0x88
++};
++static const ST_KAT_PARAM ecdsa_prime_key384[] = {
++    ST_KAT_PARAM_UTF8STRING(OSSL_PKEY_PARAM_GROUP_NAME, ecd_prime_curve_name384),
++    ST_KAT_PARAM_OCTET(OSSL_PKEY_PARAM_PUB_KEY, ecd_prime_pub384),
++    ST_KAT_PARAM_BIGNUM(OSSL_PKEY_PARAM_PRIV_KEY, ecd_prime_priv384),
++    ST_KAT_PARAM_END()
++};
++static const unsigned char ec384r1_kat_sig[] = {
++0x30, 0x65, 0x02, 0x30, 0x1a, 0xd5, 0x57, 0x1b, 0x28, 0x0f, 0xf1, 0x68, 0x66, 0x68, 0x8a, 0x98,
++0xe3, 0x9c, 0xce, 0x7f, 0xa7, 0x68, 0xdc, 0x84, 0x5a, 0x65, 0xdc, 0x2b, 0x5d, 0x7e, 0xf3, 0x9b,
++0xa0, 0x40, 0xe8, 0x7a, 0x02, 0xc7, 0x82, 0xe0, 0x0c, 0x81, 0xa5, 0xda, 0x55, 0x27, 0xbf, 0x79,
++0xee, 0x72, 0xc2, 0x14, 0x02, 0x31, 0x00, 0xd1, 0x9d, 0x67, 0xda, 0x5a, 0xd2, 0x58, 0x68, 0xe7,
++0x71, 0x08, 0xb2, 0xa4, 0xe4, 0xe8, 0x74, 0xb4, 0x0a, 0x3d, 0x76, 0x49, 0x31, 0x17, 0x6e, 0x33,
++0x16, 0xf0, 0x00, 0x1f, 0x3c, 0x1f, 0xf9, 0x7c, 0xdb, 0x93, 0x49, 0x9c, 0x7d, 0xb3, 0xd3, 0x30,
++0x98, 0x81, 0x6f, 0xb0, 0xc9, 0x30, 0x2f
++};
++static const char ecd_prime_curve_name521[] = "secp521r1";
++/*
++priv:
++    00:44:0f:96:31:a9:87:f2:5f:be:a0:bc:ef:0c:ae:
++    58:cc:5f:f8:44:9e:89:86:7e:bf:db:ce:cb:0e:20:
++    10:4a:11:ec:0b:51:1d:e4:91:ca:c6:40:fb:c6:69:
++    ad:68:33:9e:c8:f5:c4:c6:a5:93:a8:4d:a9:a9:a2:
++    af:fe:6d:cb:c2:3b
++pub:
++    04:01:5f:58:a9:40:0c:ee:9b:ed:4a:f4:7a:3c:a3:
++    89:c2:f3:7e:2c:f4:b5:53:80:ae:33:7d:36:d1:b5:
++    18:bd:ef:a9:48:00:ea:88:ee:00:5c:ca:07:08:b5:
++    67:4a:c3:2b:10:c6:07:b0:c2:45:37:b7:1d:e3:6c:
++    e1:bf:2c:44:18:4a:aa:01:af:75:40:6a:e3:f5:b2:
++    7f:d1:9d:1b:8b:29:1f:91:4d:db:93:bf:bd:8c:b7:
++    6a:8d:4b:2c:36:2a:6b:ab:54:9d:7b:31:99:a4:de:
++    c9:10:c4:f4:a3:f4:6d:94:97:62:16:a5:34:65:1f:
++    42:cd:8b:9e:e6:db:14:5d:a9:8d:19:95:8d
++*/
++static const unsigned char ecd_prime_priv521[] = {
++    0x00, 0x44, 0x0f, 0x96, 0x31, 0xa9, 0x87, 0xf2, 0x5f, 0xbe, 0xa0, 0xbc, 0xef, 0x0c, 0xae,
++    0x58, 0xcc, 0x5f, 0xf8, 0x44, 0x9e, 0x89, 0x86, 0x7e, 0xbf, 0xdb, 0xce, 0xcb, 0x0e, 0x20,
++    0x10, 0x4a, 0x11, 0xec, 0x0b, 0x51, 0x1d, 0xe4, 0x91, 0xca, 0xc6, 0x40, 0xfb, 0xc6, 0x69,
++    0xad, 0x68, 0x33, 0x9e, 0xc8, 0xf5, 0xc4, 0xc6, 0xa5, 0x93, 0xa8, 0x4d, 0xa9, 0xa9, 0xa2,
++    0xaf, 0xfe, 0x6d, 0xcb, 0xc2, 0x3b
++};
++static const unsigned char ecd_prime_pub521[] = {
++    0x04, 0x01, 0x5f, 0x58, 0xa9, 0x40, 0x0c, 0xee, 0x9b, 0xed, 0x4a, 0xf4, 0x7a, 0x3c, 0xa3,
++    0x89, 0xc2, 0xf3, 0x7e, 0x2c, 0xf4, 0xb5, 0x53, 0x80, 0xae, 0x33, 0x7d, 0x36, 0xd1, 0xb5,
++    0x18, 0xbd, 0xef, 0xa9, 0x48, 0x00, 0xea, 0x88, 0xee, 0x00, 0x5c, 0xca, 0x07, 0x08, 0xb5,
++    0x67, 0x4a, 0xc3, 0x2b, 0x10, 0xc6, 0x07, 0xb0, 0xc2, 0x45, 0x37, 0xb7, 0x1d, 0xe3, 0x6c,
++    0xe1, 0xbf, 0x2c, 0x44, 0x18, 0x4a, 0xaa, 0x01, 0xaf, 0x75, 0x40, 0x6a, 0xe3, 0xf5, 0xb2,
++    0x7f, 0xd1, 0x9d, 0x1b, 0x8b, 0x29, 0x1f, 0x91, 0x4d, 0xdb, 0x93, 0xbf, 0xbd, 0x8c, 0xb7,
++    0x6a, 0x8d, 0x4b, 0x2c, 0x36, 0x2a, 0x6b, 0xab, 0x54, 0x9d, 0x7b, 0x31, 0x99, 0xa4, 0xde,
++    0xc9, 0x10, 0xc4, 0xf4, 0xa3, 0xf4, 0x6d, 0x94, 0x97, 0x62, 0x16, 0xa5, 0x34, 0x65, 0x1f,
++    0x42, 0xcd, 0x8b, 0x9e, 0xe6, 0xdb, 0x14, 0x5d, 0xa9, 0x8d, 0x19, 0x95, 0x8d
++};
++static const ST_KAT_PARAM ecdsa_prime_key521[] = {
++    ST_KAT_PARAM_UTF8STRING(OSSL_PKEY_PARAM_GROUP_NAME, ecd_prime_curve_name521),
++    ST_KAT_PARAM_OCTET(OSSL_PKEY_PARAM_PUB_KEY, ecd_prime_pub521),
++    ST_KAT_PARAM_BIGNUM(OSSL_PKEY_PARAM_PRIV_KEY, ecd_prime_priv521),
++    ST_KAT_PARAM_END()
++};
++static const unsigned char ec521r1_kat_sig[] = {
++0x30, 0x81, 0x88, 0x02, 0x42, 0x00, 0xdf, 0x64, 0x9c, 0xc8, 0x5b, 0xdd, 0x0b, 0x7f, 0x69, 0x7e,
++0xdb, 0x83, 0x58, 0x67, 0x63, 0x43, 0xb7, 0xfa, 0x40, 0x29, 0xde, 0xb9, 0xde, 0xe9, 0x96, 0x65,
++0xe6, 0x8e, 0xf4, 0xeb, 0xd0, 0xe9, 0x6a, 0xd3, 0x27, 0x6c, 0x4d, 0x60, 0x47, 0x9c, 0x62, 0xb8,
++0x6c, 0xc1, 0x36, 0x19, 0x65, 0xff, 0xab, 0xcf, 0x24, 0xa3, 0xde, 0xd1, 0x4b, 0x1b, 0xdd, 0x89,
++0xcf, 0xf8, 0x72, 0x7b, 0x92, 0xbc, 0x02, 0x02, 0x42, 0x01, 0xf8, 0x07, 0x77, 0xb8, 0xcb, 0xa2,
++0xe2, 0x1f, 0x53, 0x9a, 0x7c, 0x16, 0xb5, 0x8e, 0xad, 0xe3, 0xc3, 0xac, 0xb7, 0xb2, 0x51, 0x8f,
++0xf9, 0x09, 0x65, 0x43, 0xf8, 0xd8, 0x3c, 0xe3, 0x5c, 0x4a, 0x5e, 0x3d, 0x6f, 0xb7, 0xbb, 0x5a,
++0x92, 0x69, 0xec, 0x71, 0xa2, 0x35, 0xe5, 0x29, 0x17, 0xaf, 0xc9, 0x69, 0xa7, 0xaa, 0x94, 0xf9,
++0xf9, 0x50, 0x87, 0x7b, 0x5d, 0x87, 0xe3, 0xd6, 0x3f, 0xb6, 0x6e
++};
++static const char ecd_prime_curve_name256[] = "prime256v1";
++/*
++priv:
++    84:88:11:3f:a9:c9:9e:23:72:8b:40:cb:a2:b1:88:
++    01:1e:92:48:af:13:2d:9b:33:8e:6d:43:40:30:c7:
++    30:fa
++pub:
++    04:22:58:b6:f9:01:3b:8c:a6:9b:9f:ae:75:fc:73:
++    cf:1b:f0:81:dc:55:a3:cc:5d:81:46:85:06:32:34:
++    99:0d:c5:7e:a1:95:bb:21:73:33:40:4b:35:17:f6:
++    8e:26:61:46:94:2c:4c:ac:9b:20:f8:08:72:25:74:
++    98:66:c4:63:a6
++*/
++static const unsigned char ecd_prime_priv256[] = {
++    0x84, 0x88, 0x11, 0x3f, 0xa9, 0xc9, 0x9e, 0x23, 0x72, 0x8b, 0x40, 0xcb, 0xa2, 0xb1, 0x88,
++    0x01, 0x1e, 0x92, 0x48, 0xaf, 0x13, 0x2d, 0x9b, 0x33, 0x8e, 0x6d, 0x43, 0x40, 0x30, 0xc7,
++    0x30, 0xfa
++};
++static const unsigned char ecd_prime_pub256[] = {
++    0x04, 0x22, 0x58, 0xb6, 0xf9, 0x01, 0x3b, 0x8c, 0xa6, 0x9b, 0x9f, 0xae, 0x75, 0xfc, 0x73,
++    0xcf, 0x1b, 0xf0, 0x81, 0xdc, 0x55, 0xa3, 0xcc, 0x5d, 0x81, 0x46, 0x85, 0x06, 0x32, 0x34,
++    0x99, 0x0d, 0xc5, 0x7e, 0xa1, 0x95, 0xbb, 0x21, 0x73, 0x33, 0x40, 0x4b, 0x35, 0x17, 0xf6,
++    0x8e, 0x26, 0x61, 0x46, 0x94, 0x2c, 0x4c, 0xac, 0x9b, 0x20, 0xf8, 0x08, 0x72, 0x25, 0x74,
++    0x98, 0x66, 0xc4, 0x63, 0xa6
++};
++static const ST_KAT_PARAM ecdsa_prime_key256[] = {
++    ST_KAT_PARAM_UTF8STRING(OSSL_PKEY_PARAM_GROUP_NAME, ecd_prime_curve_name256),
++    ST_KAT_PARAM_OCTET(OSSL_PKEY_PARAM_PUB_KEY, ecd_prime_pub256),
++    ST_KAT_PARAM_BIGNUM(OSSL_PKEY_PARAM_PRIV_KEY, ecd_prime_priv256),
++    ST_KAT_PARAM_END()
++};
++static const unsigned char ec256v1_kat_sig[] = {
++0x30, 0x46, 0x02, 0x21, 0x00, 0xc9, 0x11, 0x27, 0x06, 0x51, 0x2b, 0x50, 0x8c, 0x6b, 0xc0, 0xa6,
++0x85, 0xaa, 0xf4, 0x66, 0x0d, 0xe4, 0x54, 0x0a, 0x10, 0xb6, 0x9f, 0x87, 0xfc, 0xa2, 0xbc, 0x8f,
++0x3c, 0x58, 0xb4, 0xe9, 0x41, 0x02, 0x21, 0x00, 0xc9, 0x72, 0x94, 0xa9, 0xdd, 0x52, 0xca, 0x21,
++0x82, 0x66, 0x7a, 0x68, 0xcb, 0x1e, 0x3b, 0x12, 0x71, 0x4d, 0x56, 0xb5, 0xb7, 0xdd, 0xca, 0x2b,
++0x18, 0xa3, 0xa7, 0x08, 0x0d, 0xfa, 0x9c, 0x66
++};
+ # ifndef OPENSSL_NO_EC2M
+ static const char ecd_bin_curve_name[] = "sect233r1";
+ static const unsigned char ecd_bin_priv[] = {
+@@ -1571,8 +1715,42 @@ static const ST_KAT_SIGN st_kat_sign_tes
+         ecdsa_prime_key,
+         /*
+          * The ECDSA signature changes each time due to it using a random k.
+-         * So there is no expected KAT for this case.
++         * We provide this value in our build
++         */
++        ITM(ec224r1_kat_sig)
++    },
++    {
++        OSSL_SELF_TEST_DESC_SIGN_ECDSA,
++        "EC",
++        "SHA-256",
++        ecdsa_prime_key384,
++        /*
++         * The ECDSA signature changes each time due to it using a random k.
++         * We provide this value in our build
++         */
++        ITM(ec384r1_kat_sig)
++    },
++    {
++        OSSL_SELF_TEST_DESC_SIGN_ECDSA,
++        "EC",
++        "SHA-256",
++        ecdsa_prime_key521,
++        /*
++         * The ECDSA signature changes each time due to it using a random k.
++         * We provide this value in our build
++         */
++        ITM(ec521r1_kat_sig)
++    },
++    {
++        OSSL_SELF_TEST_DESC_SIGN_ECDSA,
++        "EC",
++        "SHA-256",
++        ecdsa_prime_key256,
++        /*
++         * The ECDSA signature changes each time due to it using a random k.
++         * We provide this value in our build
+          */
++        ITM(ec256v1_kat_sig)
+     },
+ # ifndef OPENSSL_NO_EC2M
+     {
+diff -up openssl-3.0.1/crypto/ec/ecp_s390x_nistp.c.fipskat openssl-3.0.1/crypto/ec/ecp_s390x_nistp.c
+--- openssl-3.0.1/crypto/ec/ecp_s390x_nistp.c.fipskat	2022-05-30 14:48:53.180999124 +0200
++++ openssl-3.0.1/crypto/ec/ecp_s390x_nistp.c	2022-05-30 14:58:52.841286228 +0200
+@@ -44,6 +44,10 @@
+ #define S390X_OFF_RN(n)                 (4 * n)
+ #define S390X_OFF_Y(n)                  (4 * n)
+ 
++#ifdef FIPS_MODULE
++extern int REDHAT_FIPS_signature_st;
++#endif
++
+ static int ec_GFp_s390x_nistp_mul(const EC_GROUP *group, EC_POINT *r,
+                                   const BIGNUM *scalar,
+                                   size_t num, const EC_POINT *points[],
+@@ -183,11 +187,21 @@ static ECDSA_SIG *ecdsa_s390x_nistp_sign
+          * because kdsa instruction constructs an in-range, invertible nonce
+          * internally implementing counter-measures for RNG weakness.
+          */
++#ifdef FIPS_MODULE
++       if (REDHAT_FIPS_signature_st && eckey->sign_kat_k != NULL) {
++           BN_bn2binpad(eckey->sign_kat_k, param + S390X_OFF_RN(len), len);
++           /* Turns KDSA internal nonce-generation off. */
++           fc |= S390X_KDSA_D;
++       } else {
++#endif
+          if (RAND_priv_bytes_ex(eckey->libctx, param + S390X_OFF_RN(len),
+                                 (size_t)len, 0) != 1) {
+              ERR_raise(ERR_LIB_EC, EC_R_RANDOM_NUMBER_GENERATION_FAILED);
+              goto ret;
+          }
++#ifdef FIPS_MODULE
++        }
++#endif
+     } else {
+         /* Reconstruct k = (k^-1)^-1. */
+         if (ossl_ec_group_do_inverse_ord(group, k, kinv, NULL) == 0

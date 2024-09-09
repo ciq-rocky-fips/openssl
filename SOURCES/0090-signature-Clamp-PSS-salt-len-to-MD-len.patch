@@ -1,0 +1,338 @@
+From 9cc914ff3e1fda124bdc76d72ebc9349ec19f8ae Mon Sep 17 00:00:00 2001
+From: Clemens Lang <cllang@redhat.com>
+Date: Fri, 18 Nov 2022 12:35:33 +0100
+Subject: [PATCH 3/3] signature: Clamp PSS salt len to MD len
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+FIPS 186-4 section 5 "The RSA Digital Signature Algorithm", subsection
+5.5 "PKCS #1" says: "For RSASSA-PSS […] the length (in bytes) of the
+salt (sLen) shall satisfy 0 <= sLen <= hLen, where hLen is the length of
+the hash function output block (in bytes)."
+
+Introduce a new option RSA_PSS_SALTLEN_AUTO_DIGEST_MAX and make it the
+default. The new value will behave like RSA_PSS_SALTLEN_AUTO, but will
+not use more than the digest legth when signing, so that FIPS 186-4 is
+not violated. This value has two advantages when compared with
+RSA_PSS_SALTLEN_DIGEST: (1) It will continue to do auto-detection when
+verifying signatures for maximum compatibility, where
+RSA_PSS_SALTLEN_DIGEST would fail for other digest sizes. (2) It will
+work for combinations where the maximum salt length is smaller than the
+digest size, which typically happens with large digest sizes (e.g.,
+SHA-512) and small RSA keys.
+
+Signed-off-by: Clemens Lang <cllang@redhat.com>
+---
+ crypto/rsa/rsa_ameth.c                        | 18 ++++++++-
+ crypto/rsa/rsa_pss.c                          | 26 ++++++++++--
+ doc/man3/EVP_PKEY_CTX_ctrl.pod                | 11 ++++-
+ doc/man7/EVP_SIGNATURE-RSA.pod                |  5 +++
+ include/openssl/core_names.h                  |  1 +
+ include/openssl/rsa.h                         |  3 ++
+ providers/implementations/signature/rsa_sig.c | 40 ++++++++++++++-----
+ test/recipes/25-test_req.t                    |  2 +-
+ 8 files changed, 87 insertions(+), 19 deletions(-)
+
+diff --git a/crypto/rsa/rsa_ameth.c b/crypto/rsa/rsa_ameth.c
+index 61ec53d424..e69a98d116 100644
+--- a/crypto/rsa/rsa_ameth.c
++++ b/crypto/rsa/rsa_ameth.c
+@@ -450,6 +450,7 @@ static RSA_PSS_PARAMS *rsa_ctx_to_pss(EVP_PKEY_CTX *pkctx)
+     const EVP_MD *sigmd, *mgf1md;
+     EVP_PKEY *pk = EVP_PKEY_CTX_get0_pkey(pkctx);
+     int saltlen;
++    int saltlenMax = -1;
+ 
+     if (EVP_PKEY_CTX_get_signature_md(pkctx, &sigmd) <= 0)
+         return NULL;
+@@ -457,14 +458,27 @@ static RSA_PSS_PARAMS *rsa_ctx_to_pss(EVP_PKEY_CTX *pkctx)
+         return NULL;
+     if (EVP_PKEY_CTX_get_rsa_pss_saltlen(pkctx, &saltlen) <= 0)
+         return NULL;
+-    if (saltlen == -1) {
++    if (saltlen == RSA_PSS_SALTLEN_DIGEST) {
+         saltlen = EVP_MD_get_size(sigmd);
+-    } else if (saltlen == -2 || saltlen == -3) {
++    } else if (saltlen == RSA_PSS_SALTLEN_AUTO_DIGEST_MAX) {
++        /* FIPS 186-4 section 5 "The RSA Digital Signature Algorithm",
++         * subsection 5.5 "PKCS #1" says: "For RSASSA-PSS […] the length (in
++         * bytes) of the salt (sLen) shall satisfy 0 <= sLen <= hLen, where
++         * hLen is the length of the hash function output block (in bytes)."
++         *
++         * Provide a way to use at most the digest length, so that the default
++         * does not violate FIPS 186-4. */
++        saltlen = RSA_PSS_SALTLEN_MAX;
++        saltlenMax = EVP_MD_get_size(sigmd);
++    }
++    if (saltlen == RSA_PSS_SALTLEN_MAX || saltlen == RSA_PSS_SALTLEN_AUTO) {
+         saltlen = EVP_PKEY_get_size(pk) - EVP_MD_get_size(sigmd) - 2;
+         if ((EVP_PKEY_get_bits(pk) & 0x7) == 1)
+             saltlen--;
+         if (saltlen < 0)
+             return NULL;
++        if (saltlenMax >= 0 && saltlen > saltlenMax)
++            saltlen = saltlenMax;
+     }
+ 
+     return ossl_rsa_pss_params_create(sigmd, mgf1md, saltlen);
+diff --git a/crypto/rsa/rsa_pss.c b/crypto/rsa/rsa_pss.c
+index 33874bfef8..430c36eb2a 100644
+--- a/crypto/rsa/rsa_pss.c
++++ b/crypto/rsa/rsa_pss.c
+@@ -61,11 +61,12 @@ int RSA_verify_PKCS1_PSS_mgf1(RSA *rsa, const unsigned char *mHash,
+      *      -1      sLen == hLen
+      *      -2      salt length is autorecovered from signature
+      *      -3      salt length is maximized
++     *      -4      salt length is autorecovered from signature
+      *      -N      reserved
+      */
+     if (sLen == RSA_PSS_SALTLEN_DIGEST) {
+         sLen = hLen;
+-    } else if (sLen < RSA_PSS_SALTLEN_MAX) {
++    } else if (sLen < RSA_PSS_SALTLEN_AUTO_DIGEST_MAX) {
+         ERR_raise(ERR_LIB_RSA, RSA_R_SLEN_CHECK_FAILED);
+         goto err;
+     }
+@@ -112,7 +113,9 @@ int RSA_verify_PKCS1_PSS_mgf1(RSA *rsa, const unsigned char *mHash,
+         ERR_raise(ERR_LIB_RSA, RSA_R_SLEN_RECOVERY_FAILED);
+         goto err;
+     }
+-    if (sLen != RSA_PSS_SALTLEN_AUTO && (maskedDBLen - i) != sLen) {
++    if (sLen != RSA_PSS_SALTLEN_AUTO
++            && sLen != RSA_PSS_SALTLEN_AUTO_DIGEST_MAX
++            && (maskedDBLen - i) != sLen) {
+         ERR_raise_data(ERR_LIB_RSA, RSA_R_SLEN_CHECK_FAILED,
+                        "expected: %d retrieved: %d", sLen,
+                        maskedDBLen - i);
+@@ -160,6 +163,7 @@ int RSA_padding_add_PKCS1_PSS_mgf1(RSA *rsa, unsigned char *EM,
+     int hLen, maskedDBLen, MSBits, emLen;
+     unsigned char *H, *salt = NULL, *p;
+     EVP_MD_CTX *ctx = NULL;
++    int sLenMax = -1;
+ 
+     if (mgf1Hash == NULL)
+         mgf1Hash = Hash;
+@@ -172,13 +176,25 @@ int RSA_padding_add_PKCS1_PSS_mgf1(RSA *rsa, unsigned char *EM,
+      *      -1      sLen == hLen
+      *      -2      salt length is maximized
+      *      -3      same as above (on signing)
++     *      -4      salt length is min(hLen, maximum salt length)
+      *      -N      reserved
+      */
++    /* FIPS 186-4 section 5 "The RSA Digital Signature Algorithm", subsection
++     * 5.5 "PKCS #1" says: "For RSASSA-PSS […] the length (in bytes) of the
++     * salt (sLen) shall satisfy 0 <= sLen <= hLen, where hLen is the length of
++     * the hash function output block (in bytes)."
++     *
++     * Provide a way to use at most the digest length, so that the default does
++     * not violate FIPS 186-4. */
+     if (sLen == RSA_PSS_SALTLEN_DIGEST) {
+         sLen = hLen;
+-    } else if (sLen == RSA_PSS_SALTLEN_MAX_SIGN) {
++    } else if (sLen == RSA_PSS_SALTLEN_MAX_SIGN
++            || sLen == RSA_PSS_SALTLEN_AUTO) {
+         sLen = RSA_PSS_SALTLEN_MAX;
+-    } else if (sLen < RSA_PSS_SALTLEN_MAX) {
++    } else if (sLen == RSA_PSS_SALTLEN_AUTO_DIGEST_MAX) {
++        sLen = RSA_PSS_SALTLEN_MAX;
++        sLenMax = hLen;
++    } else if (sLen < RSA_PSS_SALTLEN_AUTO_DIGEST_MAX) {
+         ERR_raise(ERR_LIB_RSA, RSA_R_SLEN_CHECK_FAILED);
+         goto err;
+     }
+@@ -195,6 +211,8 @@ int RSA_padding_add_PKCS1_PSS_mgf1(RSA *rsa, unsigned char *EM,
+     }
+     if (sLen == RSA_PSS_SALTLEN_MAX) {
+         sLen = emLen - hLen - 2;
++        if (sLenMax >= 0 && sLen > sLenMax)
++            sLen = sLenMax;
+     } else if (sLen > emLen - hLen - 2) {
+         ERR_raise(ERR_LIB_RSA, RSA_R_DATA_TOO_LARGE_FOR_KEY_SIZE);
+         goto err;
+diff --git a/doc/man3/EVP_PKEY_CTX_ctrl.pod b/doc/man3/EVP_PKEY_CTX_ctrl.pod
+index 3075eaafd6..9b96f42dbc 100644
+--- a/doc/man3/EVP_PKEY_CTX_ctrl.pod
++++ b/doc/man3/EVP_PKEY_CTX_ctrl.pod
+@@ -270,8 +270,8 @@ EVP_PKEY_CTX_get_rsa_padding() gets the RSA padding mode for I<ctx>.
+ 
+ EVP_PKEY_CTX_set_rsa_pss_saltlen() sets the RSA PSS salt length to I<saltlen>.
+ As its name implies it is only supported for PSS padding. If this function is
+-not called then the maximum salt length is used when signing and auto detection
+-when verifying. Three special values are supported:
++not called then the salt length is maximized up to the digest length when
++signing and auto detection when verifying. Four special values are supported:
+ 
+ =over 4
+ 
+@@ -289,6 +289,13 @@ causes the salt length to be automatically determined based on the
+ B<PSS> block structure when verifying.  When signing, it has the same
+ meaning as B<RSA_PSS_SALTLEN_MAX>.
+ 
++=item B<RSA_PSS_SALTLEN_AUTO_DIGEST_MAX>
++
++causes the salt length to be automatically determined based on the B<PSS> block
++structure when verifying, like B<RSA_PSS_SALTLEN_AUTO>.  When signing, the salt
++length is maximized up to a maximum of the digest length to comply with FIPS
++186-4 section 5.5.
++
+ =back
+ 
+ EVP_PKEY_CTX_get_rsa_pss_saltlen() gets the RSA PSS salt length for I<ctx>.
+diff --git a/doc/man7/EVP_SIGNATURE-RSA.pod b/doc/man7/EVP_SIGNATURE-RSA.pod
+index 1ce32cc443..13d053e262 100644
+--- a/doc/man7/EVP_SIGNATURE-RSA.pod
++++ b/doc/man7/EVP_SIGNATURE-RSA.pod
+@@ -68,6 +68,11 @@ Use the maximum salt length.
+ 
+ Auto detect the salt length.
+ 
++=item "auto-digestmax" (B<OSSL_PKEY_RSA_PSS_SALT_LEN_AUTO_DIGEST_MAX>)
++
++Auto detect the salt length when verifying.  Maximize the salt length up to the
++digest size when signing to comply with FIPS 186-4 section 5.5.
++
+ =back
+ 
+ =back
+diff --git a/include/openssl/core_names.h b/include/openssl/core_names.h
+index 69c59f0b46..5779f41427 100644
+--- a/include/openssl/core_names.h
++++ b/include/openssl/core_names.h
+@@ -399,6 +399,7 @@ extern "C" {
+ #define OSSL_PKEY_RSA_PSS_SALT_LEN_DIGEST "digest"
+ #define OSSL_PKEY_RSA_PSS_SALT_LEN_MAX    "max"
+ #define OSSL_PKEY_RSA_PSS_SALT_LEN_AUTO   "auto"
++#define OSSL_PKEY_RSA_PSS_SALT_LEN_AUTO_DIGEST_MAX "auto-digestmax"
+ 
+ /* Key generation parameters */
+ #define OSSL_PKEY_PARAM_RSA_BITS             OSSL_PKEY_PARAM_BITS
+diff --git a/include/openssl/rsa.h b/include/openssl/rsa.h
+index a55c9727c6..daf55bc6d4 100644
+--- a/include/openssl/rsa.h
++++ b/include/openssl/rsa.h
+@@ -137,6 +137,9 @@ int EVP_PKEY_CTX_set_rsa_keygen_pubexp(EVP_PKEY_CTX *ctx, BIGNUM *pubexp);
+ # define RSA_PSS_SALTLEN_AUTO   -2
+ /* Set salt length to maximum possible */
+ # define RSA_PSS_SALTLEN_MAX    -3
++/* Auto-detect on verify, set salt length to min(maximum possible, digest
++ * length) on sign */
++# define RSA_PSS_SALTLEN_AUTO_DIGEST_MAX  -4
+ /* Old compatible max salt length for sign only */
+ # define RSA_PSS_SALTLEN_MAX_SIGN    -2
+ 
+diff --git a/providers/implementations/signature/rsa_sig.c b/providers/implementations/signature/rsa_sig.c
+index 0c45008a00..1a787d77db 100644
+--- a/providers/implementations/signature/rsa_sig.c
++++ b/providers/implementations/signature/rsa_sig.c
+@@ -191,8 +191,8 @@ static void *rsa_newctx(void *provctx, const char *propq)
+     prsactx->libctx = PROV_LIBCTX_OF(provctx);
+     prsactx->flag_allow_md = 1;
+     prsactx->propq = propq_copy;
+-    /* Maximum for sign, auto for verify */
+-    prsactx->saltlen = RSA_PSS_SALTLEN_AUTO;
++    /* Maximum up to digest length for sign, auto for verify */
++    prsactx->saltlen = RSA_PSS_SALTLEN_AUTO_DIGEST_MAX;
+     prsactx->min_saltlen = -1;
+     return prsactx;
+ }
+@@ -200,13 +200,27 @@ static void *rsa_newctx(void *provctx, const char *propq)
+ static int rsa_pss_compute_saltlen(PROV_RSA_CTX *ctx)
+ {
+     int saltlen = ctx->saltlen;
+- 
++    int saltlenMax = -1;
++
++    /* FIPS 186-4 section 5 "The RSA Digital Signature Algorithm", subsection
++     * 5.5 "PKCS #1" says: "For RSASSA-PSS […] the length (in bytes) of the
++     * salt (sLen) shall satisfy 0 <= sLen <= hLen, where hLen is the length of
++     * the hash function output block (in bytes)."
++     *
++     * Provide a way to use at most the digest length, so that the default does
++     * not violate FIPS 186-4. */
+     if (saltlen == RSA_PSS_SALTLEN_DIGEST) {
+         saltlen = EVP_MD_get_size(ctx->md);
+-    } else if (saltlen == RSA_PSS_SALTLEN_AUTO || saltlen == RSA_PSS_SALTLEN_MAX) {
++    } else if (saltlen == RSA_PSS_SALTLEN_AUTO_DIGEST_MAX) {
++        saltlen = RSA_PSS_SALTLEN_MAX;
++        saltlenMax = EVP_MD_get_size(ctx->md);
++    }
++    if (saltlen == RSA_PSS_SALTLEN_MAX || saltlen == RSA_PSS_SALTLEN_AUTO) {
+         saltlen = RSA_size(ctx->rsa) - EVP_MD_get_size(ctx->md) - 2;
+         if ((RSA_bits(ctx->rsa) & 0x7) == 1)
+             saltlen--;
++        if (saltlenMax >= 0 && saltlen > saltlenMax)
++            saltlen = saltlenMax;
+     }
+     if (saltlen < 0) {
+         ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+@@ -411,8 +425,8 @@ static int rsa_signverify_init(void *vprsactx, void *vrsa,
+ 
+     prsactx->operation = operation;
+ 
+-    /* Maximum for sign, auto for verify */
+-    prsactx->saltlen = RSA_PSS_SALTLEN_AUTO;
++    /* Maximize up to digest length for sign, auto for verify */
++    prsactx->saltlen = RSA_PSS_SALTLEN_AUTO_DIGEST_MAX;
+     prsactx->min_saltlen = -1;
+ 
+     switch (RSA_test_flags(prsactx->rsa, RSA_FLAG_TYPE_MASK)) {
+@@ -1110,6 +1124,9 @@ static int rsa_get_ctx_params(void *vprsactx, OSSL_PARAM *params)
+             case RSA_PSS_SALTLEN_AUTO:
+                 value = OSSL_PKEY_RSA_PSS_SALT_LEN_AUTO;
+                 break;
++            case RSA_PSS_SALTLEN_AUTO_DIGEST_MAX:
++                value = OSSL_PKEY_RSA_PSS_SALT_LEN_AUTO_DIGEST_MAX;
++                break;
+             default:
+                 {
+                     int len = BIO_snprintf(p->data, p->data_size, "%d",
+@@ -1297,6 +1314,8 @@ static int rsa_set_ctx_params(void *vprsactx, const OSSL_PARAM params[])
+                 saltlen = RSA_PSS_SALTLEN_MAX;
+             else if (strcmp(p->data, OSSL_PKEY_RSA_PSS_SALT_LEN_AUTO) == 0)
+                 saltlen = RSA_PSS_SALTLEN_AUTO;
++            else if (strcmp(p->data, OSSL_PKEY_RSA_PSS_SALT_LEN_AUTO_DIGEST_MAX) == 0)
++                saltlen = RSA_PSS_SALTLEN_AUTO_DIGEST_MAX;
+             else
+                 saltlen = atoi(p->data);
+             break;
+@@ -1305,11 +1324,11 @@ static int rsa_set_ctx_params(void *vprsactx, const OSSL_PARAM params[])
+         }
+ 
+         /*
+-         * RSA_PSS_SALTLEN_MAX seems curiously named in this check.
+-         * Contrary to what it's name suggests, it's the currently
+-         * lowest saltlen number possible.
++         * RSA_PSS_SALTLEN_AUTO_DIGEST_MAX seems curiously named in this check.
++         * Contrary to what it's name suggests, it's the currently lowest
++         * saltlen number possible.
+          */
+-        if (saltlen < RSA_PSS_SALTLEN_MAX) {
++        if (saltlen < RSA_PSS_SALTLEN_AUTO_DIGEST_MAX) {
+             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_SALT_LENGTH);
+             return 0;
+         }
+@@ -1317,6 +1336,7 @@ static int rsa_set_ctx_params(void *vprsactx, const OSSL_PARAM params[])
+         if (rsa_pss_restricted(prsactx)) {
+             switch (saltlen) {
+             case RSA_PSS_SALTLEN_AUTO:
++            case RSA_PSS_SALTLEN_AUTO_DIGEST_MAX:
+                 if (prsactx->operation == EVP_PKEY_OP_VERIFY) {
+                     ERR_raise_data(ERR_LIB_PROV, PROV_R_INVALID_SALT_LENGTH,
+                                    "Cannot use autodetected salt length");
+diff --git a/test/recipes/25-test_req.t b/test/recipes/25-test_req.t
+index e615f1b338..35541aed12 100644
+--- a/test/recipes/25-test_req.t
++++ b/test/recipes/25-test_req.t
+@@ -199,7 +199,7 @@ subtest "generating certificate requests with RSA-PSS" => sub {
+         ok(!run(app(["openssl", "req",
+                      "-config", srctop_file("test", "test.cnf"),
+                      "-new", "-out", "testreq-rsapss3.pem", "-utf8",
+-                     "-sigopt", "rsa_pss_saltlen:-4",
++                     "-sigopt", "rsa_pss_saltlen:-5",
+                      "-key", srctop_file("test", "testrsapss.pem")])),
+            "Generating request with expected failure");
+ 
+-- 
+2.38.1
+

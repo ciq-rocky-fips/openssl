@@ -1,0 +1,82 @@
+From 56090fca0a0c8b6cf1782aced0a02349358aae7d Mon Sep 17 00:00:00 2001
+From: Clemens Lang <cllang@redhat.com>
+Date: Fri, 3 Mar 2023 12:22:03 +0100
+Subject: [PATCH 1/2] fips: Use salt >= 16 bytes in PBKDF2 selftest
+
+NIST SP 800-132 [1] section 5.1 says "[t]he length of the
+randomly-generated portion of the salt shall be at least
+128 bits", which implies that the salt for PBKDF2 must be at least 16
+bytes long (see also Appendix A.2.1).
+
+The FIPS 140-3 IG [2] section 10.3.A requires that "the lengths and the
+properties of the Password and Salt parameters, as well as the desired
+length of the Master Key used in a CAST shall be among those supported
+by the module in the approved mode."
+
+As a consequence, the salt length in the self test must be at least 16
+bytes long for FIPS 140-3 compliance. Switch the self test to use the
+only test vector from RFC 6070 that uses salt that is long enough to
+fulfil this requirement. Since RFC 6070 does not provide expected
+results for PBKDF2 with HMAC-SHA256, use the output from [3], which was
+generated with python cryptography, which was tested against the RFC
+6070 vectors with HMAC-SHA1.
+
+ [1]: https://doi.org/10.6028/NIST.SP.800-132
+ [2]: https://csrc.nist.gov/CSRC/media/Projects/cryptographic-module-validation-program/documents/fips%20140-3/FIPS%20140-3%20IG.pdf
+ [3]: https://github.com/brycx/Test-Vector-Generation/blob/master/PBKDF2/pbkdf2-hmac-sha2-test-vectors.md
+
+Signed-off-by: Clemens Lang <cllang@redhat.com>
+
+Reviewed-by: Paul Dale <pauli@openssl.org>
+Reviewed-by: Dmitry Belyavskiy <beldmit@gmail.com>
+Reviewed-by: Tomas Mraz <tomas@openssl.org>
+(Merged from https://github.com/openssl/openssl/pull/20429)
+
+(cherry picked from commit 451cb23c41c90d5a02902b3a77551aa9ee1c6956)
+---
+ providers/fips/self_test_data.inc | 22 ++++++++++++++++------
+ 1 file changed, 16 insertions(+), 6 deletions(-)
+
+diff --git a/providers/fips/self_test_data.inc b/providers/fips/self_test_data.inc
+index 8ae8cd6f4a..03adf28f3c 100644
+--- a/providers/fips/self_test_data.inc
++++ b/providers/fips/self_test_data.inc
+@@ -361,19 +361,29 @@ static const ST_KAT_PARAM x963kdf_params[] = {
+ };
+ 
+ static const char pbkdf2_digest[] = "SHA256";
++/*
++ * Input parameters from RFC 6070, vector 5 (because it is the only one with
++ * a salt >= 16 bytes, which NIST SP 800-132 section 5.1 requires). The
++ * expected output is taken from
++ *   https://github.com/brycx/Test-Vector-Generation/blob/master/PBKDF2/pbkdf2-hmac-sha2-test-vectors.md,
++ * which ran these test vectors with SHA-256.
++ */
+ static const unsigned char pbkdf2_password[] = {
+-    0x70, 0x61, 0x73, 0x73, 0x00, 0x77, 0x6f, 0x72,
+-    0x64
++    0x70, 0x61, 0x73, 0x73, 0x77, 0x6f, 0x72, 0x64, 0x50, 0x41, 0x53, 0x53,
++    0x57, 0x4f, 0x52, 0x44, 0x70, 0x61, 0x73, 0x73, 0x77, 0x6f, 0x72, 0x64
+ };
+ static const unsigned char pbkdf2_salt[] = {
+-    0x73, 0x61, 0x00, 0x6c, 0x74
++    0x73, 0x61, 0x6c, 0x74, 0x53, 0x41, 0x4c, 0x54, 0x73, 0x61, 0x6c, 0x74,
++    0x53, 0x41, 0x4c, 0x54, 0x73, 0x61, 0x6c, 0x74, 0x53, 0x41, 0x4c, 0x54,
++    0x73, 0x61, 0x6c, 0x74, 0x53, 0x41, 0x4c, 0x54, 0x73, 0x61, 0x6c, 0x74
+ };
+ static const unsigned char pbkdf2_expected[] = {
+-    0x89, 0xb6, 0x9d, 0x05, 0x16, 0xf8, 0x29, 0x89,
+-    0x3c, 0x69, 0x62, 0x26, 0x65, 0x0a, 0x86, 0x87,
++    0x34, 0x8c, 0x89, 0xdb, 0xcb, 0xd3, 0x2b, 0x2f, 0x32, 0xd8, 0x14, 0xb8,
++    0x11, 0x6e, 0x84, 0xcf, 0x2b, 0x17, 0x34, 0x7e, 0xbc, 0x18, 0x00, 0x18,
++    0x1c
+ };
+ static int pbkdf2_iterations = 4096;
+-static int pbkdf2_pkcs5 = 1;
++static int pbkdf2_pkcs5 = 0;
+ static const ST_KAT_PARAM pbkdf2_params[] = {
+     ST_KAT_PARAM_UTF8STRING(OSSL_KDF_PARAM_DIGEST, pbkdf2_digest),
+     ST_KAT_PARAM_OCTET(OSSL_KDF_PARAM_PASSWORD, pbkdf2_password),
+-- 
+2.39.2
+

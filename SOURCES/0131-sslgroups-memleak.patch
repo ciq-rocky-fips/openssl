@@ -1,0 +1,12 @@
+diff --git a/ssl/t1_lib.c b/ssl/t1_lib.c
+index 51c2283db915d..0928a30c2d37b 100644
+--- a/ssl/t1_lib.c
++++ b/ssl/t1_lib.c
+@@ -765,6 +765,7 @@ int tls1_set_groups_list(SSL_CTX *ctx, uint16_t **pext, size_t *pextlen,
+     tmparr = OPENSSL_memdup(gcb.gid_arr, gcb.gidcnt * sizeof(*tmparr));
+     if (tmparr == NULL)
+         goto end;
++    OPENSSL_free(*pext);
+     *pext = tmparr;
+     *pextlen = gcb.gidcnt;
+     ret = 1;

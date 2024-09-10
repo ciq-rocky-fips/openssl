@@ -37,8 +37,8 @@ jobs:
           cat ./RESULTS/build.log
 
           # Extract the FIPS module
-          mkdir RESULTS/fipsmodule
-          cd RESULTS/fipsmodule
+          mkdir RESULTS/{tmp,fips_module}
+          cd RESULTS/tmp
           if [ -z "$DEBUG" ]; then
               echo "Extracting FIPS module"
               rpm2cpio ../openssl-libs-3*ciqlts*.x86_64.rpm | cpio -idmv ./usr/lib64/\*/fips.so
@@ -47,9 +47,13 @@ jobs:
               echo Creating fake fips module
               touch usr/lib64/ossl-modules/fips.so
           fi
-          RPMVERSION=$(ls ../openssl-libs-3*ciqlts*.x86_64.rpm | sed -e 's/.*openssl-libs-\(3.*\)\.rpm/\1/')
+          mv ./usr/lib64/ossl-modules/fips.so ./fips.so.x86_64
+          rm -rf usr
+          cd ..
+          RPMVERSION=$(ls ../openssl-libs-3*ciqlts*.x86_64.rpm | sed -e 's/.*openssl-libs-\(3.*\)\.x86_64\.rpm/\1/')
           echo "Creating fips module tarball"
-          tar -czf ../fips_module_CIQ-${RPMVERSION}.tar.gz usr
+          tar -czf fips_module-${RPMVERSION}.tar.gz fips_module
+          sha256sum fips_module-${RPMVERSION}.tar.gz > fips_module-${RPMVERSION}.tar.gz.sha256
 
       - uses: actions/upload-artifact@v4
         with:
@@ -60,4 +64,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: fips_module_tarball
-          path: RESULTS/*.tar.gz
+          path: |
+            RESULTS/*.tar.gz
+            RESULTS/*.tar.gz.sha256

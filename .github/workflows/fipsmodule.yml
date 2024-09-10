@@ -34,7 +34,6 @@ jobs:
           fi
           echo "Contents of result directory"
           ls -l ./RESULTS
-          cat ./RESULTS/build.log
 
           # Extract the FIPS module
           mkdir RESULTS/{tmp,fips_module}
@@ -47,8 +46,7 @@ jobs:
               echo Creating fake fips module
               touch usr/lib64/ossl-modules/fips.so
           fi
-          mv ./usr/lib64/ossl-modules/fips.so ./fips.so.x86_64
-          rm -rf usr
+          mv ./usr/lib64/ossl-modules/fips.so ../fips_module/fips.so.x86_64
           cd ..
           RPMVERSION=$(ls ../openssl-libs-3*ciqlts*.x86_64.rpm | sed -e 's/.*openssl-libs-\(3.*\)\.x86_64\.rpm/\1/')
           echo "Creating fips module tarball"

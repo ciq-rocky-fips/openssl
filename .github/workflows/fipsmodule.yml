@@ -48,7 +48,7 @@ jobs:
           fi
           mv ./usr/lib64/ossl-modules/fips.so ../fips_module/fips.so.x86_64
           cd ..
-          RPMVERSION=$(ls ../openssl-libs-3*ciqlts*.x86_64.rpm | sed -e 's/.*openssl-libs-\(3.*\)\.x86_64\.rpm/\1/')
+          RPMVERSION=$(ls ./openssl-libs-3*ciqlts*.x86_64.rpm | sed -e 's/.*openssl-libs-\(3.*\)\.x86_64\.rpm/\1/')
           echo "Creating fips module tarball"
           tar -czf fips_module-${RPMVERSION}.tar.gz fips_module
           sha256sum fips_module-${RPMVERSION}.tar.gz > fips_module-${RPMVERSION}.tar.gz.sha256

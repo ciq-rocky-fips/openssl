@@ -1,24 +1,63 @@
 name: Build OpenSSL FIPS module
 
 on:
-    push:
-    pull_request:
-        branches: [ dist-git ]
+  push:
+  pull_request:
+    branches: [dist-git]
 
 jobs:
-    mockBuild:
-        runs-on: ubuntu-latest
-        container:
-            image: quay.io/rockylinux/rockylinux:9
-            options: --privileged
-        steps:
-            - uses: actions/checkout@v3
-            - name: Build openssl rpm
-              run: |
-                echo "Installing mock"
-                dnf -y install epel-release
-                dnf -y install mock rpm-build
-                echo "Running mock build"
-                mock -r .mock-config/rocky-lts92-x86_64.cfg --spec="./SPECS/openssl.spec" --sources="./SOURCES"
-                echo "Extracting FIPS module from RPM"
-                
+  mockBuild:
+    runs-on: ubuntu-latest
+    container:
+      image: quay.io/rockylinux/rockylinux:9
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build openssl rpm
+        run: |
+          unset DEBUG
+          mkdir -p RESULTS
+          if [ -z "$DEBUG" ]; then
+              echo "Installing mock"
+              dnf -y install epel-release
+              dnf -y install mock rpm-build
+              echo "Running mock build"
+              mock -v -r .mock-config/rocky-lts92-x86_64.cfg \
+                --spec="./SPECS/openssl.spec" \
+                --sources="./SOURCES" \
+                --resultdir="./RESULTS"
+          else
+              set -x
+              set +e
+              touch RESULTS/openssl-libs-3.0.7-27.el9_2.ciqlts.0.2.1.x86_64.rpm
+              echo "Fake build log for your sprog" > RESULTS/build.log
+          fi
+          echo "Contents of result directory"
+          ls -l ./RESULTS
+          cat ./RESULTS/build.log
+
+          # Extract the FIPS module
+          mkdir RESULTS/fipsmodule
+          cd RESULTS/fipsmodule
+          if [ -z "$DEBUG" ]; then
+              echo "Extracting FIPS module"
+              rpm2cpio ../openssl-libs-3*ciqlts*.x86_64.rpm | cpio -idmv ./usr/lib64/\*/fips.so
+          else
+              mkdir -p usr/lib64/ossl-modules
+              echo Creating fake fips module
+              touch usr/lib64/ossl-modules/fips.so
+          fi
+          RPMVERSION=$(ls ../openssl-libs-3*ciqlts*.x86_64.rpm | sed -e 's/.*openssl-libs-\(3.*\)\.rpm/\1/')
+          echo "Creating fips module tarball"
+          tar -czf ../fips_module_CIQ-${RPMVERSION}.tar.gz usr
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fips_module_RESULTS
+          path: |
+            RESULTS/*.log
+            RESULTS/*.rpm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fips_module_tarball
+          path: RESULTS/*.tar.gz

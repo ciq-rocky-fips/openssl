@@ -354,7 +354,7 @@ export HASHBANGPERL=/usr/bin/perl
 	zlib enable-camellia enable-seed enable-rfc3779 enable-sctp \
 	enable-cms enable-md2 enable-rc5 enable-ktls enable-fips\
 	no-mdc2 no-ec2m no-sm2 no-sm4 enable-buildtest-c++\
-	shared  ${sslarch} $RPM_OPT_FLAGS '-DDEVRANDOM="\"/dev/urandom\"" -DROCKY_FIPS_NAME="\"Rocky Enterprise Linux 9 - OpenSSL FIPS Provider\"" -DROCKY_FIPS_VERSION="\"Rocky9.20250907\""'\
+	shared  ${sslarch} $RPM_OPT_FLAGS '-DDEVRANDOM="\"/dev/urandom\"" -DROCKY_FIPS_NAME="\"Rocky Enterprise Linux 9 - OpenSSL FIPS Provider\"" -DROCKY_FIPS_VERSION="\"Rocky9.20240907\""'\
 	-Wl,--allow-multiple-definition
 
 # Do not run this in a production package the FIPS symbols must be patched-in

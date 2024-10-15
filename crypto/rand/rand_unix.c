@@ -220,7 +220,9 @@ void rand_pool_keep_random_devices_open(int keep)
 #    error "OS seeding requires DEVRANDOM to be configured"
 #   endif
 #   define OPENSSL_RAND_SEED_GETRANDOM
-#   define OPENSSL_RAND_SEED_DEVRANDOM
+#   if defined(OPENSSL_RAND_SEED_DEVRANDOM)
+#     undef OPENSSL_RAND_SEED_DEVRANDOM
+#   endif
 #  endif
 
 #  if defined(OPENSSL_RAND_SEED_LIBRANDOM)

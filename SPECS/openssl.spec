@@ -556,8 +556,8 @@ ln -s /etc/crypto-policies/back-ends/openssl_fips.config $RPM_BUILD_ROOT%{_sysco
 %ldconfig_scriptlets libs
 
 %changelog
-* Thu Sep 7 2024 Jason Rodriguez <jrodriguez@ciq.com> - 3.0.7-27.0.2.2
-- Rocky FIPS provider updating Rocky references 
+* Tue Oct 15 2024 Jason Rodriguez <jrodriguez@ciq.com> - 3.0.7-27.0.2.2
+- Rocky FIPS provider updating Rocky references
 
 * Thu Sep 7 2024 Jason Rodriguez <jrodriguez@ciq.com> - 3.0.7-27.0.2.1
 - Rocky FIPS provider rebranding

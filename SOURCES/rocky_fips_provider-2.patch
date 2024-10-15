@@ -1,0 +1,99 @@
+From b078462e3f3bfb16ca0f92e05ef3724930a29a08 Mon Sep 17 00:00:00 2001
+From: Jason Rodriguez <jrodriguez@ciq.com>
+Date: Tue, 15 Oct 2024 19:04:49 -0400
+Subject: [PATCH] removing Enterprise from Rocky references
+
+---
+ apps/fipsinstall.c                  |  2 +-
+ doc/man1/openssl-fipsinstall.pod.in |  2 +-
+ doc/man5/fips_config.pod            |  4 ++--
+ doc/man7/fips_module_indicators.pod | 10 +++++-----
+ 4 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/apps/fipsinstall.c b/apps/fipsinstall.c
+index 1564406a..3de2bf51 100644
+--- a/apps/fipsinstall.c
++++ b/apps/fipsinstall.c
+@@ -311,7 +311,7 @@ int fipsinstall_main(int argc, char **argv)
+     EVP_MAC *mac = NULL;
+     CONF *conf = NULL;
+ 
+-    BIO_printf(bio_err, "This command is not enabled in the Rocky Enterprise Linux OpenSSL build, please consult Rocky documentation to learn how to enable FIPS mode\n");
++    BIO_printf(bio_err, "This command is not enabled in the Rocky Linux OpenSSL build, please consult Rocky documentation to learn how to enable FIPS mode\n");
+     return 1;
+ 
+     if ((opts = sk_OPENSSL_STRING_new_null()) == NULL)
+diff --git a/doc/man1/openssl-fipsinstall.pod.in b/doc/man1/openssl-fipsinstall.pod.in
+index db12d117..4e3bd46a 100644
+--- a/doc/man1/openssl-fipsinstall.pod.in
++++ b/doc/man1/openssl-fipsinstall.pod.in
+@@ -11,7 +11,7 @@ B<openssl fipsinstall>
+ 
+ =head1 DESCRIPTION
+ This command is disabled.
+-Please consult Rocky Enterprise Linux documentation to learn how to correctly
++Please consult Rocky Linux documentation to learn how to correctly
+ enable FIPS mode on Rocky Enterprise
+ 
+ =head1 COPYRIGHT
+diff --git a/doc/man5/fips_config.pod b/doc/man5/fips_config.pod
+index 05495188..0ab06b77 100644
+--- a/doc/man5/fips_config.pod
++++ b/doc/man5/fips_config.pod
+@@ -6,12 +6,12 @@ fips_config - OpenSSL FIPS configuration
+ 
+ =head1 DESCRIPTION
+ 
+-This command is disabled in Rocky Enterprise Linux. The FIPS provider is
++This command is disabled in Rocky Linux. The FIPS provider is
+ automatically loaded when the system is booted in FIPS mode, or when the
+ environment variable B<OPENSSL_FORCE_FIPS_MODE> is set. See the documentation
+ for more information.
+ 
+-Rocky Enterprise Linux uses a supplementary config for FIPS module located in
++Rocky Linux uses a supplementary config for FIPS module located in
+ OpenSSL configuration directory and managed by crypto policies. If present, it
+ should have format
+ 
+diff --git a/doc/man7/fips_module_indicators.pod b/doc/man7/fips_module_indicators.pod
+index dd508ae7..eb68b308 100644
+--- a/doc/man7/fips_module_indicators.pod
++++ b/doc/man7/fips_module_indicators.pod
+@@ -6,7 +6,7 @@ fips_module_indicators - Rocky OpenSSL FIPS module indicators guide
+ 
+ =head1 DESCRIPTION
+ 
+-This guide documents how the Rocky Enterprise Linux 9 OpenSSL FIPS provider
++This guide documents how the Rocky Linux 9 OpenSSL FIPS provider
+ implements Approved Security Service Indicators according to the FIPS 140-3
+ Implementation Guidelines, section 2.4.C. See
+ L<https://csrc.nist.gov/CSRC/media/Projects/cryptographic-module-validation-program/documents/fips%20140-3/FIPS%20140-3%20IG.pdf>
+@@ -41,8 +41,8 @@ dlsym(3).
+     }
+ 
+     const OSSL_RL_FIPSINDICATOR_ALORITHM *(*rocky_ossl_query_fipsindicator)(int) \
+-        = dlsym(provider, "redhat_ossl_query_fipsindicator");
+-    if (redhat_ossl_query_fipsindicator == NULL) {
++        = dlsym(provider, "rocky_ossl_query_fipsindicator");
++    if (rocky_ossl_query_fipsindicator == NULL) {
+         fprintf(stderr, "%s\n", dlerror());
+         fprintf(stderr, "Does your copy of fips.so have the required Rocky"
+                         " patches?\n");
+@@ -54,7 +54,7 @@ public. Install the I<openssl-debugsource> package from the I<BaseOS-debuginfo>
+ repository using I<dnf debuginfo-install openssl> and include
+ I</usr/src/debug/openssl-3.*/> in the compiler's include path.
+ 
+-I<redhat_ossl_query_fipsindicator> expects an operation ID as its only
++I<rocky_ossl_query_fipsindicator> expects an operation ID as its only
+ argument. Currently, the only supported operation ID is I<OSSL_OP_SIGNATURE> to
+ obtain the indicators for signature operations. On success, the return value is
+ a pointer to an array of I<OSSL_RL_FIPSINDICATOR_STRUCT>s. On failure, NULL is
+@@ -79,7 +79,7 @@ I<algorithm> contains the algorithm name to search for:
+ 
+     const OSSL_RL_FIPSINDICATOR_DISPATCH *indicator_dispatch = NULL;
+     const OSSL_RL_FIPSINDICATOR_ALGORITHM *indicator =
+-        redhat_ossl_query_fipsindicator(operation_id);
++        rocky_ossl_query_fipsindicator(operation_id);
+     if (indicator == NULL) {
+         fprintf(stderr, "No indicator for operation, probably using implicit"
+                         " indicators.\n");

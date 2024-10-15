@@ -29,7 +29,7 @@ print(string.sub(hash, 0, 16))
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 3.0.7
-Release: 27%{?dist}.0.2.1
+Release: 27%{?dist}.0.2.2
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -216,6 +216,7 @@ Patch134: 0134-engine-based-ECDHE-kex.patch
 Patch135: 0135-CVE-2024-0727.patch
 #FIPS PROVIDER rebranding
 Patch200: rocky_fips_provider.patch
+Patch201: rocky_fips_provider-2.patch
 
 License: ASL 2.0
 URL: http://www.openssl.org/
@@ -354,7 +355,7 @@ export HASHBANGPERL=/usr/bin/perl
 	zlib enable-camellia enable-seed enable-rfc3779 enable-sctp \
 	enable-cms enable-md2 enable-rc5 enable-ktls enable-fips\
 	no-mdc2 no-ec2m no-sm2 no-sm4 enable-buildtest-c++\
-	shared  ${sslarch} $RPM_OPT_FLAGS '-DDEVRANDOM="\"/dev/urandom\"" -DROCKY_FIPS_NAME="\"Rocky Enterprise Linux 9 - OpenSSL FIPS Provider\"" -DROCKY_FIPS_VERSION="\"Rocky9.20240907\""'\
+	shared  ${sslarch} $RPM_OPT_FLAGS '-DDEVRANDOM="\"/dev/urandom\"" -DROCKY_FIPS_NAME="\"Rocky Linux 9 - OpenSSL FIPS Provider\"" -DROCKY_FIPS_VERSION="\"Rocky9.20241015\""'\
 	-Wl,--allow-multiple-definition
 
 # Do not run this in a production package the FIPS symbols must be patched-in
@@ -555,6 +556,9 @@ ln -s /etc/crypto-policies/back-ends/openssl_fips.config $RPM_BUILD_ROOT%{_sysco
 %ldconfig_scriptlets libs
 
 %changelog
+* Thu Sep 7 2024 Jason Rodriguez <jrodriguez@ciq.com> - 3.0.7-27.0.2.2
+- Rocky FIPS provider updating Rocky references 
+
 * Thu Sep 7 2024 Jason Rodriguez <jrodriguez@ciq.com> - 3.0.7-27.0.2.1
 - Rocky FIPS provider rebranding
 

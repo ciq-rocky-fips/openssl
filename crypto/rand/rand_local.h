@@ -41,7 +41,7 @@
  *
  * The value is in bytes.
  */
-#define CRNGT_BUFSIZ    16
+#define CRNGT_BUFSIZ    64
 
 /*
  * Maximum input size for the DRBG (entropy, nonce, personalization string)

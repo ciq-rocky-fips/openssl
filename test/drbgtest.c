@@ -682,7 +682,7 @@ static int test_drbg_reseed(int expect_success,
 
     if (expect_success == 1) {
         /* Test whether all three reseed counters are synchronized */
-        if (!TEST_int_eq(public->reseed_counter, master->reseed_counter)
+        if (!TEST_int_eq(public->reseed_counter, master->reseed_counter - 1)
             || !TEST_int_eq(private->reseed_counter, master->reseed_counter))
             return 0;
 
@@ -725,7 +725,7 @@ static int test_drbg_reseed_after_fork(RAND_DRBG *master,
     }
 
     /* I'm the child; check whether all three DRBGs reseed. */
-    if (!TEST_true(test_drbg_reseed(1, master, public, private, 1, 1, 1, 0)))
+    if (!TEST_true(test_drbg_reseed(1, master, public, private, 2, 1, 1, 0)))
         status = 1;
 
     /* Remove hooks  */
@@ -785,7 +785,7 @@ static int test_rand_drbg_reseed(void)
     /*
      * Test initial seeding of shared DRBGs
      */
-    if (!TEST_true(test_drbg_reseed(1, master, public, private, 1, 1, 1, 0)))
+    if (!TEST_true(test_drbg_reseed(1, master, public, private, 3, 1, 1, 0)))
         goto error;
     reset_drbg_hook_ctx();
 
@@ -793,7 +793,7 @@ static int test_rand_drbg_reseed(void)
     /*
      * Test initial state of shared DRBGs
      */
-    if (!TEST_true(test_drbg_reseed(1, master, public, private, 0, 0, 0, 0)))
+    if (!TEST_true(test_drbg_reseed(1, master, public, private, 2, 1, 1, 0)))
         goto error;
     reset_drbg_hook_ctx();
 
@@ -802,7 +802,7 @@ static int test_rand_drbg_reseed(void)
      * reseed counters differ from the master's reseed counter.
      */
     master->reseed_counter++;
-    if (!TEST_true(test_drbg_reseed(1, master, public, private, 0, 1, 1, 0)))
+    if (!TEST_true(test_drbg_reseed(1, master, public, private, 2, 1, 1, 0)))
         goto error;
     reset_drbg_hook_ctx();
 
@@ -812,7 +812,7 @@ static int test_rand_drbg_reseed(void)
      */
     master->reseed_counter++;
     private->reseed_counter++;
-    if (!TEST_true(test_drbg_reseed(1, master, public, private, 0, 1, 0, 0)))
+    if (!TEST_true(test_drbg_reseed(1, master, public, private, 2, 1, 1, 0)))
         goto error;
     reset_drbg_hook_ctx();
 
@@ -822,7 +822,7 @@ static int test_rand_drbg_reseed(void)
      */
     master->reseed_counter++;
     public->reseed_counter++;
-    if (!TEST_true(test_drbg_reseed(1, master, public, private, 0, 0, 1, 0)))
+    if (!TEST_true(test_drbg_reseed(1, master, public, private, 2, 1, 1, 0)))
         goto error;
     reset_drbg_hook_ctx();
 
@@ -844,7 +844,7 @@ static int test_rand_drbg_reseed(void)
      */
     before_reseed = time(NULL);
     RAND_add(rand_add_buf, sizeof(rand_add_buf), sizeof(rand_add_buf));
-    if (!TEST_true(test_drbg_reseed(1, master, public, private, 1, 1, 1,
+    if (!TEST_true(test_drbg_reseed(1, master, public, private, 3, 1, 1,
                                     before_reseed)))
         goto error;
     reset_drbg_hook_ctx();

@@ -163,6 +163,21 @@ size_t rand_drbg_get_entropy(RAND_DRBG *drbg,
 
         if (buffer != NULL) {
             size_t bytes = 0;
+            RAND_DRBG *master_drbg = RAND_DRBG_get0_master();
+
+            /*
+             * FIPS 140-3 IG D.K Resolution 5. Requires that the master
+             * DRBG shall have prediction resistance enabled, or shall
+             * be reseeded before requesting an output.
+             *
+             * Prediction resistance isn't implemented, but setting
+             * prediction_resistance = 1 here causes RAND_DRBG_reseed()
+             * to be called inside RAND_DRBG_generate().
+             *
+             */
+            if (drbg->parent == master_drbg) {
+                 prediction_resistance = 1;
+            }
 
             /*
              * Get random data from parent. Include our address as additional input,
@@ -189,6 +204,13 @@ size_t rand_drbg_get_entropy(RAND_DRBG *drbg,
         }
 
     } else {
+#if 0
+	/*
+	 * Setting prediction_resistance = 1 for master (above)
+	 * causes this to fail with not supported. We don't need
+	 * prediction resistance as we are reseeding the master
+	 * DRBG (above).
+	 */
         if (prediction_resistance) {
             /*
              * We don't have any entropy sources that comply with the NIST
@@ -199,6 +221,7 @@ size_t rand_drbg_get_entropy(RAND_DRBG *drbg,
                     RAND_R_PREDICTION_RESISTANCE_NOT_SUPPORTED);
             goto err;
         }
+#endif
 
         /* Get entropy by polling system entropy sources. */
         entropy_available = rand_pool_acquire_entropy(pool);

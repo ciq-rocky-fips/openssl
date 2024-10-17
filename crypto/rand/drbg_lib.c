@@ -295,7 +295,12 @@ int RAND_DRBG_instantiate(RAND_DRBG *drbg,
 {
     unsigned char *nonce = NULL, *entropy = NULL;
     size_t noncelen = 0, entropylen = 0;
-    size_t min_entropy = drbg->strength;
+    /*
+     * FIPS 140-3: the draft SP800-90C requires requested entropy
+     * (3 * strength) /2 bits during seeding when using a CTR_DRBG
+     * with a derivation function.
+     */
+    size_t min_entropy = drbg->strength + (drbg->strength / 2);
     size_t min_entropylen = drbg->min_entropylen;
     size_t max_entropylen = drbg->max_entropylen;
 
@@ -327,7 +332,6 @@ int RAND_DRBG_instantiate(RAND_DRBG *drbg,
      * We do this in case a nonce is require and get_nonce is NULL.
      */
     if (drbg->min_noncelen > 0 && drbg->get_nonce == NULL) {
-        min_entropy += drbg->strength / 2;
         min_entropylen += drbg->min_noncelen;
         max_entropylen += drbg->max_noncelen;
     }
@@ -977,7 +981,12 @@ size_t rand_drbg_seedlen(RAND_DRBG *drbg)
      * the following requirements, which follow from the calculations
      * in RAND_DRBG_instantiate().
      */
-    size_t min_entropy = drbg->strength;
+    /*
+     * FIPS 140-3: the draft SP800-90C requires requested entropy
+     * (3 * strength) /2 bits during seeding when using a CTR_DRBG
+     * with a derivation function.
+     */
+    size_t min_entropy = drbg->strength + (drbg->strength / 2);
     size_t min_entropylen = drbg->min_entropylen;
 
     /*
@@ -985,7 +994,6 @@ size_t rand_drbg_seedlen(RAND_DRBG *drbg)
      * get_nonce callback, see comment in RAND_DRBG_instantiate().
      */
     if (drbg->min_noncelen > 0 && drbg->get_nonce == NULL) {
-        min_entropy += drbg->strength / 2;
         min_entropylen += drbg->min_noncelen;
     }
 

@@ -214,6 +214,8 @@ Patch133: 0133-CVE-2023-6237.patch
 Patch134: 0134-engine-based-ECDHE-kex.patch
 # https://github.com/openssl/openssl/pull/23362
 Patch135: 0135-CVE-2024-0727.patch
+# https://github.com/openssl/openssl/commit/05f360d9e849a1b277db628f1f13083a7f8dd04f
+Patch136:             0136-CVE-2024-6119.patch
 #FIPS PROVIDER rebranding
 Patch200: rocky_fips_provider.patch
 Patch201: rocky_fips_provider-2.patch
@@ -558,6 +560,9 @@ ln -s /etc/crypto-policies/back-ends/openssl_fips.config $RPM_BUILD_ROOT%{_sysco
 %changelog
 * Tue Oct 15 2024 Jason Rodriguez <jrodriguez@ciq.com> - 3.0.7-27.0.2.2
 - Rocky FIPS provider updating Rocky references
+- Adding requirment for FIPS provider
+- Cleaning up FIPS references
+- Adding patch for CVE-2024-6119
 
 * Thu Sep 7 2024 Jason Rodriguez <jrodriguez@ciq.com> - 3.0.7-27.0.2.1
 - Rocky FIPS provider rebranding

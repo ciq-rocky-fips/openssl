@@ -110,6 +110,8 @@ int FIPS_selftest(void)
         rv = 0;
     if (!FIPS_selftest_kdf())
         rv = 0;
+    if (!FIPS_selftest_eddsa())
+        rv = 0;
 
     return rv;
 }

@@ -127,6 +127,7 @@ static ERR_STRING_DATA FIPS_str_functs[] = {
     {ERR_FUNC(FIPS_F_RSA_OSSL_PUBLIC_DECRYPT), "rsa_ossl_public_decrypt"},
     {ERR_FUNC(FIPS_F_RSA_OSSL_PUBLIC_ENCRYPT), "rsa_ossl_public_encrypt"},
     {ERR_FUNC(FIPS_F_FIPS_SELFTEST_TLS13), "FIPS_selftest_tls13"},    
+    {ERR_FUNC(FIPS_F_FIPS_SELFTEST_EDDSA), "FIPS_selftest_eddsa"},
     {0, NULL}
 };
 

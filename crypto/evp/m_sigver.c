@@ -182,9 +182,6 @@ int EVP_DigestSign(EVP_MD_CTX *ctx, unsigned char *sigret, size_t *siglen,
                    const unsigned char *tbs, size_t tbslen)
 {
     if (ctx->pctx->pmeth->digestsign != NULL) {
-        /* digestsign is only used for ed25519 and ed448 signatures, so should
-         * be safe to disapprove it completely */
-        fips_sli_disapprove_EVP_MD_CTX(ctx);
         return ctx->pctx->pmeth->digestsign(ctx, sigret, siglen, tbs, tbslen);
     }
     if (sigret != NULL && EVP_DigestSignUpdate(ctx, tbs, tbslen) <= 0)
@@ -241,9 +238,6 @@ int EVP_DigestVerify(EVP_MD_CTX *ctx, const unsigned char *sigret,
                      size_t siglen, const unsigned char *tbs, size_t tbslen)
 {
     if (ctx->pctx->pmeth->digestverify != NULL) {
-        /* digestverify is only used for ed25519 and ed448 signatures, so should
-         * be safe to disapprove it completely */
-        fips_sli_disapprove_EVP_MD_CTX(ctx);
         return ctx->pctx->pmeth->digestverify(ctx, sigret, siglen, tbs, tbslen);
     }
     if (EVP_DigestVerifyUpdate(ctx, tbs, tbslen) <= 0)

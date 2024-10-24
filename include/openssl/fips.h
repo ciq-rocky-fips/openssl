@@ -152,6 +152,7 @@ extern "C" {
 # define FIPS_F_RSA_OSSL_PUBLIC_DECRYPT                   119
 # define FIPS_F_RSA_OSSL_PUBLIC_ENCRYPT                   120
 # define FIPS_F_FIPS_SELFTEST_TLS13                       163
+# define FIPS_F_FIPS_SELFTEST_EDDSA                       164
 
 /* Reason codes. */
 # define FIPS_R_ADDITIONAL_INPUT_ERROR_UNDETECTED         150

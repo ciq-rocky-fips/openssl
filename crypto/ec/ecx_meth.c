@@ -822,7 +822,7 @@ static int pkey_ecd_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
 }
 
 const EVP_PKEY_METHOD ed25519_pkey_meth = {
-    EVP_PKEY_ED25519, EVP_PKEY_FLAG_SIGCTX_CUSTOM,
+    EVP_PKEY_ED25519, EVP_PKEY_FLAG_SIGCTX_CUSTOM | EVP_PKEY_FLAG_FIPS,
     0, 0, 0, 0, 0, 0,
     pkey_ecx_keygen,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -833,7 +833,7 @@ const EVP_PKEY_METHOD ed25519_pkey_meth = {
 };
 
 const EVP_PKEY_METHOD ed448_pkey_meth = {
-    EVP_PKEY_ED448, EVP_PKEY_FLAG_SIGCTX_CUSTOM,
+    EVP_PKEY_ED448, EVP_PKEY_FLAG_SIGCTX_CUSTOM | EVP_PKEY_FLAG_FIPS,
     0, 0, 0, 0, 0, 0,
     pkey_ecx_keygen,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

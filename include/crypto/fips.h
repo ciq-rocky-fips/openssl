@@ -64,7 +64,6 @@ int FIPS_selftest_aes_xts(void);
 int FIPS_selftest_aes(void);
 int FIPS_selftest_des(void);
 int FIPS_selftest_rsa(void);
-int FIPS_selftest_dsa(void);
 int FIPS_selftest_ecdsa(void);
 int FIPS_selftest_ecdh(void);
 int FIPS_selftest_dh(void);

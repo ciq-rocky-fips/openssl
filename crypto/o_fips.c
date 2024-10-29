@@ -25,7 +25,7 @@ int FIPS_mode_set(int r)
 #ifdef OPENSSL_FIPS
     if (r && FIPS_module_mode()) /* can be implicitly initialized by OPENSSL_init() */
         return 1;
-    return FIPS_module_mode_set(r);
+    return FIPS_module_mode_set(r, 1);
 #else
     if (r == 0)
         return 1;

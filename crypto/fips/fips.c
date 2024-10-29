@@ -414,7 +414,7 @@ int FIPS_module_installed(void)
     return !rv || FIPS_module_mode();
 }
 
-int FIPS_module_mode_set(int onoff)
+int FIPS_module_mode_set(int onoff, int force_reseed)
 {
     int ret = 0;
 
@@ -471,8 +471,11 @@ int FIPS_module_mode_set(int onoff)
         fips_post = 0;
 
         fips_set_mode(onoff);
-        /* force RNG reseed with entropy from getrandom() on next call */
-        rand_force_reseed();
+
+        if (force_reseed) {
+            /* force RNG reseed with entropy from getrandom() on next call */
+            rand_force_reseed();
+        }
 
         ret = 1;
         goto end;

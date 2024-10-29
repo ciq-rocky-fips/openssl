@@ -52,7 +52,7 @@
 
 #ifdef OPENSSL_FIPS
 
-int FIPS_module_mode_set(int onoff);
+int FIPS_module_mode_set(int onoff, int force_reseed);
 int FIPS_module_mode(void);
 int FIPS_module_installed(void);
 int FIPS_selftest_sha1(void);

@@ -12,6 +12,7 @@
 #include <openssl/x509.h>
 #include <openssl/ec.h>
 #include <openssl/rand.h>
+#include <openssl/fips.h>
 #include "crypto/asn1.h"
 #include "crypto/evp.h"
 #include "ec_local.h"
@@ -36,6 +37,85 @@
                                                               : ED448_KEYLEN))
 #define KEYLEN(p)       KEYLENID((p)->ameth->pkey_id)
 
+static int fips_eddsa_keygen_pct(int id, uint8_t *pubkey, uint8_t *privkey,
+                                 size_t keylen)
+{
+    EVP_PKEY *pkey = NULL;
+    EVP_MD_CTX *md_ctx = NULL;
+    uint8_t sig[114] = { 0 };
+    size_t sig_len = sizeof(sig);
+    size_t expected_sig_len = (id == EVP_PKEY_ED25519 ? 64 : 114);
+    uint8_t message[64] = { 0 };
+    int rc = 0;
+
+    md_ctx = EVP_MD_CTX_new();
+    if (md_ctx == NULL) {
+        goto err;
+    }
+
+    pkey = EVP_PKEY_new_raw_private_key(id,
+                                        NULL,
+                                        privkey,
+                                        keylen);
+    if (pkey == NULL) {
+        goto err;
+    }
+
+    if (EVP_DigestSignInit(md_ctx,
+                           NULL,
+                           NULL,
+                           NULL,
+                           pkey) != 1) {
+        goto err;
+    }
+
+    if (EVP_DigestSign(md_ctx,
+                       sig,
+                       &sig_len,
+                       message,
+                       sizeof(message)) != 1) {
+        goto err;
+    }
+
+    if (sig_len != expected_sig_len) {
+        goto err;
+    }
+
+    /* Now check verify. */
+    if (EVP_DigestVerify(md_ctx,
+                         sig,
+                         sig_len,
+                         message,
+                         sizeof(message)) != 1) {
+        goto err;
+    }
+
+    /* Check a bad signature doesn't match. */
+    sig[0] ^= 0x1;
+    if (EVP_DigestVerify(md_ctx,
+                         sig,
+                         sig_len,
+                         message,
+                         sizeof(message)) == 1) {
+        goto err;
+    }
+
+    rc = 1;
+
+  err:
+
+    if (md_ctx != NULL) {
+        EVP_MD_CTX_free(md_ctx);
+    }
+    if (pkey != NULL) {
+        EVP_PKEY_free(pkey);
+    }
+    if (rc == 0) {
+        fips_set_selftest_fail();
+        FIPSerr(FIPS_F_FIPS_SELFTEST_EDDSA, FIPS_R_SELFTEST_FAILED);
+    }
+    return rc;
+}
 
 typedef enum {
     KEY_OP_PUBLIC,
@@ -49,6 +129,12 @@ static int ecx_key_op(EVP_PKEY *pkey, int id, const X509_ALGOR *palg,
 {
     ECX_KEY *key = NULL;
     unsigned char *privkey, *pubkey;
+
+    if (op == KEY_OP_KEYGEN && FIPS_mode() && FIPS_selftest_failed()) {
+        /* Don't do anything if in error mode. */
+        FIPSerr(FIPS_F_FIPS_SELFTEST_EDDSA, FIPS_R_FIPS_SELFTEST_FAILED);
+        return 0;
+    }
 
     if (op != KEY_OP_KEYGEN) {
         if (palg != NULL) {
@@ -116,6 +202,22 @@ static int ecx_key_op(EVP_PKEY *pkey, int id, const X509_ALGOR *palg,
         }
     }
 
+    /* Run PCT's for EVP_PKEY_ED25519 and EVP_PKEY_ED448 */
+    if ((op == KEY_OP_KEYGEN) && FIPS_mode()) {
+        switch (id) {
+            case EVP_PKEY_ED25519:
+            case EVP_PKEY_ED448:
+            {
+                int rc = fips_eddsa_keygen_pct(id, pubkey, privkey, KEYLENID(id));
+                if (rc < 1) {
+                    goto err;
+                }
+                break;
+            }
+        default:
+            break;
+        }
+    }
     EVP_PKEY_assign(pkey, id, key);
     return 1;
  err:
@@ -652,7 +754,25 @@ const EVP_PKEY_ASN1_METHOD ed448_asn1_meth = {
 
 static int pkey_ecx_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY *pkey)
 {
-    return ecx_key_op(pkey, ctx->pmeth->pkey_id, NULL, NULL, 0, KEY_OP_KEYGEN);
+    int rc = ecx_key_op(pkey, ctx->pmeth->pkey_id, NULL, NULL, 0, KEY_OP_KEYGEN);
+
+    if (rc <= 0) {
+        /* keygen failed. */
+        return rc;
+    }
+
+    /* Set FIPS state for keygen. */
+    switch (ctx->pmeth->pkey_id) {
+    case EVP_PKEY_ED25519:
+    case EVP_PKEY_ED448:
+        fips_sli_approve_EVP_PKEY_CTX(ctx);
+        break;
+    default:
+        /* All other types are disapproved. */
+        fips_sli_disapprove_EVP_PKEY_CTX(ctx);
+        break;
+    }
+    return rc;
 }
 
 static int validate_ecx_derive(EVP_PKEY_CTX *ctx, unsigned char *key,

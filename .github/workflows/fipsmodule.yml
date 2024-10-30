@@ -23,6 +23,7 @@ jobs:
               dnf -y install epel-release
               dnf -y install mock rpm-build
               echo "Running mock build"
+              echo "config_opts['macros']['provider'] = 'provider'" >> .mock-config/rocky-lts92-x86_64.cfg
               mock -v -r .mock-config/rocky-lts92-x86_64.cfg \
                 --spec="./SPECS/openssl.spec" \
                 --sources="./SOURCES" \

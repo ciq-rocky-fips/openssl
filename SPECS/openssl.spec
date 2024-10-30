@@ -29,7 +29,7 @@ print(string.sub(hash, 0, 16))
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 3.0.7
-Release: 27%{?dist}.0.2.2
+Release: 27%{?dist}.0.2.3
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -246,7 +246,7 @@ protocols.
 Summary: A general purpose cryptography library with TLS implementation
 Requires: ca-certificates >= 2008-5
 Requires: crypto-policies >= 20180730
-%if ( %{defined rhel} && (! %{defined centos}) )
+%if (! %{defined provider})
 Requires: openssl-fips-provider
 %endif
 
@@ -401,7 +401,7 @@ make test HARNESS_JOBS=8
 # Add generation of HMAC checksum of the final stripped library
 # We manually copy standard definition of __spec_install_post
 # and add hmac calculation/embedding to fips.so
-%if ( %{defined rhel} && (! %{defined centos}) )
+%if (! %{defined provider})
 %define __spec_install_post \
     rm -rf $RPM_BUILD_ROOT/%{_libdir}/ossl-modules/fips.so \
     %{?__debug_package:%{__debug_install_post}} \
@@ -558,6 +558,9 @@ ln -s /etc/crypto-policies/back-ends/openssl_fips.config $RPM_BUILD_ROOT%{_sysco
 %ldconfig_scriptlets libs
 
 %changelog
+* Tue Oct 29 2024 Jason Rodriguez <jrodriguez@ciq.com> - 3.0.7-27.0.2.3
+- enable provider check
+
 * Tue Oct 15 2024 Jason Rodriguez <jrodriguez@ciq.com> - 3.0.7-27.0.2.2
 - Rocky FIPS provider updating Rocky references
 - Adding requirment for FIPS provider

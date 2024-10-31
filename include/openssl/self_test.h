@@ -72,6 +72,8 @@ extern "C" {
 # define OSSL_SELF_TEST_DESC_KDF_TLS13_EXTRACT  "TLS13_KDF_EXTRACT"
 # define OSSL_SELF_TEST_DESC_KDF_TLS13_EXPAND   "TLS13_KDF_EXPAND"
 # define OSSL_SELF_TEST_DESC_RNG            "RNG"
+# define OSSL_SELF_TEST_DESC_SIGN_ED25519   "ED25519"
+# define OSSL_SELF_TEST_DESC_SIGN_ED448     "ED448"
 
 void OSSL_SELF_TEST_set_callback(OSSL_LIB_CTX *libctx, OSSL_CALLBACK *cb,
                                  void *cbarg);

@@ -542,6 +542,126 @@ err:
     return ret;
 }
 
+static int self_test_eddsa_sign(const ST_KAT_SIGN *t,
+                         OSSL_SELF_TEST *st, OSSL_LIB_CTX *libctx)
+{
+    int ret = 0;
+    const char *message = "Hello World!";
+    unsigned char test_signature[256];
+    size_t sig_len = sizeof(test_signature);
+    EVP_PKEY *pkey = NULL;
+    EVP_MD_CTX *md_ctx = NULL;
+    EVP_PKEY_CTX *kctx = NULL;
+    EVP_PKEY_CTX *sctx = NULL;
+    const char *typ = OSSL_SELF_TEST_TYPE_KAT_SIGNATURE;
+    OSSL_PARAM params[3] = { 0 };
+
+    OSSL_SELF_TEST_onbegin(st, typ, t->desc);
+
+    params[0] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PRIV_KEY,
+                                                  (void *)t->key[0].data,
+                                                  t->key[0].data_len);
+    params[1] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PUB_KEY,
+                                                  (void *)t->key[1].data,
+                                                  t->key[1].data_len);
+    params[2] = OSSL_PARAM_construct_end();
+
+    md_ctx = EVP_MD_CTX_new();
+    if (md_ctx == NULL) {
+        goto err;
+    }
+
+    kctx = EVP_PKEY_CTX_new_from_name(libctx, t->algorithm, "");
+    if (kctx == NULL) {
+        goto err;
+    }
+
+    if (!EVP_PKEY_fromdata_init(kctx)) {
+        goto err;
+    }
+
+    if (!EVP_PKEY_fromdata(kctx,
+                           &pkey,
+                           EVP_PKEY_KEYPAIR,
+                           params)) {
+        goto err;
+    }
+
+    EVP_MD_CTX_set_flags(md_ctx, EVP_MD_CTX_FLAG_FINALISE | EVP_MD_CTX_FLAG_ONESHOT);
+
+    if (EVP_DigestSignInit(md_ctx,
+                           &sctx,
+                           NULL,
+                           NULL,
+                           pkey) != 1) {
+        goto err;
+    }
+
+    if (EVP_DigestSign(md_ctx,
+                       test_signature,
+                       &sig_len,
+                       (uint8_t *)message,
+                       strlen(message)) != 1) {
+        goto err;
+    }
+
+    if (sig_len != t->sig_expected_len) {
+        goto err;
+    }
+
+    if (memcmp(test_signature, t->sig_expected, sig_len) != 0) {
+        goto err;
+    }
+
+    /* Now check verify. */
+    EVP_MD_CTX_set_flags(md_ctx, EVP_MD_CTX_FLAG_FINALISE | EVP_MD_CTX_FLAG_ONESHOT);
+
+    if (EVP_DigestVerifyInit(md_ctx,
+                             &sctx,
+                             NULL,
+                             NULL,
+                             pkey) != 1) {
+        goto err;
+    }
+
+    if (EVP_DigestVerify(md_ctx,
+                         t->sig_expected,
+                         t->sig_expected_len,
+                         (uint8_t *)message,
+                         strlen(message)) != 1) {
+        goto err;
+    }
+
+    /* Check a bad signature doesn't match. */
+    test_signature[0] ^= 0x1;
+    if (EVP_DigestVerify(md_ctx,
+                         test_signature,
+                         sig_len,
+                         (uint8_t *)message,
+                         strlen(message)) == 1) {
+        goto err;
+    }
+
+    ret = 1;
+
+ err:
+
+    if (sctx != NULL) {
+        EVP_PKEY_CTX_free(sctx);
+    }
+    if (md_ctx != NULL) {
+        EVP_MD_CTX_free(md_ctx);
+    }
+    if (pkey != NULL) {
+        EVP_PKEY_free(pkey);
+    }
+    if (kctx != NULL) {
+        EVP_PKEY_CTX_free(kctx);
+    }
+    OSSL_SELF_TEST_onend(st, ret);
+    return ret;
+}
+
 /*
  * Test an encrypt or decrypt KAT..
  *
@@ -717,8 +837,14 @@ static int self_test_signatures(OSSL_SELF_TEST *st, OSSL_LIB_CTX *libctx)
     ROCKY_FIPS_signature_st = 1;
 
     for (i = 0; i < (int)OSSL_NELEM(st_kat_sign_tests); ++i) {
-        if (!self_test_sign(&st_kat_sign_tests[i], st, libctx))
+        if ((strcmp("ED25519", st_kat_sign_tests[i].algorithm)==0) ||
+            (strcmp("ED448", st_kat_sign_tests[i].algorithm)==0)) {
+            if (!self_test_eddsa_sign(&st_kat_sign_tests[i], st, libctx)) {
+                ret = 0;
+            }
+        } else if (!self_test_sign(&st_kat_sign_tests[i], st, libctx)) {
             ret = 0;
+        }
     }
     ROCKY_FIPS_signature_st = 0;
     return ret;

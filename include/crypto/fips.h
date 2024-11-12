@@ -52,7 +52,7 @@
 
 #ifdef OPENSSL_FIPS
 
-int FIPS_module_mode_set(int onoff);
+int FIPS_module_mode_set(int onoff, int force_reseed);
 int FIPS_module_mode(void);
 int FIPS_module_installed(void);
 int FIPS_selftest_sha1(void);
@@ -64,7 +64,6 @@ int FIPS_selftest_aes_xts(void);
 int FIPS_selftest_aes(void);
 int FIPS_selftest_des(void);
 int FIPS_selftest_rsa(void);
-int FIPS_selftest_dsa(void);
 int FIPS_selftest_ecdsa(void);
 int FIPS_selftest_ecdh(void);
 int FIPS_selftest_dh(void);
@@ -73,6 +72,7 @@ int FIPS_selftest_hmac(void);
 int FIPS_selftest_drbg(void);
 int FIPS_selftest_cmac(void);
 int FIPS_selftest_kdf(void);
+int FIPS_selftest_eddsa(void);
 
 int fips_in_post(void);
 

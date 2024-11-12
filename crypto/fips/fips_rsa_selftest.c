@@ -324,6 +324,13 @@ int FIPS_selftest_rsa()
     if ((key = RSA_new()) == NULL)
         goto err;
 
+    /*
+     * In FIPS selftest mode this
+     * prevents syscall_random()
+     * from being called.
+     */
+    RSA_blinding_off(key);
+
     if (!setrsakey(key))
         goto err;
 

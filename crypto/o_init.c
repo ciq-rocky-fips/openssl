@@ -41,7 +41,7 @@ static void init_fips_mode(void)
 
     /* Ensure the selftests always run */
     /* XXX: TO SOLVE - premature initialization due to selftests */
-    FIPS_mode_set(1);
+    FIPS_module_mode_set(1, 0);
 
     /* Failure reading the fips mode switch file means just not
      * switching into FIPS mode. We would break too many things

@@ -58,6 +58,15 @@
 #include "fips_locl.h"
 
 #ifdef OPENSSL_FIPS
+
+#if 0
+
+/* Don't compile in FIPS_selftest_dsa().
+ * Service level indicators always set this
+ * as unapproved so we don't need a KAT for
+ * this.
+ */
+
 #include <openssl/rand.h>
 #include "internal/nelem.h"
 
@@ -357,4 +366,5 @@ int FIPS_selftest_dsa()
     }
     return ret;
 }
+#endif
 #endif

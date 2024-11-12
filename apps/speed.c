@@ -1646,12 +1646,12 @@ int speed_main(int argc, char **argv)
                 ecdh_doit[i] = 2;
             continue;
         }
-        if (!FIPS_mode() && strcmp(*argv, "eddsa") == 0) {
+        if (strcmp(*argv, "eddsa") == 0) {
             for (loop = 0; loop < OSSL_NELEM(eddsa_doit); loop++)
                 eddsa_doit[loop] = 1;
             continue;
         }
-        if (!FIPS_mode() && found(*argv, eddsa_choices, &i)) {
+        if (found(*argv, eddsa_choices, &i)) {
             eddsa_doit[i] = 2;
             continue;
         }
@@ -1762,9 +1762,8 @@ int speed_main(int argc, char **argv)
         for (loop = 0; loop < OSSL_NELEM(ecdh_doit); loop++)
             if(!FIPS_mode() || (loop != R_EC_X25519 && loop != R_EC_X448))
                 ecdh_doit[loop] = 1;
-        if (!FIPS_mode())
-            for (loop = 0; loop < OSSL_NELEM(eddsa_doit); loop++)
-                eddsa_doit[loop] = 1;
+        for (loop = 0; loop < OSSL_NELEM(eddsa_doit); loop++)
+            eddsa_doit[loop] = 1;
 #endif
     }
     for (i = 0; i < ALGOR_NUM; i++)

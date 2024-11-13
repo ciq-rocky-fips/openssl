@@ -292,9 +292,7 @@ void fips_sli_check_key_rsa_siggen_EVP_PKEY_CTX(EVP_PKEY_CTX * ctx, const RSA * 
 void fips_sli_check_key_rsa_sigver_EVP_PKEY_CTX(EVP_PKEY_CTX * ctx, const RSA * rsa) {
     const int len_n = RSA_bits(rsa);
 
-    if (1024 <= len_n && len_n < 2048)
-        fips_sli_approve_EVP_PKEY_CTX(ctx); // legacy use
-    else if (2048 <= len_n)
+    if (2048 <= len_n)
         fips_sli_approve_EVP_PKEY_CTX(ctx);
     else
         fips_sli_disapprove_EVP_PKEY_CTX(ctx);

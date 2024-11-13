@@ -2827,6 +2827,8 @@ static int aes_gcm_cleanup(EVP_CIPHER_CTX *c)
     return 1;
 }
 
+#define IV_SET_INTERNAL 0x80000000
+#define IV_GEN_INTERNAL 0x40000000
 static int aes_gcm_ctrl(EVP_CIPHER_CTX *c, int type, int arg, void *ptr)
 {
     EVP_AES_GCM_CTX *gctx = EVP_C_DATA(EVP_AES_GCM_CTX,c);
@@ -2896,7 +2898,7 @@ static int aes_gcm_ctrl(EVP_CIPHER_CTX *c, int type, int arg, void *ptr)
             memcpy(gctx->iv, ptr, arg);
         if (c->encrypt && RAND_bytes(gctx->iv + arg, gctx->ivlen - arg) <= 0)
             return 0;
-        gctx->iv_gen = 1;
+        gctx->iv_gen = (arg == 4 ? IV_GEN_INTERNAL : 0) | 1;
         return 1;
 
     case EVP_CTRL_GCM_IV_GEN:
@@ -2911,7 +2913,12 @@ static int aes_gcm_ctrl(EVP_CIPHER_CTX *c, int type, int arg, void *ptr)
          * to check wrap around or increment more than last 8 bytes.
          */
         ctr64_inc(gctx->iv + gctx->ivlen - 8);
-        gctx->iv_set = 1;
+        /*
+         * Within EVP_CTRL_GCM_SET_IV_FIXED the caller must provide
+         * exactly 4 bytes (the lower limit for the call to succeed).
+         * Then and only then we consider the IV to be generated internally.
+         */
+        gctx->iv_set = (gctx->iv_gen & IV_GEN_INTERNAL ? IV_SET_INTERNAL : 0) | 1;
         return 1;
 
     case EVP_CTRL_GCM_SET_IV_INV:
@@ -3184,6 +3191,25 @@ static int aes_gcm_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
 
     if (!gctx->iv_set)
         return -1;
+
+    /*
+     * FIPS compliance check
+     *
+     * iv_gen and iv_set must be equal to 1 AND the iv must
+     * have been set internally to be fips compliant.
+     *
+     * This can only be met by calling `*aes_gcm_ctrl` with the following arguments:
+     * 1. `EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IV_FIXED, 4, iv)`
+     * 2. `EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_IV_GEN, 12, &buffer[0])`
+     *
+     * NOTE: one is required to provide exactly 4 bytes (the lower limit)
+     *       during the first call as the remaining bytes are generated
+     *       internally.
+     */
+    if (ctx->encrypt && (((gctx->iv_gen & IV_GEN_INTERNAL) == 0) || ((gctx->iv_set & IV_SET_INTERNAL) == 0))) {
+        fips_sli_disapprove_EVP_CIPHER_CTX(ctx);
+    }
+
     if (in) {
         if (out == NULL) {
             if (CRYPTO_gcm128_aad(&gctx->gcm, in, len))

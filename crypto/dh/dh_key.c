@@ -269,6 +269,9 @@ static int generate_key(DH *dh)
     {
         if (FIPS_mode()) {
             if (!dh_check_pairwise(dh)) {
+                dh->pub_key = NULL;
+                dh->priv_key = NULL;
+                fips_set_selftest_fail();
                 DHerr(DH_F_GENERATE_KEY, DH_R_INVALID_KEYPAIR);
                 goto err;
             }
@@ -361,6 +364,7 @@ static int compute_key(unsigned char *key, const BIGNUM *pub_key, DH *dh)
     {
         if (FIPS_mode()) {
             if (!dh_check_pairwise(dh)) {
+                fips_set_selftest_fail();
                 DHerr(DH_F_COMPUTE_KEY, DH_R_INVALID_KEYPAIR);
                 goto err;
             }

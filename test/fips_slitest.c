@@ -266,20 +266,24 @@ err:
 
 typedef struct {
     int fips_approved;
+    int iv_gen; // The cipher must generate the IV [y=1,n=0]
     int cipher_nid;
 } SLI_CIPHER_TEST;
 
 static const SLI_CIPHER_TEST cipher_tests[] = {
-    {1, NID_aes_128_cfb128},
-    {1, NID_aes_256_gcm},
-    {0, NID_des_ede3_cbc},
-    {0, NID_des_ede3_cfb8},
-    {0, NID_des_ofb64},
-    {0, NID_des_ede_ecb},
-    {0, NID_des_ede_ofb64},
-    {0, NID_idea_cbc},
-    {1, NID_aes_128_xts},
-    {1, NID_aes_256_xts},
+    {1, 0, NID_aes_128_cfb128},
+    /* Test if aes_gcm_cipher detects an external IV as not FIPS compliant. */
+    {0, 0, NID_aes_256_gcm},
+    /* Test if aes_gcm_cipher is fine with a randomly generated IV. */
+    {1, 1, NID_aes_256_gcm},
+    {0, 0, NID_des_ede3_cbc},
+    {0, 0, NID_des_ede3_cfb8},
+    {0, 0, NID_des_ofb64},
+    {0, 0, NID_des_ede_ecb},
+    {0, 0, NID_des_ede_ofb64},
+    {0, 0, NID_idea_cbc},
+    {1, 0, NID_aes_128_xts},
+    {1, 0, NID_aes_256_xts},
 };
 static const size_t cipher_tests_len = sizeof(cipher_tests) / sizeof(cipher_tests[0]);
 
@@ -338,16 +342,34 @@ static int cipher(int cipher_test_index) {
             || !TEST_true(RAND_bytes(key, key_len) == 1))
         goto end;
 
-    if (iv_len != 0) {
+    if (!cipher_tests[cipher_test_index].iv_gen && iv_len != 0) {
         if (!TEST_ptr(iv = OPENSSL_malloc(iv_len))
                 || !TEST_true(RAND_bytes(iv, iv_len) == 1))
             goto end;
     }
 
-    int tmp_len = 0;
     if (!TEST_ptr(ctx = EVP_CIPHER_CTX_new())
-            || !TEST_true(EVP_EncryptInit_ex(ctx, cipher, NULL, key, iv) == 1)
-            || !TEST_true(EVP_EncryptUpdate(ctx, ctext, &ctext_written_len, ptext, ptext_len) == 1)
+            || !TEST_true(EVP_EncryptInit_ex(ctx, cipher, NULL, NULL, NULL) == 1))
+        goto end;
+
+    if (!cipher_tests[cipher_test_index].iv_gen && iv_len != 0) {
+        if (!TEST_ptr(iv = OPENSSL_malloc(iv_len))
+                || !TEST_true(RAND_bytes(iv, iv_len) == 1)
+                || !TEST_true(EVP_EncryptInit_ex(ctx, NULL, NULL, key, iv) == 1))
+            goto end;
+    } else if (cipher_tests[cipher_test_index].iv_gen) {
+        char buffer[12];
+        if (!TEST_ptr(iv = OPENSSL_malloc(4))
+                || !TEST_true(RAND_bytes(iv, 4) == 1)
+                || !TEST_true(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IV_FIXED, 4, iv) == 1)
+                || !TEST_true(EVP_EncryptInit_ex(ctx, NULL, NULL, key, NULL) == 1)
+                || !TEST_true(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_IV_GEN, 12, &buffer[0]) == 1)
+                )
+            goto end;
+    }
+
+    int tmp_len = 0;
+    if (!TEST_true(EVP_EncryptUpdate(ctx, ctext, &ctext_written_len, ptext, ptext_len) == 1)
             || !TEST_true(ctext_written_len <= get_ciphertext_len(ptext_len, cipher))
             || !TEST_true(EVP_EncryptFinal_ex(ctx, ctext + ctext_written_len, &tmp_len) == 1))
         goto end;
@@ -665,6 +687,126 @@ end:
     return success;
 }
 
+static int fips_evp_aes_gcm_restore_iv_not_fips_compliant() {
+    int success = 0;
+    unsigned char *key = NULL, *iv = NULL, *ctext = NULL, *buffer = NULL;
+    int ctext_written_len = 0;
+    const EVP_CIPHER *cipher = NULL;
+    EVP_CIPHER_CTX *ctx = NULL;
+    const uint8_t* const ptext = get_msg_16();
+    const size_t ptext_len = 16;
+    const int cipher_nid = NID_aes_256_gcm;
+
+    TEST_note("testing if aes_gcm_cipher detects restored IV as not FIPS compliant");
+
+    if (!TEST_ptr(cipher = EVP_get_cipherbynid(cipher_nid))) {
+        goto end;
+    }
+
+    const size_t key_len = EVP_CIPHER_key_length(cipher);
+    const size_t iv_len = EVP_CIPHER_iv_length(cipher);
+    /*TEST_note("have keylen = %zd, ivlen = %zd", key_len, iv_len);*/
+
+    if (!TEST_ptr(ctx = EVP_CIPHER_CTX_new())
+            || !TEST_true(EVP_EncryptInit_ex(ctx, cipher, NULL, NULL, NULL) == 1))
+        goto end;
+
+    if (!TEST_ptr(key = OPENSSL_malloc(key_len))
+            || !TEST_ptr(ctext = OPENSSL_malloc(get_ciphertext_len(ptext_len, cipher)))
+            || !TEST_true(RAND_bytes(key, key_len) == 1)
+            || !TEST_ptr(iv = OPENSSL_malloc(iv_len))
+            || !TEST_true(RAND_bytes(iv, iv_len) == 1)
+            || !TEST_ptr(buffer = OPENSSL_malloc(iv_len)))
+        goto end;
+
+    if (!TEST_true(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IV_FIXED, -1, iv) == 1)
+            || !TEST_true(EVP_EncryptInit_ex(ctx, NULL, NULL, key, NULL) == 1)
+            || !TEST_true(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_IV_GEN, 12, buffer) == 1))
+        goto end;
+
+    int tmp_len = 0;
+    if (!TEST_true(EVP_EncryptUpdate(ctx, ctext, &ctext_written_len, ptext, ptext_len) == 1)
+            || !TEST_true(ctext_written_len <= get_ciphertext_len(ptext_len, cipher))
+            || !TEST_true(EVP_EncryptFinal_ex(ctx, ctext + ctext_written_len, &tmp_len) == 1))
+        goto end;
+
+    if (!TEST_true(ctext_written_len + tmp_len <= get_ciphertext_len(ptext_len, cipher)))
+        goto end;
+
+    if (!TEST_false(fips_sli_is_approved_EVP_CIPHER_CTX(ctx)))
+            goto end;
+
+    success = 1;
+end:
+    EVP_CIPHER_CTX_free(ctx);
+    if (key != NULL)
+        OPENSSL_free(key);
+    if (iv != NULL)
+        OPENSSL_free(iv);
+    if (ctext != NULL)
+        OPENSSL_free(ctext);
+    if (buffer != NULL)
+        OPENSSL_free(buffer);
+    return success;
+}
+
+static int fips_evp_aes_gcm_adding_too_much_iv() {
+    int success = 0;
+    unsigned char *key = NULL, *iv = NULL, *ctext = NULL, *buffer = NULL;
+    int ctext_written_len = 0;
+    const EVP_CIPHER *cipher = NULL;
+    EVP_CIPHER_CTX *ctx = NULL;
+    const uint8_t* const ptext = get_msg_16();
+    const size_t ptext_len = 16;
+    const int cipher_nid = NID_aes_256_gcm;
+
+    /* NOTE: with a default of 12 bytes for the iv the maximum is also 4 bytes,
+       i.e., this test actually doesn't check FIPS compliance directly. */
+    TEST_note("testing if aes_gcm_cipher doesn't allow a fixed fieled larger than 4 byets");
+
+    if (!TEST_ptr(cipher = EVP_get_cipherbynid(cipher_nid))) {
+        goto end;
+    }
+
+    const size_t key_len = EVP_CIPHER_key_length(cipher);
+    const size_t iv_len = EVP_CIPHER_iv_length(cipher);
+    /*TEST_note("have keylen = %zd, ivlen = %zd", key_len, iv_len); */
+
+    if (!TEST_ptr(ctx = EVP_CIPHER_CTX_new())
+            || !TEST_true(EVP_EncryptInit_ex(ctx, cipher, NULL, NULL, NULL) == 1))
+        goto end;
+
+    if (!TEST_ptr(key = OPENSSL_malloc(key_len))
+            || !TEST_ptr(ctext = OPENSSL_malloc(get_ciphertext_len(ptext_len, cipher)))
+            || !TEST_true(RAND_bytes(key, key_len) == 1)
+            || !TEST_ptr(iv = OPENSSL_malloc(5))
+            || !TEST_true(RAND_bytes(iv, 5) == 1)
+            || !TEST_ptr(buffer = OPENSSL_malloc(iv_len)))
+        goto end;
+
+    if (!TEST_true(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IV_FIXED, 5, iv) == 0)
+            || !TEST_true(EVP_EncryptInit_ex(ctx, NULL, NULL, key, NULL) == 1)
+            || !TEST_true(EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_IV_GEN, 12, buffer) == 0))
+        goto end;
+
+    int tmp_len = 0;
+    if (!TEST_true(EVP_EncryptUpdate(ctx, ctext, &ctext_written_len, ptext, ptext_len) == 0))
+        goto end;
+
+    success = 1;
+end:
+    EVP_CIPHER_CTX_free(ctx);
+    if (key != NULL)
+        OPENSSL_free(key);
+    if (iv != NULL)
+        OPENSSL_free(iv);
+    if (ctext != NULL)
+        OPENSSL_free(ctext);
+    if (buffer != NULL)
+        OPENSSL_free(buffer);
+    return success;
+}
+
 int setup_tests(void) {
     ADD_TEST(test_sli_noop);
     ADD_TEST(cmac_aes_cbc);
@@ -684,6 +826,9 @@ int setup_tests(void) {
     ADD_ALL_TESTS(test_PKCS5_PBKDF2_HMAC, pbkdf2_tests_len);
     ADD_ALL_TESTS(sshkdf, sshkdf_tests_len);
     ADD_TEST(rand_bytes);
+
+    ADD_TEST(fips_evp_aes_gcm_restore_iv_not_fips_compliant);
+    ADD_TEST(fips_evp_aes_gcm_adding_too_much_iv);
 
     return 1; /* success */
 }

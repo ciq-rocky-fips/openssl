@@ -29,7 +29,7 @@ print(string.sub(hash, 0, 16))
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 3.0.7
-Release: 27%{?dist}.0.2.3
+Release: 27%{?dist}.0.2.4
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -219,6 +219,10 @@ Patch136:             0136-CVE-2024-6119.patch
 #FIPS PROVIDER rebranding
 Patch200: rocky_fips_provider.patch
 Patch201: rocky_fips_provider-2.patch
+
+# EDDSA patches (ED25519 and ED448).
+Patch301: 0001-Add-KAT-and-enable-support-for-ED25519-and-ED448-in-.patch
+Patch302: 0002-Add-PCTs-for-key-generation-for-ED25519-and-ED448.patch
 
 License: ASL 2.0
 URL: http://www.openssl.org/
@@ -558,6 +562,9 @@ ln -s /etc/crypto-policies/back-ends/openssl_fips.config $RPM_BUILD_ROOT%{_sysco
 %ldconfig_scriptlets libs
 
 %changelog
+* Tue Nov 5 2024 Jeremy Allison <jallison@ciq.com> - 3.0.7-27.0.2.4
+- Add EDDSA (ED25519 and ED448 curves)
+
 * Tue Oct 29 2024 Jason Rodriguez <jrodriguez@ciq.com> - 3.0.7-27.0.2.3
 - enable provider check
 

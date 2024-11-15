@@ -68,6 +68,9 @@ void ossl_ecx_key_free(ECX_KEY *key)
     REF_ASSERT_ISNT(i < 0);
 
     OPENSSL_free(key->propq);
+#ifdef FIPS_MODULE
+    OPENSSL_cleanse(&key->pubkey, sizeof(key->pubkey));
+#endif
     OPENSSL_secure_clear_free(key->privkey, key->keylen);
     CRYPTO_THREAD_lock_free(key->lock);
     OPENSSL_free(key);

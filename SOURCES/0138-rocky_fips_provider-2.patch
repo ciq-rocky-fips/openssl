@@ -97,3 +97,4 @@ index dd508ae7..eb68b308 100644
      if (indicator == NULL) {
          fprintf(stderr, "No indicator for operation, probably using implicit"
                          " indicators.\n");
+

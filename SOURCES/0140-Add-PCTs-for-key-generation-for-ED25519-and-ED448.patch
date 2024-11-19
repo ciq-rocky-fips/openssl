@@ -1,0 +1,177 @@
+From 2bdd90998d1b99703f56e1cf4b24b7782acccd45 Mon Sep 17 00:00:00 2001
+From: Jeremy Allison <jallison@ciq.com>
+Date: Fri, 1 Nov 2024 11:11:10 -0700
+Subject: [PATCH 2/3] Add PCTs for key generation for ED25519 and ED448.
+
+Signed-off-by: Jeremy Allison <jallison@ciq.com>
+---
+ providers/implementations/keymgmt/ecx_kmgmt.c | 141 ++++++++++++++++++
+ 1 file changed, 141 insertions(+)
+
+diff --git a/providers/implementations/keymgmt/ecx_kmgmt.c b/providers/implementations/keymgmt/ecx_kmgmt.c
+index 2a7f867..3386613 100644
+--- a/providers/implementations/keymgmt/ecx_kmgmt.c
++++ b/providers/implementations/keymgmt/ecx_kmgmt.c
+@@ -573,6 +573,127 @@ static const OSSL_PARAM *ecx_gen_settable_params(ossl_unused void *genctx,
+     return settable;
+ }
+ 
++#ifdef FIPS_MODULE
++static int fips_eddsa_pct(OSSL_LIB_CTX *libctx,
++                          ECX_KEY_TYPE type,
++                          uint8_t *pubkey,
++                          uint8_t *privkey,
++                          size_t keylen)
++{
++    int ret = 0;
++    const char *message = "Hello World!";
++    unsigned char test_signature[114];
++    size_t sig_len = sizeof(test_signature);
++    size_t expected_sig_len = (type == ECX_KEY_TYPE_ED25519) ? 64 : 114;
++    EVP_PKEY *pkey = NULL;
++    EVP_MD_CTX *md_ctx = NULL;
++    EVP_PKEY_CTX *kctx = NULL;
++    EVP_PKEY_CTX *sctx = NULL;
++    OSSL_PARAM params[3] = { 0 };
++
++    params[0] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PRIV_KEY,
++                                                  (void *)privkey,
++                                                  keylen);
++    params[1] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_PUB_KEY,
++                                                  (void *)pubkey,
++                                                  keylen);
++    params[2] = OSSL_PARAM_construct_end();
++
++    md_ctx = EVP_MD_CTX_new();
++    if (md_ctx == NULL) {
++        goto err;
++    }
++
++    kctx = EVP_PKEY_CTX_new_from_name(libctx,
++                                      (type == ECX_KEY_TYPE_ED25519) ?
++                                            "ED25519" : "ED448",
++                                      "");
++    if (kctx == NULL) {
++        goto err;
++    }
++
++    if (!EVP_PKEY_fromdata_init(kctx)) {
++        goto err;
++    }
++
++    if (!EVP_PKEY_fromdata(kctx,
++                           &pkey,
++                           EVP_PKEY_KEYPAIR,
++                           params)) {
++        goto err;
++    }
++
++    EVP_MD_CTX_set_flags(md_ctx, EVP_MD_CTX_FLAG_FINALISE | EVP_MD_CTX_FLAG_ONESHOT);
++
++    if (EVP_DigestSignInit(md_ctx,
++                           &sctx,
++                           NULL,
++                           NULL,
++                           pkey) != 1) {
++        goto err;
++    }
++
++    if (EVP_DigestSign(md_ctx,
++                       test_signature,
++                       &sig_len,
++                       (uint8_t *)message,
++                       strlen(message)) != 1) {
++        goto err;
++    }
++
++    if (sig_len != expected_sig_len) {
++        goto err;
++    }
++
++    /* Now check verify. */
++    EVP_MD_CTX_set_flags(md_ctx, EVP_MD_CTX_FLAG_FINALISE | EVP_MD_CTX_FLAG_ONESHOT);
++
++    if (EVP_DigestVerifyInit(md_ctx,
++                             &sctx,
++                             NULL,
++                             NULL,
++                             pkey) != 1) {
++        goto err;
++    }
++
++    if (EVP_DigestVerify(md_ctx,
++                         test_signature,
++                         sig_len,
++                         (uint8_t *)message,
++                         strlen(message)) != 1) {
++        goto err;
++    }
++
++    /* Check a bad signature doesn't match. */
++    test_signature[0] ^= 0x1;
++    if (EVP_DigestVerify(md_ctx,
++                         test_signature,
++                         sig_len,
++                         (uint8_t *)message,
++                         strlen(message)) == 1) {
++        goto err;
++    }
++
++    ret = 1;
++
++ err:
++
++    if (sctx != NULL) {
++        EVP_PKEY_CTX_free(sctx);
++    }
++    if (md_ctx != NULL) {
++        EVP_MD_CTX_free(md_ctx);
++    }
++    if (pkey != NULL) {
++        EVP_PKEY_free(pkey);
++    }
++    if (kctx != NULL) {
++        EVP_PKEY_CTX_free(kctx);
++    }
++    return ret;
++}
++#endif
++
+ static void *ecx_gen(struct ecx_gen_ctx *gctx)
+ {
+     ECX_KEY *key;
+@@ -612,11 +733,31 @@ static void *ecx_gen(struct ecx_gen_ctx *gctx)
+         if (!ossl_ed25519_public_from_private(gctx->libctx, key->pubkey, privkey,
+                                               gctx->propq))
+             goto err;
++#ifdef FIPS_MODULE
++        if (!fips_eddsa_pct(gctx->libctx,
++                            ECX_KEY_TYPE_ED25519,
++                            key->pubkey,
++                            privkey,
++                            key->keylen)) {
++            /* rsa pct aborts on fail, do the same. */
++            abort();
++        }
++#endif
+         break;
+     case ECX_KEY_TYPE_ED448:
+         if (!ossl_ed448_public_from_private(gctx->libctx, key->pubkey, privkey,
+                                             gctx->propq))
+             goto err;
++#ifdef FIPS_MODULE
++        if (!fips_eddsa_pct(gctx->libctx,
++                            ECX_KEY_TYPE_ED448,
++                            key->pubkey,
++                            privkey,
++                            key->keylen)) {
++            /* rsa pct aborts on fail, do the same. */
++            abort();
++        }
++#endif
+         break;
+     }
+     key->haspubkey = 1;
+-- 
+2.43.5
+

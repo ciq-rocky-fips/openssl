@@ -106,6 +106,11 @@ static int pkey_ec_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen,
     EC_KEY *ec = ctx->pkey->pkey.ec;
     const int sig_sz = ECDSA_size(ec);
 
+    /* Trying to detect a pre-hashed message, which is disapproved. */
+    if (dctx->md == NULL) {
+        fips_sli_disapprove_EVP_PKEY_CTX(ctx);
+    }
+
     /* ensure cast to size_t is safe */
     if (!ossl_assert(sig_sz > 0))
         return 0;
@@ -138,6 +143,11 @@ static int pkey_ec_verify(EVP_PKEY_CTX *ctx,
     int ret, type;
     EC_PKEY_CTX *dctx = ctx->data;
     EC_KEY *ec = ctx->pkey->pkey.ec;
+
+    /* Trying to detect a pre-hashed message, which is disapproved. */
+    if (dctx->md == NULL) {
+        fips_sli_disapprove_EVP_PKEY_CTX(ctx);
+    }
 
     if (dctx->md)
         type = EVP_MD_type(dctx->md);

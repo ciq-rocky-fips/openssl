@@ -489,6 +489,47 @@ int FIPS_module_mode_set(int onoff, int force_reseed)
     return ret;
 }
 
+/*
+ * In non-FIPS mode, the selftests must succeed if the
+ * checksum files are present
+ */
+
+void NONFIPS_selftest_check(void)
+{
+    int rv;
+    char *hmacpath;
+    char path[PATH_MAX+1];
+
+    if (fips_selftest_fail) {
+        /* Check if the checksum files are installed. */
+        rv = get_library_path("libcrypto.so." SHLIB_VERSION_NUMBER, "FIPS_mode_set", path, sizeof(path));
+        if (rv < 0) {
+            OpenSSLDie(__FILE__,__LINE__, "FATAL FIPS SELFTEST FAILURE");
+        }
+
+        hmacpath = make_hmac_path(path);
+        if (hmacpath == NULL) {
+            OpenSSLDie(__FILE__,__LINE__, "FATAL FIPS SELFTEST FAILURE");
+        }
+
+        if (access(hmacpath, F_OK)) {
+            /* No hmac file is present, ignore the failed selftests. */
+            if (errno == ENOENT) {
+                free(hmacpath);
+                return;
+            }
+            /* We fail on any other error. */
+        }
+        /*
+         * If the file exists, but the selftests failed
+         * (eg wrong checksum), we fail too.
+         */
+        free(hmacpath);
+        OpenSSLDie(__FILE__,__LINE__, "FATAL FIPS SELFTEST FAILURE");
+    }
+    /* otherwise ok, selftests were successful */
+}
+
 static CRYPTO_THREAD_ID fips_threadid;
 static int fips_thread_set = 0;
 

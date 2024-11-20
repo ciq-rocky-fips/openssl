@@ -24,6 +24,14 @@
 
 # define FIPS_MODE_SWITCH_FILE "/proc/sys/crypto/fips_enabled"
 
+/*
+ * Don't put this in openssl/fips.h
+ * as that requires an ordinal in libcrypto.num
+ * and this should be internal.
+ */
+
+extern void NONFIPS_selftest_check(void);
+
 static void init_fips_mode(void)
 {
     char buf[2] = "0";
@@ -49,6 +57,8 @@ static void init_fips_mode(void)
      */
 
     if (buf[0] != '1') {
+        /* Abort if selftest failed and the module is complete. */
+        NONFIPS_selftest_check();
         /* drop down to non-FIPS mode if it is not requested */
         FIPS_mode_set(0);
         ERR_clear_error();

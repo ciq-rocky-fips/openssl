@@ -95,6 +95,9 @@ void fips_sli_check_key_ecdh_EVP_PKEY_CTX(EVP_PKEY_CTX *ctx, const EC_KEY *ecdh)
 void fips_sli_check_padding_rsa_enc_EVP_PKEY_CTX(EVP_PKEY_CTX * ctx, int pad_mode);
 void fips_sli_check_padding_rsa_dec_EVP_PKEY_CTX(EVP_PKEY_CTX * ctx, int pad_mode);
 
+void fips_sli_check_padding_rsa_sigver_EVP_MD_CTX(EVP_MD_CTX * ctx, int pad_mode, int res_salt_len);
+void fips_sli_check_padding_rsa_siggen_EVP_MD_CTX(EVP_MD_CTX * ctx, int pad_mode);
+
 FIPS_STATUS EVP_CIPHER_get_fips_status(const EVP_CIPHER *cipher);
 void fips_sli_check_cipher_EVP_CIPHER_CTX(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *cipher);
 

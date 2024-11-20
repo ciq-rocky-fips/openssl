@@ -4,6 +4,8 @@
 #include "crypto/evp.h"
 #include "../evp/evp_local.h"
 #include "../hmac/hmac_local.h"
+#include "../rsa/rsa_local.h"
+#include <openssl/tls1.h>
 #include "internal/fips_sli_local.h"
 
 /* Main part of the FIPS Service Level Indicator
@@ -413,4 +415,69 @@ void fips_sli_check_padding_rsa_enc_EVP_PKEY_CTX(EVP_PKEY_CTX * ctx, int pad_mod
 
 void fips_sli_check_padding_rsa_dec_EVP_PKEY_CTX(EVP_PKEY_CTX * ctx, int pad_mode) {
     fips_sli_check_padding_rsa_enc_EVP_PKEY_CTX(ctx, pad_mode);
+}
+
+/* Approved range is only [0; hash output block length]. */
+
+static FIPS_STATUS get_fips_padding_rsa_pss_genver_status(EVP_MD_CTX * ctx, const int * res_salt_len) {
+    if (ctx == NULL)
+        return FIPS_ERROR;
+    EVP_PKEY_CTX * pkey_ctx = EVP_MD_CTX_pkey_ctx(ctx);
+    if (pkey_ctx == NULL)
+        return FIPS_ERROR;
+    EVP_PKEY * pkey = pkey_ctx->pkey;
+    if (pkey == NULL)
+        return FIPS_ERROR;
+    const EVP_MD * md = ctx->digest;
+
+    long sLen = ASN1_INTEGER_get(RSA_get0_pss_params(
+    EVP_PKEY_get1_RSA(pkey))->saltLength);
+
+    if (sLen >= 0) {
+        if (sLen > EVP_MD_block_size(md))
+            return FIPS_NONAPPROVED;
+        else
+            return FIPS_APPROVED;
+    }
+
+    /* Check the special values. */
+    if (pkey_ctx->operation & EVP_PKEY_OP_SIGN) {
+        switch (sLen) {
+        case RSA_PSS_SALTLEN_DIGEST:
+            return FIPS_APPROVED;
+        case RSA_PSS_SALTLEN_MAX:
+        case RSA_PSS_SALTLEN_MAX_SIGN:
+        default:
+            return FIPS_NONAPPROVED;
+        }
+    } else if (pkey_ctx->operation & EVP_PKEY_OP_VERIFY) {
+        /* Need to access the resulting salt length for verification. */
+        if (res_salt_len == NULL)
+            return FIPS_ERROR;
+        if (*res_salt_len > EVP_MD_block_size(md) || *res_salt_len < 0)
+            return FIPS_NONAPPROVED;
+        else
+            return FIPS_APPROVED;
+    }
+    return FIPS_NONAPPROVED;
+}
+
+void fips_sli_check_padding_rsa_siggen_EVP_MD_CTX(EVP_MD_CTX * ctx, int pad_mode) {
+    switch (pad_mode) {
+    case RSA_PKCS1_PSS_PADDING:
+        fips_sli_fsm_EVP_MD_CTX(ctx, get_fips_padding_rsa_pss_genver_status(ctx, NULL));
+    default:
+        fips_sli_fsm_EVP_MD_CTX(ctx, FIPS_ERROR);
+    }
+}
+
+/* Find a better way to access the actual salt length, maybe in ctx->data ? */
+
+void fips_sli_check_padding_rsa_sigver_EVP_MD_CTX(EVP_MD_CTX * ctx, int pad_mode, int res_salt_len) {
+    switch (pad_mode) {
+    case RSA_PKCS1_PSS_PADDING:
+        fips_sli_fsm_EVP_MD_CTX(ctx, get_fips_padding_rsa_pss_genver_status(ctx, &res_salt_len));
+    default:
+        fips_sli_fsm_EVP_MD_CTX(ctx, FIPS_ERROR);
+    }
 }

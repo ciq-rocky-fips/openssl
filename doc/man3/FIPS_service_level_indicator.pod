@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-C<int fips_sli_is_approved_*_CTX> - get status of the FIPS Service Level Indicator (SLI) for context operations
+C<int fips_sli_is_approved_*> - get status of the FIPS Service Level Indicator (SLI) for context operations
 
 C<int fips_sli_*_is_approved> - get status of the FIPS SLI for standalone operations
 
@@ -21,6 +21,8 @@ C<int fips_sli_*_is_approved> - get status of the FIPS SLI for standalone operat
  int fips_sli_is_approved_CMAC_CTX(const CMAC_CTX *ctx);
 
  int fips_sli_is_approved_HMAC_CTX(const HMAC_CTX *ctx);
+
+ int fips_sli_is_approved_SSL(const SSL *ssl);
 
  int fips_sli_SHA1_is_approved(const unsigned char *d, size_t n, unsigned char *md);
 
@@ -42,7 +44,7 @@ The service level indicator has two different usage scenarios.
 
 =over 1
 
-=item C<int fips_sli_is_approved_*_CTX(...)>
+=item C<int fips_sli_is_approved_*(...)>
 
 Most operations happen on some form of a context, which also holds the SLI.
 This function returns whether the FIPS SLI indicates an approved operation or not.
@@ -86,7 +88,7 @@ Swapping out OPENSSL's RNG implementation (e.g. via L<RAND_set_rand_method(3)>) 
 
 =head1 RETURN VALUES
 
-C<fips_sli_is_approved_*_CTX()> returns 0 if the previous operation(s) was unapproved or B<ctx> was B<NULL>, and returns 1
+C<fips_sli_is_approved_*()> returns 0 if the previous operation(s) was unapproved or B<ctx> was B<NULL>, and returns 1
 if the previous operation(s) were approved (or rather, no non-approved operations happened).
 
 C<fips_sli_*_is_approved()> returns 0 if an operation with a given set of parameters was unapproved, and returns 1
@@ -100,7 +102,7 @@ The FIPS SLI was added in OpenSSL 1.1.1.l.
 
 =head1 COPYRIGHT
 
-Copyright 2022
+Copyright 2024
 
 Licensed under the OpenSSL license (the "License").  You may not use
 this file except in compliance with the License.  You can obtain a copy

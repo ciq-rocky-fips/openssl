@@ -32,6 +32,7 @@
 # include "statem/statem.h"
 # include "packet_local.h"
 # include "internal/dane.h"
+# include "internal/fips_sli_local.h"
 # include "internal/refcount.h"
 # include "internal/tsan_assist.h"
 
@@ -1479,6 +1480,7 @@ struct ssl_st {
      */
     const struct sigalg_lookup_st **shared_sigalgs;
     size_t shared_sigalgslen;
+    FIPS_STATUS sli; /* Service Level Indicator */
 };
 
 /*

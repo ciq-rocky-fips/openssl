@@ -1,3 +1,4 @@
+#include <openssl/crypto.h>
 #include <openssl/dsa.h>
 #include <openssl/ec.h>
 #include <openssl/rsa.h>
@@ -5,6 +6,7 @@
 #include "../evp/evp_local.h"
 #include "../hmac/hmac_local.h"
 #include "../rsa/rsa_local.h"
+#include "../ssl/ssl_local.h"
 #include <openssl/tls1.h>
 #include "internal/fips_sli_local.h"
 
@@ -54,6 +56,7 @@ fips_sli_define_for(EVP_KDF_CTX)
 fips_sli_define_for(EVP_MD_CTX)
 fips_sli_define_for(EVP_PKEY_CTX)
 fips_sli_define_for(HMAC_CTX)
+fips_sli_define_for(SSL)
 
 typedef enum curve_usage_e {
     CURVE_KEYGEN,
@@ -479,5 +482,15 @@ void fips_sli_check_padding_rsa_sigver_EVP_MD_CTX(EVP_MD_CTX * ctx, int pad_mode
         fips_sli_fsm_EVP_MD_CTX(ctx, get_fips_padding_rsa_pss_genver_status(ctx, &res_salt_len));
     default:
         fips_sli_fsm_EVP_MD_CTX(ctx, FIPS_ERROR);
+    }
+}
+
+void fips_sli_check_prf_label_SSL(SSL * s, const void * label)
+{
+    if (CRYPTO_memcmp(label, TLS_MD_EXTENDED_MASTER_SECRET_CONST,
+               TLS_MD_EXTENDED_MASTER_SECRET_CONST_SIZE) == 0) {
+        fips_sli_approve_SSL(s);
+    } else {
+        fips_sli_disapprove_SSL(s);
     }
 }

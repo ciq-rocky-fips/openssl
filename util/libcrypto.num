@@ -4646,3 +4646,5 @@ fips_sli_PKCS5_PBKDF2_HMAC_is_approved  6607	1_1_1k	EXIST::FUNCTION:
 fips_sli_HMAC_is_approved               6608	1_1_1k	EXIST::FUNCTION:
 fips_sli_RAND_bytes_is_approved         6609	1_1_1k	EXIST::FUNCTION:
 fips_sli_RAND_priv_bytes_is_approved    6610	1_1_1k	EXIST::FUNCTION:
+fips_sli_is_approved_SSL                6611	1_1_1k	EXIST::FUNCTION:
+fips_sli_check_prf_label_SSL            6612	1_1_1k	EXIST::FUNCTION:

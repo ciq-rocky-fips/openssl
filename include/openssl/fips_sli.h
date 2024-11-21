@@ -15,6 +15,7 @@ int fips_sli_is_approved_EVP_MD_CTX(const EVP_MD_CTX *ctx);
 int fips_sli_is_approved_EVP_PKEY_CTX(const EVP_PKEY_CTX *ctx);
 int fips_sli_is_approved_CMAC_CTX(const CMAC_CTX *ctx);
 int fips_sli_is_approved_HMAC_CTX(const HMAC_CTX *ctx);
+int fips_sli_is_approved_SSL(const SSL *s);
 
 int fips_sli_SHA1_is_approved(const unsigned char *d, size_t n, unsigned char *md);
 int fips_sli_HMAC_is_approved(const EVP_MD *evp_md, const void *key, int key_len,
@@ -25,6 +26,8 @@ int fips_sli_PKCS5_PBKDF2_HMAC_is_approved(const char *pass, int passlen,
                       const EVP_MD *digest, int keylen, unsigned char *out);
 int fips_sli_RAND_bytes_is_approved(unsigned char *buf, int num);
 int fips_sli_RAND_priv_bytes_is_approved(unsigned char *buf, int num);
+
+void fips_sli_check_prf_label_SSL(SSL * ctx, const void * label);
 
 #  ifdef  __cplusplus
 }

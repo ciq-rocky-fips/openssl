@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 #include "ssl_local.h"
+#include "internal/fips_sli_local.h"
 #include <openssl/comp.h>
 #include <openssl/evp.h>
 #include <openssl/kdf.h>
@@ -56,6 +57,8 @@ static int tls1_PRF(SSL *s,
         goto err;
     }
 
+    /* seed1 is the label */
+    fips_sli_check_prf_label_SSL(s, seed1);
     ret = 1;
 
  err:

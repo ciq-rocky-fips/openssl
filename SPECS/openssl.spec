@@ -29,7 +29,7 @@ print(string.sub(hash, 0, 16))
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 3.0.7
-Release: 27%{?dist}.0.2.4
+Release: 27%{?dist}.0.2.5
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -217,12 +217,14 @@ Patch135: 0135-CVE-2024-0727.patch
 # https://github.com/openssl/openssl/commit/05f360d9e849a1b277db628f1f13083a7f8dd04f
 Patch136:             0136-CVE-2024-6119.patch
 #FIPS PROVIDER rebranding
-Patch200: rocky_fips_provider.patch
-Patch201: rocky_fips_provider-2.patch
+Patch200: 0137-rocky_fips_provider.patch
+Patch201: 0138-rocky_fips_provider-2.patch
 
 # EDDSA patches (ED25519 and ED448).
-Patch301: 0001-Add-KAT-and-enable-support-for-ED25519-and-ED448-in-.patch
-Patch302: 0002-Add-PCTs-for-key-generation-for-ED25519-and-ED448.patch
+Patch301: 0139-Add-KAT-and-enable-support-for-ED25519-and-ED448-in-.patch
+Patch302: 0140-Add-PCTs-for-key-generation-for-ED25519-and-ED448.patch
+# FIPS - zero ECX keys.
+Patch303: 0141-ECX-pubkey-zero.patch
 
 License: ASL 2.0
 URL: http://www.openssl.org/
@@ -361,7 +363,7 @@ export HASHBANGPERL=/usr/bin/perl
 	zlib enable-camellia enable-seed enable-rfc3779 enable-sctp \
 	enable-cms enable-md2 enable-rc5 enable-ktls enable-fips\
 	no-mdc2 no-ec2m no-sm2 no-sm4 enable-buildtest-c++\
-	shared  ${sslarch} $RPM_OPT_FLAGS '-DDEVRANDOM="\"/dev/urandom\"" -DROCKY_FIPS_NAME="\"Rocky Linux 9 - OpenSSL FIPS Provider\"" -DROCKY_FIPS_VERSION="\"Rocky9.20241015\""'\
+	shared  ${sslarch} $RPM_OPT_FLAGS '-DDEVRANDOM="\"/dev/urandom\"" -DROCKY_FIPS_NAME="\"Rocky Linux 9 - OpenSSL FIPS Provider\"" -DROCKY_FIPS_VERSION="\"Rocky9.20241119\""'\
 	-Wl,--allow-multiple-definition
 
 # Do not run this in a production package the FIPS symbols must be patched-in
@@ -562,7 +564,11 @@ ln -s /etc/crypto-policies/back-ends/openssl_fips.config $RPM_BUILD_ROOT%{_sysco
 %ldconfig_scriptlets libs
 
 %changelog
-* Tue Nov 5 2024 Jeremy Allison <jallison@ciq.com> - 3.0.7-27.0.2.4
+* Mon Nov 19 2024 Jason Rodriguez <jrodriguez@ciq.com> - 3.0.7-27.0.2.5
+- Renaming patch files to adhear to provider naming convention
+
+* Mon Nov 18 2024 Jeremy Allison <jallison@ciq.com> - 3.0.7-27.0.2.4
+- FIPS - zeroization of ECX public keys
 - Add EDDSA (ED25519 and ED448 curves)
 
 * Tue Oct 29 2024 Jason Rodriguez <jrodriguez@ciq.com> - 3.0.7-27.0.2.3

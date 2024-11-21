@@ -1,0 +1,28 @@
+commit 2525d132b727aa625617013974cf499923459612
+Author: Jeremy Allison <jallison@ciq.com>
+Date:   Fri Nov 15 10:28:24 2024 -0800
+
+    fips: zeroization of ECX public keys
+    
+    Upstream commit fa338aa added zeroization of public security parameters as
+    required by ISO 19790:2012/Cor.1:2015 7.9. However, that commit
+    overlooked ECX keys, which are used for EdDSA and X25519/X448.
+    
+    Written by Joachim Vandersmissen.
+    
+    Signed-off-by: Jeremy Allison <jallison@ciq.com>
+
+diff --git a/crypto/ec/ecx_key.c b/crypto/ec/ecx_key.c
+index dcec26c..ae179de 100644
+--- a/crypto/ec/ecx_key.c
++++ b/crypto/ec/ecx_key.c
+@@ -68,6 +68,9 @@ void ossl_ecx_key_free(ECX_KEY *key)
+     REF_ASSERT_ISNT(i < 0);
+ 
+     OPENSSL_free(key->propq);
++#ifdef FIPS_MODULE
++    OPENSSL_cleanse(&key->pubkey, sizeof(key->pubkey));
++#endif
+     OPENSSL_secure_clear_free(key->privkey, key->keylen);
+     CRYPTO_THREAD_lock_free(key->lock);
+     OPENSSL_free(key);

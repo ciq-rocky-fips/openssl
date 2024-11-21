@@ -86,7 +86,6 @@ static FIPS_STATUS get_fips_curve_status(const EC_GROUP *group, CURVE_USAGE u) {
         }
     case CURVE_SIGVER:
         switch (EC_GROUP_get_curve_name(group)) {
-        case NID_X9_62_prime192v1: /* NIST P-192 */
         case NID_secp224r1:
         /* SECG secp256r1 is the same as X9.62 prime256v1 (P-256) and hence omitted */
         case NID_X9_62_prime256v1:

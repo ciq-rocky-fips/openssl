@@ -164,7 +164,6 @@ static FIPS_STATUS get_fips_hash_status(const EVP_MD *md, HASH_USAGE u) {
             return FIPS_NONAPPROVED;
         }
     case HASH_KDF_PBKDF2:
-    case HASH_KDF_SSHKDF:
     case HASH_MAC:
         switch (EVP_MD_type(md)) {
         case NID_sha1:
@@ -194,6 +193,17 @@ static FIPS_STATUS get_fips_hash_status(const EVP_MD *md, HASH_USAGE u) {
         }
     case HASH_KDF_SSKDF:
         switch (EVP_MD_type(md)) {
+        case NID_sha224:
+        case NID_sha256:
+        case NID_sha384:
+        case NID_sha512:
+            return FIPS_APPROVED;
+        default:
+            return FIPS_NONAPPROVED;
+        }
+    case HASH_KDF_SSHKDF:
+        switch (EVP_MD_type(md)) {
+        case NID_sha1:
         case NID_sha224:
         case NID_sha256:
         case NID_sha384:

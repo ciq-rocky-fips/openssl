@@ -351,6 +351,10 @@ static int FIPSCHECK_verify(const char *path)
         if (strcmp(hex, hmac) != 0) {
             rv = -1;
         }
+        if (hmaclen != 0) {
+            OPENSSL_cleanse(buf, hmaclen);
+            OPENSSL_cleanse(hex, hmaclen * 2 + 1);
+        }
         free(buf);
         free(hex);
     } else {
@@ -358,7 +362,11 @@ static int FIPSCHECK_verify(const char *path)
     }
 
  end:
+    if (n != 0)
+        OPENSSL_cleanse(hmac, n);
     free(hmac);
+    if (strlen(hmacpath) != 0)
+        OPENSSL_cleanse(hmacpath, strlen(hmacpath));
     free(hmacpath);
     fclose(hf);
 

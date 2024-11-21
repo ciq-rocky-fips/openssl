@@ -65,8 +65,10 @@ void fips_sli_check_hash_sigver_EVP_MD_CTX(EVP_MD_CTX * ctx, const EVP_MD * md);
 void fips_sli_check_hash_siggen_EVP_PKEY_CTX(EVP_PKEY_CTX * ctx, const EVP_MD * md);
 void fips_sli_check_hash_sigver_EVP_PKEY_CTX(EVP_PKEY_CTX * ctx, const EVP_MD * md);
 void fips_sli_check_hash_mac_HMAC_CTX(HMAC_CTX * ctx, const EVP_MD * md);
+void fips_sli_check_hash_pbkdf2_HMAC_CTX(EVP_KDF_CTX * ctx, const EVP_MD * md);
 
 FIPS_STATUS fips_sli_get_hash_status_sshkdf(const EVP_MD * md);
+FIPS_STATUS fips_sli_get_hash_status_hkdf(const EVP_MD * md);
 FIPS_STATUS fips_sli_get_hash_status_pbkdf2(const EVP_MD * md);
 FIPS_STATUS fips_sli_get_hash_status_kbkdf(const EVP_MD * md);
 FIPS_STATUS fips_sli_get_hash_status_sskdf(const EVP_MD * md);

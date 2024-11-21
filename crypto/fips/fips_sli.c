@@ -140,6 +140,7 @@ typedef enum hash_usage_e {
     HASH_SIGVER,
     HASH_KDF_SSHKDF,
     HASH_KDF_PBKDF2,
+    HASH_KDF_HKDF,
     HASH_KDF_TLS,
     HASH_KDF_KBKDF,
     HASH_KDF_SSKDF,
@@ -164,6 +165,23 @@ static FIPS_STATUS get_fips_hash_status(const EVP_MD *md, HASH_USAGE u) {
             return FIPS_NONAPPROVED;
         }
     case HASH_KDF_PBKDF2:
+    case HASH_KDF_HKDF:
+        switch (EVP_MD_type(md)) {
+        case NID_sha1:
+        case NID_sha224:
+        case NID_sha256:
+        case NID_sha384:
+        case NID_sha512:
+        case NID_sha512_224:
+        case NID_sha512_256:
+        case NID_sha3_224:
+        case NID_sha3_256:
+        case NID_sha3_384:
+        case NID_sha3_512:
+            return FIPS_APPROVED;
+        default:
+            return FIPS_NONAPPROVED;
+        }
     case HASH_MAC:
         switch (EVP_MD_type(md)) {
         case NID_sha1:
@@ -250,6 +268,9 @@ make_fips_sli_check_hash(HMAC_CTX, mac, HASH_MAC)
 /* KDF impl is a bit special - avoid changing everything just because of that */
 FIPS_STATUS fips_sli_get_hash_status_sshkdf(const EVP_MD * md) {
     return get_fips_hash_status(md, HASH_KDF_SSHKDF);
+}
+FIPS_STATUS fips_sli_get_hash_status_hkdf(const EVP_MD * md) {
+    return get_fips_hash_status(md, HASH_KDF_HKDF);
 }
 FIPS_STATUS fips_sli_get_hash_status_pbkdf2(const EVP_MD * md) {
     return get_fips_hash_status(md, HASH_KDF_PBKDF2);

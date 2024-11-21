@@ -17,6 +17,7 @@
 #include "internal/cryptlib.h"
 #include "crypto/evp.h"
 #include "kdf_local.h"
+#include "internal/fips_sli_local.h"
 
 #define HKDF_MAXBUF 1024
 
@@ -223,9 +224,13 @@ static int kdf_hkdf_derive(EVP_KDF_IMPL *impl, unsigned char *key,
     }
 }
 
-static int kdf_hkdf_fips_sli_is_approved(ossl_unused const EVP_KDF_IMPL *impl) {
-    return 0; /* can't check whether this is only used for DH / TLS1.3 because
-    this is handled by the application. Thus label HKDF as non-approved. */
+static int kdf_hkdf_fips_sli_is_approved(const EVP_KDF_IMPL *impl)
+{
+    if (fips_sli_get_hash_status_hkdf(impl->md) != FIPS_APPROVED)
+        return 0;
+    if (impl->key_len < 112/8)
+        return 0;
+    return 1;
 }
 
 const EVP_KDF_METHOD hkdf_kdf_meth = {

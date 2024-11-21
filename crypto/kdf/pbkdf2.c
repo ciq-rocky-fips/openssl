@@ -34,6 +34,15 @@ struct evp_kdf_impl_st {
     FIPS_STATUS sli; /* Service Level Indicator */
 };
 
+static int kdf_pbkdf_fips_sli_is_approved(const EVP_KDF_IMPL *impl)
+{
+    if (fips_sli_get_hash_status_pbkdf2(impl->md) != FIPS_APPROVED)
+        return 0;
+    if (impl->pass_len < 112/8)
+        return 0;
+    return 1;
+}
+
 static ossl_unused int fips_sli_is_approved_struct_evp_kdf_impl_st(const struct evp_kdf_impl_st *ctx);
 fips_sli_define_basic_for(static, struct_evp_kdf_impl_st, struct evp_kdf_impl_st)
 
@@ -207,7 +216,7 @@ const EVP_KDF_METHOD pbkdf2_kdf_meth = {
     kdf_pbkdf2_ctrl_str,
     NULL,
     kdf_pbkdf2_derive,
-    fips_sli_is_approved_struct_evp_kdf_impl_st
+    kdf_pbkdf_fips_sli_is_approved
 };
 
 /*

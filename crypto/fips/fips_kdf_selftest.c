@@ -77,7 +77,7 @@ static int FIPS_selftest_tls1_prf(void)
         goto err;
     }
     if (EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_TLS_SECRET,
-                     "secret", (size_t)6) <= 0) {
+                     "secretSECRETsecret", (size_t)18) <= 0) {
         goto err;
     }
     if (EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_ADD_TLS_SEED, "seed", (size_t)4) <= 0) {
@@ -89,8 +89,8 @@ static int FIPS_selftest_tls1_prf(void)
 
     {
         const unsigned char expected[sizeof(out)] = {
-            0x8e, 0x4d, 0x93, 0x25, 0x30, 0xd7, 0x65, 0xa0,
-            0xaa, 0xe9, 0x74, 0xc3, 0x04, 0x73, 0x5e, 0xcc
+            0xe8, 0x91, 0x68, 0x49, 0x6d, 0xe5, 0x0e, 0x3b,
+            0x34, 0x49, 0x10, 0xbd, 0x89, 0x42, 0x3d, 0x64
         };
         if (memcmp(out, expected, sizeof(expected))) {
             goto err;
@@ -120,7 +120,7 @@ static int FIPS_selftest_hkdf(void)
     if (EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_SALT, "salt", (size_t)4) <= 0) {
         goto err;
     }
-    if (EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_KEY, "secret", (size_t)6) <= 0) {
+    if (EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_KEY, "secretSECRETsecretSECRET", (size_t)24) <= 0) {
         goto err;
     }
     if (EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_ADD_HKDF_INFO,
@@ -133,7 +133,7 @@ static int FIPS_selftest_hkdf(void)
 
     {
         const unsigned char expected[sizeof(out)] = {
-            0x2a, 0xc4, 0x36, 0x9f, 0x52, 0x59, 0x96, 0xf8, 0xde, 0x13
+            0x04, 0xb6, 0x43, 0x68, 0x62, 0x5c, 0x10, 0x17, 0x01, 0x76
         };
         if (memcmp(out, expected, sizeof(expected))) {
             goto err;

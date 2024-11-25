@@ -14,6 +14,7 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/sha.h>
+#include "internal/fips_sli_local.h"
 #include "rsa_local.h"
 
 static const unsigned char zeroes[] = { 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -35,7 +36,7 @@ int RSA_verify_PKCS1_PSS_mgf1(RSA *rsa, const unsigned char *mHash,
 {
     int i;
     int ret = 0;
-    int hLen, maskedDBLen, MSBits, emLen;
+    int hLen, maskedDBLen, MSBits, emLen, sLenRes;
     const unsigned char *H;
     unsigned char *DB = NULL;
     EVP_MD_CTX *ctx = EVP_MD_CTX_new();
@@ -118,6 +119,7 @@ int RSA_verify_PKCS1_PSS_mgf1(RSA *rsa, const unsigned char *mHash,
         if (!EVP_DigestUpdate(ctx, DB + i, maskedDBLen - i))
             goto err;
     }
+    sLenRes = maskedDBLen - i;
     if (!EVP_DigestFinal_ex(ctx, H_, NULL))
         goto err;
     if (memcmp(H_, H, hLen)) {
@@ -127,6 +129,8 @@ int RSA_verify_PKCS1_PSS_mgf1(RSA *rsa, const unsigned char *mHash,
         ret = 1;
     }
 
+    fips_sli_check_padding_rsa_sigver_EVP_MD_CTX(ctx, RSA_PKCS1_PSS_PADDING, sLenRes);
+    
  err:
     OPENSSL_free(DB);
     EVP_MD_CTX_free(ctx);
@@ -241,6 +245,8 @@ int RSA_padding_add_PKCS1_PSS_mgf1(RSA *rsa, unsigned char *EM,
     EM[emLen - 1] = 0xbc;
 
     ret = 1;
+
+    fips_sli_check_padding_rsa_siggen_EVP_MD_CTX(ctx, RSA_PKCS1_PSS_PADDING);
 
  err:
     EVP_MD_CTX_free(ctx);

@@ -288,6 +288,12 @@ static int rsa_ossl_private_encrypt(int flen, const unsigned char *from,
             RSAerr(RSA_F_RSA_OSSL_PRIVATE_ENCRYPT, RSA_R_KEY_SIZE_TOO_SMALL);
             return -1;
         }
+
+        if (!(rsa->flags & RSA_FLAG_NON_FIPS_ALLOW)
+            && padding == RSA_X931_PADDING) {
+            RSAerr(RSA_F_RSA_PADDING_ADD_X931, RSA_R_OPERATION_NOT_ALLOWED_IN_FIPS_MODE);
+            return -1;
+        }
     }
 # endif
 
@@ -683,6 +689,12 @@ static int rsa_ossl_public_decrypt(int flen, const unsigned char *from,
         if (!(rsa->flags & RSA_FLAG_NON_FIPS_ALLOW)
             && (BN_num_bits(rsa->n) < OPENSSL_RSA_FIPS_MIN_MODULUS_BITS)) {
             RSAerr(RSA_F_RSA_OSSL_PUBLIC_DECRYPT, RSA_R_KEY_SIZE_TOO_SMALL);
+            return -1;
+        }
+
+        if (!(rsa->flags & RSA_FLAG_NON_FIPS_ALLOW)
+            && padding == RSA_X931_PADDING) {
+            RSAerr(RSA_F_RSA_PADDING_CHECK_X931, RSA_R_OPERATION_NOT_ALLOWED_IN_FIPS_MODE);
             return -1;
         }
     }

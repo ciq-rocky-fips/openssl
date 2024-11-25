@@ -1,9 +1,13 @@
+#include <openssl/crypto.h>
 #include <openssl/dsa.h>
 #include <openssl/ec.h>
 #include <openssl/rsa.h>
 #include "crypto/evp.h"
 #include "../evp/evp_local.h"
 #include "../hmac/hmac_local.h"
+#include "../rsa/rsa_local.h"
+#include "../ssl/ssl_local.h"
+#include <openssl/tls1.h>
 #include "internal/fips_sli_local.h"
 
 /* Main part of the FIPS Service Level Indicator
@@ -52,6 +56,7 @@ fips_sli_define_for(EVP_KDF_CTX)
 fips_sli_define_for(EVP_MD_CTX)
 fips_sli_define_for(EVP_PKEY_CTX)
 fips_sli_define_for(HMAC_CTX)
+fips_sli_define_for(SSL)
 
 typedef enum curve_usage_e {
     CURVE_KEYGEN,
@@ -81,7 +86,6 @@ static FIPS_STATUS get_fips_curve_status(const EC_GROUP *group, CURVE_USAGE u) {
         }
     case CURVE_SIGVER:
         switch (EC_GROUP_get_curve_name(group)) {
-        case NID_X9_62_prime192v1: /* NIST P-192 */
         case NID_secp224r1:
         /* SECG secp256r1 is the same as X9.62 prime256v1 (P-256) and hence omitted */
         case NID_X9_62_prime256v1:
@@ -136,9 +140,8 @@ typedef enum hash_usage_e {
     HASH_SIGVER,
     HASH_KDF_SSHKDF,
     HASH_KDF_PBKDF2,
+    HASH_KDF_HKDF,
     HASH_KDF_TLS,
-    HASH_KDF_KBKDF,
-    HASH_KDF_SSKDF,
     HASH_RNG,
     HASH_MAC
 } HASH_USAGE;
@@ -160,7 +163,23 @@ static FIPS_STATUS get_fips_hash_status(const EVP_MD *md, HASH_USAGE u) {
             return FIPS_NONAPPROVED;
         }
     case HASH_KDF_PBKDF2:
-    case HASH_KDF_SSHKDF:
+    case HASH_KDF_HKDF:
+        switch (EVP_MD_type(md)) {
+        case NID_sha1:
+        case NID_sha224:
+        case NID_sha256:
+        case NID_sha384:
+        case NID_sha512:
+        case NID_sha512_224:
+        case NID_sha512_256:
+        case NID_sha3_224:
+        case NID_sha3_256:
+        case NID_sha3_384:
+        case NID_sha3_512:
+            return FIPS_APPROVED;
+        default:
+            return FIPS_NONAPPROVED;
+        }
     case HASH_MAC:
         switch (EVP_MD_type(md)) {
         case NID_sha1:
@@ -180,16 +199,9 @@ static FIPS_STATUS get_fips_hash_status(const EVP_MD *md, HASH_USAGE u) {
         default:
             return FIPS_NONAPPROVED;
         }
-    case HASH_KDF_KBKDF:
+    case HASH_KDF_SSHKDF:
         switch (EVP_MD_type(md)) {
-        case NID_sha256:
-        case NID_sha384:
-            return FIPS_APPROVED;
-        default:
-            return FIPS_NONAPPROVED;
-        }
-    case HASH_KDF_SSKDF:
-        switch (EVP_MD_type(md)) {
+        case NID_sha1:
         case NID_sha224:
         case NID_sha256:
         case NID_sha384:
@@ -237,17 +249,14 @@ make_fips_sli_check_hash(HMAC_CTX, mac, HASH_MAC)
 FIPS_STATUS fips_sli_get_hash_status_sshkdf(const EVP_MD * md) {
     return get_fips_hash_status(md, HASH_KDF_SSHKDF);
 }
+FIPS_STATUS fips_sli_get_hash_status_hkdf(const EVP_MD * md) {
+    return get_fips_hash_status(md, HASH_KDF_HKDF);
+}
 FIPS_STATUS fips_sli_get_hash_status_pbkdf2(const EVP_MD * md) {
     return get_fips_hash_status(md, HASH_KDF_PBKDF2);
 }
 FIPS_STATUS fips_sli_get_hash_status_kdf_tls1_prf(const EVP_MD * md) {
     return get_fips_hash_status(md, HASH_KDF_TLS);
-}
-FIPS_STATUS fips_sli_get_hash_status_kbkdf(const EVP_MD * md) {
-    return get_fips_hash_status(md, HASH_KDF_KBKDF);
-}
-FIPS_STATUS fips_sli_get_hash_status_sskdf(const EVP_MD * md) {
-    return get_fips_hash_status(md, HASH_KDF_SSKDF);
 }
 
 FIPS_STATUS fips_sli_get_kdf_keylen_status(size_t keylen_bytes) {
@@ -413,4 +422,79 @@ void fips_sli_check_padding_rsa_enc_EVP_PKEY_CTX(EVP_PKEY_CTX * ctx, int pad_mod
 
 void fips_sli_check_padding_rsa_dec_EVP_PKEY_CTX(EVP_PKEY_CTX * ctx, int pad_mode) {
     fips_sli_check_padding_rsa_enc_EVP_PKEY_CTX(ctx, pad_mode);
+}
+
+/* Approved range is only [0; hash output block length]. */
+
+static FIPS_STATUS get_fips_padding_rsa_pss_genver_status(EVP_MD_CTX * ctx, const int * res_salt_len) {
+    if (ctx == NULL)
+        return FIPS_ERROR;
+    EVP_PKEY_CTX * pkey_ctx = EVP_MD_CTX_pkey_ctx(ctx);
+    if (pkey_ctx == NULL)
+        return FIPS_ERROR;
+    EVP_PKEY * pkey = pkey_ctx->pkey;
+    if (pkey == NULL)
+        return FIPS_ERROR;
+    const EVP_MD * md = ctx->digest;
+
+    long sLen = ASN1_INTEGER_get(RSA_get0_pss_params(
+    EVP_PKEY_get1_RSA(pkey))->saltLength);
+
+    if (sLen >= 0) {
+        if (sLen > EVP_MD_block_size(md))
+            return FIPS_NONAPPROVED;
+        else
+            return FIPS_APPROVED;
+    }
+
+    /* Check the special values. */
+    if (pkey_ctx->operation & EVP_PKEY_OP_SIGN) {
+        switch (sLen) {
+        case RSA_PSS_SALTLEN_DIGEST:
+            return FIPS_APPROVED;
+        case RSA_PSS_SALTLEN_MAX:
+        case RSA_PSS_SALTLEN_MAX_SIGN:
+        default:
+            return FIPS_NONAPPROVED;
+        }
+    } else if (pkey_ctx->operation & EVP_PKEY_OP_VERIFY) {
+        /* Need to access the resulting salt length for verification. */
+        if (res_salt_len == NULL)
+            return FIPS_ERROR;
+        if (*res_salt_len > EVP_MD_block_size(md) || *res_salt_len < 0)
+            return FIPS_NONAPPROVED;
+        else
+            return FIPS_APPROVED;
+    }
+    return FIPS_NONAPPROVED;
+}
+
+void fips_sli_check_padding_rsa_siggen_EVP_MD_CTX(EVP_MD_CTX * ctx, int pad_mode) {
+    switch (pad_mode) {
+    case RSA_PKCS1_PSS_PADDING:
+        fips_sli_fsm_EVP_MD_CTX(ctx, get_fips_padding_rsa_pss_genver_status(ctx, NULL));
+    default:
+        fips_sli_fsm_EVP_MD_CTX(ctx, FIPS_ERROR);
+    }
+}
+
+/* Find a better way to access the actual salt length, maybe in ctx->data ? */
+
+void fips_sli_check_padding_rsa_sigver_EVP_MD_CTX(EVP_MD_CTX * ctx, int pad_mode, int res_salt_len) {
+    switch (pad_mode) {
+    case RSA_PKCS1_PSS_PADDING:
+        fips_sli_fsm_EVP_MD_CTX(ctx, get_fips_padding_rsa_pss_genver_status(ctx, &res_salt_len));
+    default:
+        fips_sli_fsm_EVP_MD_CTX(ctx, FIPS_ERROR);
+    }
+}
+
+void fips_sli_check_prf_label_SSL(SSL * s, const void * label)
+{
+    if (CRYPTO_memcmp(label, TLS_MD_EXTENDED_MASTER_SECRET_CONST,
+               TLS_MD_EXTENDED_MASTER_SECRET_CONST_SIZE) == 0) {
+        fips_sli_approve_SSL(s);
+    } else {
+        fips_sli_disapprove_SSL(s);
+    }
 }

@@ -351,6 +351,10 @@ static int FIPSCHECK_verify(const char *path)
         if (strcmp(hex, hmac) != 0) {
             rv = -1;
         }
+        if (hmaclen != 0) {
+            OPENSSL_cleanse(buf, hmaclen);
+            OPENSSL_cleanse(hex, hmaclen * 2 + 1);
+        }
         free(buf);
         free(hex);
     } else {
@@ -358,7 +362,11 @@ static int FIPSCHECK_verify(const char *path)
     }
 
  end:
+    if (n != 0)
+        OPENSSL_cleanse(hmac, n);
     free(hmac);
+    if (strlen(hmacpath) != 0)
+        OPENSSL_cleanse(hmacpath, strlen(hmacpath));
     free(hmacpath);
     fclose(hf);
 
@@ -487,6 +495,47 @@ int FIPS_module_mode_set(int onoff, int force_reseed)
     fips_clear_owning_thread();
     fips_w_unlock();
     return ret;
+}
+
+/*
+ * In non-FIPS mode, the selftests must succeed if the
+ * checksum files are present
+ */
+
+void NONFIPS_selftest_check(void)
+{
+    int rv;
+    char *hmacpath;
+    char path[PATH_MAX+1];
+
+    if (fips_selftest_fail) {
+        /* Check if the checksum files are installed. */
+        rv = get_library_path("libcrypto.so." SHLIB_VERSION_NUMBER, "FIPS_mode_set", path, sizeof(path));
+        if (rv < 0) {
+            OpenSSLDie(__FILE__,__LINE__, "FATAL FIPS SELFTEST FAILURE");
+        }
+
+        hmacpath = make_hmac_path(path);
+        if (hmacpath == NULL) {
+            OpenSSLDie(__FILE__,__LINE__, "FATAL FIPS SELFTEST FAILURE");
+        }
+
+        if (access(hmacpath, F_OK)) {
+            /* No hmac file is present, ignore the failed selftests. */
+            if (errno == ENOENT) {
+                free(hmacpath);
+                return;
+            }
+            /* We fail on any other error. */
+        }
+        /*
+         * If the file exists, but the selftests failed
+         * (eg wrong checksum), we fail too.
+         */
+        free(hmacpath);
+        OpenSSLDie(__FILE__,__LINE__, "FATAL FIPS SELFTEST FAILURE");
+    }
+    /* otherwise ok, selftests were successful */
 }
 
 static CRYPTO_THREAD_ID fips_threadid;

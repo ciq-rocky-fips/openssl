@@ -133,6 +133,11 @@ static int pkey_rsa_sign(EVP_PKEY_CTX *ctx, unsigned char *sig,
     RSA_PKEY_CTX *rctx = ctx->data;
     RSA *rsa = ctx->pkey->pkey.rsa;
 
+    /* Trying to detect a pre-hashed message, which is disapproved. */
+    if (rctx->md == NULL) {
+        fips_sli_disapprove_EVP_PKEY_CTX(ctx);
+    }
+
     fips_sli_check_key_rsa_siggen_EVP_PKEY_CTX(ctx, rsa);
     if (rctx->md) {
         if (tbslen != (size_t)EVP_MD_size(rctx->md)) {
@@ -224,6 +229,11 @@ static int pkey_rsa_verifyrecover(EVP_PKEY_CTX *ctx,
     int ret;
     RSA_PKEY_CTX *rctx = ctx->data;
 
+    /* Trying to detect a pre-hashed message, which is disapproved. */
+    if (rctx->md == NULL) {
+        fips_sli_disapprove_EVP_PKEY_CTX(ctx);
+    }
+
     if (rctx->md) {
         if (rctx->pad_mode == RSA_X931_PADDING) {
             if (!setup_tbuf(rctx, ctx))
@@ -291,6 +301,12 @@ static int pkey_rsa_verify(EVP_PKEY_CTX *ctx,
     RSA_PKEY_CTX *rctx = ctx->data;
     RSA *rsa = ctx->pkey->pkey.rsa;
     size_t rslen;
+
+    /* Trying to detect a pre-hashed message, which is disapproved. */
+    if (rctx->md == NULL) {
+        fips_sli_disapprove_EVP_PKEY_CTX(ctx);
+    }
+
     fips_sli_check_key_rsa_sigver_EVP_PKEY_CTX(ctx, rsa);
 
     if (rctx->md) {

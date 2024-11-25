@@ -79,6 +79,10 @@ int RSA_sign(int type, const unsigned char *m, unsigned int m_len,
         RSAerr(RSA_F_RSA_SIGN, RSA_R_NON_FIPS_RSA_METHOD);
         return 0;
     }
+    if (FIPS_mode() && (type == NID_shake128 || type == NID_shake256)) {
+        RSAerr(RSA_F_RSA_SIGN, RSA_R_OPERATION_NOT_ALLOWED_IN_FIPS_MODE);
+        return 0;
+    }
 #endif
     if (rsa->meth->rsa_sign) {
         return rsa->meth->rsa_sign(type, m, m_len, sigret, siglen, rsa);
@@ -247,6 +251,12 @@ err:
 int RSA_verify(int type, const unsigned char *m, unsigned int m_len,
                const unsigned char *sigbuf, unsigned int siglen, RSA *rsa)
 {
+#ifdef OPENSSL_FIPS
+    if (FIPS_mode() && (type == NID_shake128 || type == NID_shake256)) {
+        RSAerr(RSA_F_RSA_VERIFY, RSA_R_OPERATION_NOT_ALLOWED_IN_FIPS_MODE);
+        return 0;
+    }
+#endif
 
     if (rsa->meth->rsa_verify) {
         return rsa->meth->rsa_verify(type, m, m_len, sigbuf, siglen, rsa);

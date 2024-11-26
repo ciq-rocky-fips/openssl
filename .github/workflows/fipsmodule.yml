@@ -38,23 +38,9 @@ jobs:
           ls -l ./RESULTS
 
           # Extract the FIPS module
-          #mkdir RESULTS/{tmp,fips_module}
-          #cd RESULTS/tmp
-          #if [ -z "$DEBUG" ]; then
-          #    echo "Extracting FIPS module"
-          #    rpm2cpio ../openssl-libs-3*ciqfips*.x86_64.rpm | cpio -idmv ./usr/lib64/\*/fips.so
-          #else
-          #    mkdir -p usr/lib64/ossl-modules
-          #    echo Creating fake fips module
-          #    touch usr/lib64/ossl-modules/fips.so
-          #fi
-          #mv ./usr/lib64/ossl-modules/fips.so ../fips_module/fips.so.x86_64
           cd RESULTS
           RPMVERSION=$(ls ./openssl-libs-3*ciqfips*.x86_64.rpm | sed -e 's/.*openssl-libs-\(3.*\)\.x86_64\.rpm/\1/')
           echo "Creating fips provider tarball"
-          #tar -czf fips_module-${RPMVERSION}.tar.gz fips_module
-          #sha256sum fips_module-${RPMVERSION}.tar.gz > fips_module-${RPMVERSION}.tar.gz.sha256
-
           tar -czf openssl-fips-provider-${RPMVERSION}.tar.gz *.rpm
           sha256sum openssl-fips-provider-${RPMVERSION}.tar.gz > openssl-fips-provider-${RPMVERSION}.tar.gz.sha256
 

@@ -29,7 +29,7 @@ print(string.sub(hash, 0, 16))
 Summary: Utilities from the general purpose cryptography library with TLS implementation
 Name: openssl
 Version: 3.0.7
-Release: 27%{?dist}.0.2.5
+Release: 27%{?dist}.0.2.6
 Epoch: 1
 # We have to remove certain patented algorithms from the openssl source
 # tarball with the hobble-openssl script which is included below.
@@ -564,6 +564,9 @@ ln -s /etc/crypto-policies/back-ends/openssl_fips.config $RPM_BUILD_ROOT%{_sysco
 %ldconfig_scriptlets libs
 
 %changelog
+* Tue Nov 26 2024 Jason Rodriguez <jrodriguez@ciq.com> - 3.0.7-27.0.2.6
+- Incrementing version to bring builds into alignment
+
 * Mon Nov 19 2024 Jason Rodriguez <jrodriguez@ciq.com> - 3.0.7-27.0.2.5
 - Renaming patch files to adhear to provider naming convention
 

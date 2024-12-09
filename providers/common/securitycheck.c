@@ -255,15 +255,5 @@ int ossl_digest_is_allowed(OSSL_LIB_CTX *ctx, const EVP_MD *md)
     if (ossl_securitycheck_enabled(ctx))
         return ossl_digest_get_approved_nid(md) != NID_undef;
 # endif /* OPENSSL_NO_FIPS_SECURITYCHECKS */
-
-#ifndef FIPS_MODULE
-    {
-        int mdnid = EVP_MD_nid(md);
-        if ((mdnid == NID_sha1 || mdnid == NID_md5_sha1)
-                && !ossl_ctx_legacy_digest_signatures_allowed(ctx, 0))
-            return 0;
-    }
-#endif
-
     return 1;
 }

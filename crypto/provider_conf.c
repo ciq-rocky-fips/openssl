@@ -10,6 +10,7 @@
 #include <string.h>
 #include <openssl/trace.h>
 #include <openssl/err.h>
+#include <openssl/evp.h>
 #include <unistd.h>
 #include <openssl/conf.h>
 #include <openssl/safestack.h>
@@ -336,6 +337,9 @@ static int provider_conf_init(CONF_IMODULE *md, const CONF *cnf)
             if (provider_conf_activate(libctx, "fips", NULL, NULL, 0, NULL) != 1)
                 return 0;
         }
+        /* provider_conf_load can return 1 even wwhen the test is failed so check explicitly */
+        if (OSSL_PROVIDER_available(libctx, "fips") != 1)
+            return 0;
         if (provider_conf_activate(libctx, "base", NULL, NULL, 0, NULL) != 1)
             return 0;
         if (EVP_default_properties_enable_fips(libctx, 1) != 1)

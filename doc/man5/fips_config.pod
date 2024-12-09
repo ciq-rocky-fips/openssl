@@ -6,12 +6,12 @@ fips_config - OpenSSL FIPS configuration
 
 =head1 DESCRIPTION
 
-This command is disabled in Rocky Enterprise Linux. The FIPS provider is
+This command is disabled in Rocky Linux. The FIPS provider is
 automatically loaded when the system is booted in FIPS mode, or when the
 environment variable B<OPENSSL_FORCE_FIPS_MODE> is set. See the documentation
 for more information.
 
-Rocky Enterprise Linux uses a supplementary config for FIPS module located in
+Rocky Linux uses a supplementary config for FIPS module located in
 OpenSSL configuration directory and managed by crypto policies. If present, it
 should have format
 

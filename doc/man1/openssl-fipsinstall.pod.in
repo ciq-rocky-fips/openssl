@@ -11,7 +11,7 @@ B<openssl fipsinstall>
 
 =head1 DESCRIPTION
 This command is disabled.
-Please consult Rocky Enterprise Linux documentation to learn how to correctly
+Please consult Rocky Linux documentation to learn how to correctly
 enable FIPS mode on Rocky Enterprise
 
 =head1 COPYRIGHT

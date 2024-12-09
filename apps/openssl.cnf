@@ -46,6 +46,11 @@ tsa_policy3 = 1.2.3.4.5.7
 providers = provider_sect
 # Load default TLS policy configuration
 ssl_conf = ssl_module
+alg_section = evp_properties
+
+[ evp_properties ]
+#This section is intentionally added empty here
+#to be tuned on particular systems
 
 # Uncomment the sections that start with ## below to enable the legacy provider.
 # Loading the legacy provider enables support for the following algorithms:
@@ -65,6 +70,9 @@ activate = 1
 
 ##[legacy_sect]
 ##activate = 1
+
+#Place the third party provider configuration files into this folder
+.include /etc/pki/tls/openssl.d
 
 [ ssl_module ]
 

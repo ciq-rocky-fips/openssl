@@ -807,6 +807,114 @@ end:
     return success;
 }
 
+static const size_t FIPS_slitest_pbkdf2_tests_len = 6;
+
+#define PBKDF2_VALID_KEYLEN 40
+#define PBKDF2_SALT_STR "saltSALTsaltSALTsaltSALTsaltSALTsalt"
+#define PBKDF2_PW_STR "passwordPASSWORDpassword"
+
+static int FIPS_slitest_pbkdf2(int pbkdf2_test_index)
+{
+    int success = 0;
+    size_t pwlen = strlen(PBKDF2_PW_STR);
+    size_t keylen = PBKDF2_VALID_KEYLEN;
+    size_t saltlen = strlen(PBKDF2_SALT_STR);
+    size_t iternum = 4096;
+    const EVP_MD *md = EVP_sha256();
+    EVP_KDF_CTX *kctx = NULL;
+    unsigned char out_key[PBKDF2_VALID_KEYLEN];
+    int ret;
+
+    if (!TEST_ptr(kctx = EVP_KDF_CTX_new_id(EVP_KDF_PBKDF2))) {
+        goto end;
+    }
+    if (pbkdf2_test_index == 0) {
+        /* Bad pwlen */
+        pwlen = 2;
+    }
+    if (pbkdf2_test_index == 1) {
+        /* Bad keylen */
+        keylen = 2;
+    }
+    if (pbkdf2_test_index == 2) {
+        /* Bad saltlen */
+        saltlen = 2;
+    }
+    if (pbkdf2_test_index == 3) {
+        /* Bad iternum */
+        iternum = 10;
+    }
+    if (pbkdf2_test_index == 4) {
+        /* Bad md */
+        md = EVP_md5();
+    }
+    ret = EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_PASS,
+                     PBKDF2_PW_STR, pwlen);
+    if (!TEST_true(ret == 1)) {
+        goto end;
+    }
+    ret = EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_SALT,
+                     PBKDF2_SALT_STR, saltlen);
+    if (!TEST_true(ret == 1)) {
+        goto end;
+    }
+    ret = EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_ITER, iternum);
+    if (!TEST_true(ret == 1)) {
+        goto end;
+    }
+    ret = EVP_KDF_ctrl(kctx, EVP_KDF_CTRL_SET_MD, md);
+    if (!TEST_true(ret == 1)) {
+        goto end;
+    }
+    ret = EVP_KDF_derive(kctx, out_key, keylen);
+#ifdef OPENSSL_FIPS
+    if (FIPS_mode() && (md == EVP_md5())) {
+        /*
+         * In FIPS mode KDF derive must fail
+         * if md == EVP_md5 as it can't be used.
+         */
+        if (!TEST_true(ret == 0)) {
+            goto end;
+        }
+    } else {
+        if (!TEST_true(ret == 1)) {
+            goto end;
+        }
+    }
+#else
+    if (!TEST_true(ret == 1)) {
+        goto end;
+    }
+#endif
+
+    ret = fips_sli_is_approved_EVP_KDF_CTX(kctx);
+    if (pbkdf2_test_index != 5) {
+        /*
+         * On pbkdf2_test_index < 5 we corrupted something
+         * the PBKDF2 should object to.
+         */
+        if (!TEST_true(ret == 0)) {
+            goto end;
+        }
+    } else {
+        /*
+         * On pbkdf2_test_index == 5 we didn't corrupt anything
+         * so this should be approved.
+         */
+        if (!TEST_true(ret == 1)) {
+            goto end;
+        }
+    }
+
+    success = 1;
+
+end:
+    if (kctx) {
+        EVP_KDF_CTX_free(kctx);
+    }
+    return success;
+}
+
 int setup_tests(void) {
     ADD_TEST(test_sli_noop);
     ADD_TEST(cmac_aes_cbc);
@@ -829,6 +937,8 @@ int setup_tests(void) {
 
     ADD_TEST(fips_evp_aes_gcm_restore_iv_not_fips_compliant);
     ADD_TEST(fips_evp_aes_gcm_adding_too_much_iv);
+
+    ADD_ALL_TESTS(FIPS_slitest_pbkdf2, FIPS_slitest_pbkdf2_tests_len);
 
     return 1; /* success */
 }

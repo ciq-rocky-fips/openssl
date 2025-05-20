@@ -1,0 +1,58 @@
+From 54eabd5b18433a4d624904193c7148e92cb3c9b0 Mon Sep 17 00:00:00 2001
+From: Gerd Hoffmann <kraxel@redhat.com>
+Date: Mon, 7 Apr 2025 12:58:54 +0200
+Subject: [PATCH 55/57] crypto: disable OSSL_PARAM_REAL on UEFI
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Floating point types like double can't be used on UEFI.
+Fix build on UEFI by disabling the OSSL_PARAM_REAL branch.
+
+Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
+
+Reviewed-by: Saša Nedvědický <sashan@openssl.org>
+Reviewed-by: Tomas Mraz <tomas@openssl.org>
+Reviewed-by: Matt Caswell <matt@openssl.org>
+(Merged from https://github.com/openssl/openssl/pull/27284)
+---
+ crypto/params_from_text.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/crypto/params_from_text.c b/crypto/params_from_text.c
+index 7532d4d439..fb25400dc1 100644
+--- a/crypto/params_from_text.c
++++ b/crypto/params_from_text.c
+@@ -220,9 +220,9 @@ int OSSL_PARAM_print_to_bio(const OSSL_PARAM *p, BIO *bio, int print_values)
+     BIGNUM *bn;
+ #ifndef OPENSSL_SYS_UEFI
+     double d;
++    int dok;
+ #endif
+     int ok = -1;
+-    int dok;
+ 
+     /*
+      * Iterate through each key in the array printing its key and value
+@@ -280,16 +280,16 @@ int OSSL_PARAM_print_to_bio(const OSSL_PARAM *p, BIO *bio, int print_values)
+         case OSSL_PARAM_OCTET_STRING:
+             ok = BIO_dump(bio, (char *)p->data, p->data_size);
+             break;
++#ifndef OPENSSL_SYS_UEFI
+         case OSSL_PARAM_REAL:
+             dok = 0;
+-#ifndef OPENSSL_SYS_UEFI
+             dok = OSSL_PARAM_get_double(p, &d);
+-#endif
+             if (dok == 1)
+                 ok = BIO_printf(bio, "%f\n", d);
+             else
+                 ok = BIO_printf(bio, "error getting value\n");
+             break;
++#endif
+         default:
+             ok = BIO_printf(bio, "unknown type (%u) of %zu bytes\n",
+                             p->data_type, p->data_size);
+-- 
+2.49.0
+

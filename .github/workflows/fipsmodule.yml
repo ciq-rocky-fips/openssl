@@ -1,0 +1,55 @@
+name: Build OpenSSL 3.5.0 FIPS module
+
+on:
+  push:
+  pull_request:
+    branches: [dist-git]
+
+jobs:
+  mockBuild:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
+    container:
+      image: quay.io/rockylinux/rockylinux:9
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build openssl rpm
+        run: |
+          unset DEBUG
+          mkdir -p RESULTS
+          if [ -z "$DEBUG" ]; then
+              echo "Installing mock"
+              dnf -y install epel-release
+              dnf -y install mock rpm-build
+              echo "Running mock build"
+              echo "config_opts['macros']['provider'] = 'provider'" >> .mock-config/rocky-lts9-x86_64.cfg
+              mock -v -r .mock-config/rocky-lts9-x86_64.cfg \
+                --spec="./SPECS/openssl.spec" \
+                --sources="./SOURCES" \
+                --resultdir="./RESULTS"
+          else              
+              echo "Fake build log for your sprog" > RESULTS/build.log
+          fi
+          echo "Contents of result directory"
+          ls -l ./RESULTS
+
+          # Extract the FIPS module
+          cd RESULTS
+          RPMVERSION=$(ls ./openssl-libs-3*ciqfips*.x86_64.rpm | sed -e 's/.*openssl-libs-\(3.*\)\.x86_64\.rpm/\1/')
+          echo "Creating fips provider tarball"
+          tar -czf openssl-fips-provider-${RPMVERSION}.tar.gz *.rpm
+          sha256sum openssl-fips-provider-${RPMVERSION}.tar.gz > openssl-fips-provider-${RPMVERSION}.tar.gz.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fips_module_RESULTS
+          path: |
+            RESULTS/*.log
+            RESULTS/*.rpm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fips_tarball
+          path: |
+            RESULTS/*.tar.gz
+            RESULTS/*.tar.gz.sha256

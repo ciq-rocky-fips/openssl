@@ -1,0 +1,30 @@
+From 73574d1847777d0c93d9ebe353d235ebb165eeae Mon Sep 17 00:00:00 2001
+From: Simo Sorce <simo@redhat.com>
+Date: Thu, 13 Feb 2025 18:11:19 -0500
+Subject: [PATCH 15/50] RH: TMP KTLS test skip
+
+From-dist-git-commit: 83382cc2a09dfcc55d5740fd08fd95c2333a56c9
+---
+ test/sslapitest.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/test/sslapitest.c b/test/sslapitest.c
+index 38d58e9387..39118a9162 100644
+--- a/test/sslapitest.c
++++ b/test/sslapitest.c
+@@ -1023,9 +1023,10 @@ static int execute_test_large_message(const SSL_METHOD *smeth,
+ /* sock must be connected */
+ static int ktls_chk_platform(int sock)
+ {
+-    if (!ktls_enable(sock))
++/*    if (!ktls_enable(sock))
+         return 0;
+-    return 1;
++    return 1; */
++    return 0;
+ }
+ 
+ static int ping_pong_query(SSL *clientssl, SSL *serverssl)
+-- 
+2.49.0
+

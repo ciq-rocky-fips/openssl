@@ -1,4 +1,4 @@
-name: Build OpenSSL 3.5.0 FIPS module
+name: Build OpenSSL 3.2.2 FIPS module
 
 on:
   push:

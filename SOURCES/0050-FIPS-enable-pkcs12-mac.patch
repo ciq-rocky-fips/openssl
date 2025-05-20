@@ -1,0 +1,95 @@
+diff -up openssl-3.0.1/crypto/pkcs12/p12_key.c.pkc12_fips openssl-3.0.1/crypto/pkcs12/p12_key.c
+--- openssl-3.0.1/crypto/pkcs12/p12_key.c.pkc12_fips	2022-02-21 12:35:24.829893907 +0100
++++ openssl-3.0.1/crypto/pkcs12/p12_key.c	2022-02-21 13:01:22.711622967 +0100
+@@ -85,17 +85,41 @@ int PKCS12_key_gen_uni_ex(unsigned char
+     EVP_KDF *kdf;
+     EVP_KDF_CTX *ctx;
+     OSSL_PARAM params[6], *p = params;
++    char *adjusted_propq = NULL;
+ 
+     if (n <= 0)
+         return 0;
+ 
+-    kdf = EVP_KDF_fetch(libctx, "PKCS12KDF", propq);
+-    if (kdf == NULL)
++    if (ossl_get_kernel_fips_flag()) {
++        const char *nofips = "-fips";
++        size_t len = propq ? strlen(propq) + 1 + strlen(nofips) + 1 :
++                                                 strlen(nofips) + 1;
++        char *ptr = NULL;
++
++        adjusted_propq = OPENSSL_zalloc(len);
++        if (adjusted_propq != NULL) {
++            ptr = adjusted_propq;
++            if (propq) {
++                memcpy(ptr, propq, strlen(propq));
++                ptr += strlen(propq);
++                *ptr = ',';
++                ptr++;
++            }
++            memcpy(ptr, nofips, strlen(nofips));
++        }
++    }
++
++    kdf = adjusted_propq ? EVP_KDF_fetch(libctx, "PKCS12KDF", adjusted_propq) : EVP_KDF_fetch(libctx, "PKCS12KDF", propq);
++    if (kdf == NULL) {
++        OPENSSL_free(adjusted_propq);
+         return 0;
++    }
+     ctx = EVP_KDF_CTX_new(kdf);
+     EVP_KDF_free(kdf);
+-    if (ctx == NULL)
++    if (ctx == NULL) {
++        OPENSSL_free(adjusted_propq);
+         return 0;
++    }
+ 
+     *p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST,
+                                             (char *)EVP_MD_get0_name(md_type),
+@@ -127,6 +149,7 @@ int PKCS12_key_gen_uni_ex(unsigned char
+         } OSSL_TRACE_END(PKCS12_KEYGEN);
+     }
+     EVP_KDF_CTX_free(ctx);
++    OPENSSL_free(adjusted_propq);
+     return res;
+ }
+ 
+diff -up openssl-3.0.1/apps/pkcs12.c.pkc12_fips_apps openssl-3.0.1/apps/pkcs12.c
+--- openssl-3.0.1/apps/pkcs12.c.pkc12_fips_apps	2022-02-21 16:37:07.908923682 +0100
++++ openssl-3.0.1/apps/pkcs12.c	2022-02-21 17:38:44.555345633 +0100
+@@ -765,15 +765,34 @@ int pkcs12_main(int argc, char **argv)
+     }
+     if (macver) {
+         EVP_KDF *pkcs12kdf;
++        char *adjusted_propq = NULL;
++        const char *nofips = "-fips";
++        size_t len = app_get0_propq() ? strlen(app_get0_propq()) + 1 + strlen(nofips) + 1 :
++                                                            strlen(nofips) + 1;
++        char *ptr = NULL;
++
++        adjusted_propq = OPENSSL_zalloc(len);
++        if (adjusted_propq != NULL) {
++                ptr = adjusted_propq;
++                if (app_get0_propq()) {
++                    memcpy(ptr, app_get0_propq(), strlen(app_get0_propq()));
++                    ptr += strlen(app_get0_propq());
++                    *ptr = ',';
++                    ptr++;
++                }
++                memcpy(ptr, nofips, strlen(nofips));
++        }
+ 
+         pkcs12kdf = EVP_KDF_fetch(app_get0_libctx(), "PKCS12KDF",
+-                                  app_get0_propq());
++                                  adjusted_propq ? adjusted_propq : app_get0_propq());
+         if (pkcs12kdf == NULL) {
+             BIO_printf(bio_err, "Error verifying PKCS12 MAC; no PKCS12KDF support.\n");
+             BIO_printf(bio_err, "Use -nomacver if MAC verification is not required.\n");
++            OPENSSL_free(adjusted_propq);
+             goto end;
+         }
+         EVP_KDF_free(pkcs12kdf);
++        OPENSSL_free(adjusted_propq);
+         /* If we enter empty password try no password first */
+         if (!mpass[0] && PKCS12_verify_mac(p12, NULL, 0)) {
+             /* If mac and crypto pass the same set it to NULL too */

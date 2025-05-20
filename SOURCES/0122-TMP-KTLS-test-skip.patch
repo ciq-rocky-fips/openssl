@@ -1,0 +1,16 @@
+diff -up openssl-3.2.1/test/sslapitest.c.xxx openssl-3.2.1/test/sslapitest.c
+--- openssl-3.2.1/test/sslapitest.c.xxx	2024-04-15 10:14:47.292448045 +0200
++++ openssl-3.2.1/test/sslapitest.c	2024-04-15 10:15:23.428396994 +0200
+@@ -1020,9 +1020,10 @@ static int execute_test_large_message(co
+ /* sock must be connected */
+ static int ktls_chk_platform(int sock)
+ {
+-    if (!ktls_enable(sock))
++/*    if (!ktls_enable(sock))
+         return 0;
+-    return 1;
++    return 1; */
++    return 0;
+ }
+ 
+ static int ping_pong_query(SSL *clientssl, SSL *serverssl)

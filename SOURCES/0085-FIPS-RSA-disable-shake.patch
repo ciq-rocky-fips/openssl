@@ -1,0 +1,113 @@
+From 52b347703ba2b98a0efee86c1a483c2f0f9f73d6 Mon Sep 17 00:00:00 2001
+From: Clemens Lang <cllang@redhat.com>
+Date: Wed, 11 Jan 2023 12:52:59 +0100
+Subject: [PATCH] rsa: Disallow SHAKE in OAEP and PSS in FIPS prov
+
+According to FIPS 140-3 IG, section C.C, the SHAKE digest algorithms
+must not be used in higher-level algorithms (such as RSA-OAEP and
+RSASSA-PSS):
+
+"To be used in an approved mode of operation, the SHA-3 hash functions
+may be implemented either as part of an approved higher-level algorithm,
+for example, a digital signature algorithm, or as the standalone
+functions. The SHAKE128 and SHAKE256 extendable-output functions may
+only be used as the standalone algorithms."
+
+Add a check to prevent their use as message digest in PSS signatures and
+as MGF1 hash function in both OAEP and PSS.
+
+Signed-off-by: Clemens Lang <cllang@redhat.com>
+---
+ crypto/rsa/rsa_oaep.c | 28 ++++++++++++++++++++++++++++
+ crypto/rsa/rsa_pss.c  | 16 ++++++++++++++++
+ 2 files changed, 44 insertions(+)
+
+diff --git a/crypto/rsa/rsa_oaep.c b/crypto/rsa/rsa_oaep.c
+index d9be1a4f98..dfe9c9f0e8 100644
+--- a/crypto/rsa/rsa_oaep.c
++++ b/crypto/rsa/rsa_oaep.c
+@@ -73,9 +73,23 @@ int ossl_rsa_padding_add_PKCS1_OAEP_mgf1_ex(OSSL_LIB_CTX *libctx,
+         return 0;
+ #endif
+     }
++
++#ifdef FIPS_MODULE
++    if (EVP_MD_is_a(md, "SHAKE-128") || EVP_MD_is_a(md, "SHAKE-256")) {
++        ERR_raise(ERR_LIB_RSA, RSA_R_DIGEST_NOT_ALLOWED);
++        return 0;
++    }
++#endif
+     if (mgf1md == NULL)
+         mgf1md = md;
+ 
++#ifdef FIPS_MODULE
++    if (EVP_MD_is_a(mgf1md, "SHAKE-128") || EVP_MD_is_a(mgf1md, "SHAKE-256")) {
++        ERR_raise(ERR_LIB_RSA, RSA_R_DIGEST_NOT_ALLOWED);
++        return 0;
++    }
++#endif
++
+     mdlen = EVP_MD_get_size(md);
+     if (mdlen <= 0) {
+         ERR_raise(ERR_LIB_RSA, RSA_R_INVALID_LENGTH);
+@@ -181,9 +195,23 @@ int RSA_padding_check_PKCS1_OAEP_mgf1(unsigned char *to, int tlen,
+ #endif
+     }
+ 
++#ifdef FIPS_MODULE
++    if (EVP_MD_is_a(md, "SHAKE-128") || EVP_MD_is_a(md, "SHAKE-256")) {
++        ERR_raise(ERR_LIB_RSA, RSA_R_DIGEST_NOT_ALLOWED);
++        return -1;
++    }
++#endif
++
+     if (mgf1md == NULL)
+         mgf1md = md;
+ 
++#ifdef FIPS_MODULE
++    if (EVP_MD_is_a(mgf1md, "SHAKE-128") || EVP_MD_is_a(mgf1md, "SHAKE-256")) {
++        ERR_raise(ERR_LIB_RSA, RSA_R_DIGEST_NOT_ALLOWED);
++        return -1;
++    }
++#endif
++
+     mdlen = EVP_MD_get_size(md);
+ 
+     if (tlen <= 0 || flen <= 0)
+diff --git a/crypto/rsa/rsa_pss.c b/crypto/rsa/rsa_pss.c
+index 33874bfef8..e8681b0351 100644
+--- a/crypto/rsa/rsa_pss.c
++++ b/crypto/rsa/rsa_pss.c
+@@ -53,6 +53,14 @@ int RSA_verify_PKCS1_PSS_mgf1(RSA *rsa, const unsigned char *mHash,
+     if (mgf1Hash == NULL)
+         mgf1Hash = Hash;
+ 
++#ifdef FIPS_MODULE
++    if (EVP_MD_is_a(Hash, "SHAKE-128") || EVP_MD_is_a(Hash, "SHAKE-256"))
++        goto err;
++
++    if (EVP_MD_is_a(mgf1Hash, "SHAKE-128") || EVP_MD_is_a(mgf1Hash, "SHAKE-256"))
++        goto err;
++#endif
++
+     hLen = EVP_MD_get_size(Hash);
+     if (hLen < 0)
+         goto err;
+@@ -164,6 +172,14 @@ int RSA_padding_add_PKCS1_PSS_mgf1(RSA *rsa, unsigned char *EM,
+     if (mgf1Hash == NULL)
+         mgf1Hash = Hash;
+ 
++#ifdef FIPS_MODULE
++    if (EVP_MD_is_a(Hash, "SHAKE-128") || EVP_MD_is_a(Hash, "SHAKE-256"))
++        goto err;
++
++    if (EVP_MD_is_a(mgf1Hash, "SHAKE-128") || EVP_MD_is_a(mgf1Hash, "SHAKE-256"))
++        goto err;
++#endif
++
+     hLen = EVP_MD_get_size(Hash);
+     if (hLen < 0)
+         goto err;
+-- 
+2.39.0
+

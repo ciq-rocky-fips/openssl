@@ -1,0 +1,65 @@
+diff -up openssl-3.0.7/apps/cms.c.fips_cms openssl-3.0.7/apps/cms.c
+--- openssl-3.0.7/apps/cms.c.fips_cms	2023-05-18 14:03:56.360555106 +0200
++++ openssl-3.0.7/apps/cms.c	2023-05-18 14:13:33.765183185 +0200
+@@ -20,6 +20,7 @@
+ #include <openssl/x509_vfy.h>
+ #include <openssl/x509v3.h>
+ #include <openssl/cms.h>
++#include <openssl/fips.h>
+ 
+ static int save_certs(char *signerfile, STACK_OF(X509) *signers);
+ static int cms_cb(int ok, X509_STORE_CTX *ctx);
+@@ -810,12 +811,16 @@ int cms_main(int argc, char **argv)
+ 
+     if (operation == SMIME_ENCRYPT) {
+         if (!cipher) {
++            if (FIPS_mode()) {
++                cipher = (EVP_CIPHER *)EVP_aes_128_cbc();
++            } else {
+ #ifndef OPENSSL_NO_DES
+-            cipher = (EVP_CIPHER *)EVP_des_ede3_cbc();
++                cipher = (EVP_CIPHER *)EVP_des_ede3_cbc();
+ #else
+-            BIO_printf(bio_err, "No cipher selected\n");
+-            goto end;
++                BIO_printf(bio_err, "No cipher selected\n");
++                goto end;
+ #endif
++           }
+         }
+ 
+         if (secret_key && !secret_keyid) {
+diff -up openssl-3.0.7/crypto/cms/cms_env.c.fips_cms openssl-3.0.7/crypto/cms/cms_env.c
+--- openssl-3.0.7/crypto/cms/cms_env.c.fips_cms	2023-05-22 10:06:50.276528155 +0200
++++ openssl-3.0.7/crypto/cms/cms_env.c	2023-05-22 10:08:58.406073945 +0200
+@@ -14,6 +14,7 @@
+ #include <openssl/err.h>
+ #include <openssl/cms.h>
+ #include <openssl/evp.h>
++#include <openssl/fips.h>
+ #include "internal/sizes.h"
+ #include "crypto/asn1.h"
+ #include "crypto/evp.h"
+@@ -321,6 +321,10 @@ static int cms_RecipientInfo_ktri_init(C
+             return 0;
+         if (EVP_PKEY_encrypt_init(ktri->pctx) <= 0)
+             return 0;
++        if (FIPS_mode()) {
++            if (EVP_PKEY_CTX_ctrl_str(ktri->pctx, "rsa_padding_mode", "oaep") <= 0)
++                return 0;
++        }
+     } else if (!ossl_cms_env_asn1_ctrl(ri, 0))
+         return 0;
+     return 1;
+@@ -484,6 +489,11 @@ static int cms_RecipientInfo_ktri_encryp
+ 
+         if (EVP_PKEY_encrypt_init(pctx) <= 0)
+             goto err;
++
++        if (FIPS_mode()) {
++            if (EVP_PKEY_CTX_ctrl_str(pctx, "rsa_padding_mode", "oaep") <= 0)
++                goto err;
++        }
+     }
+ 
+     if (EVP_PKEY_encrypt(pctx, NULL, &eklen, ec->key, ec->keylen) <= 0)

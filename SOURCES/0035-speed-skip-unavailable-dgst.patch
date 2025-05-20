@@ -1,0 +1,13 @@
+diff -up openssl-3.0.0/apps/speed.c.beldmit openssl-3.0.0/apps/speed.c
+--- openssl-3.0.0/apps/speed.c.beldmit	2021-12-21 15:14:04.210431584 +0100
++++ openssl-3.0.0/apps/speed.c	2021-12-21 15:46:05.554085125 +0100
+@@ -547,6 +547,9 @@ static int EVP_MAC_loop(int algindex, vo
+     for (count = 0; COND(c[algindex][testnum]); count++) {
+         size_t outl;
+ 
++        if (mctx == NULL)
++            return -1;
++
+         if (!EVP_MAC_init(mctx, NULL, 0, NULL)
+             || !EVP_MAC_update(mctx, buf, lengths[testnum])
+             || !EVP_MAC_final(mctx, mac, &outl, sizeof(mac)))

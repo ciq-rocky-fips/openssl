@@ -85,17 +85,41 @@ int PKCS12_key_gen_uni_ex(unsigned char *pass, int passlen, unsigned char *salt,
     EVP_KDF *kdf;
     EVP_KDF_CTX *ctx;
     OSSL_PARAM params[6], *p = params;
+    char *adjusted_propq = NULL;
 
     if (n <= 0)
         return 0;
 
-    kdf = EVP_KDF_fetch(libctx, "PKCS12KDF", propq);
-    if (kdf == NULL)
+    if (ossl_get_kernel_fips_flag()) {
+        const char *nofips = "-fips";
+        size_t len = propq ? strlen(propq) + 1 + strlen(nofips) + 1 :
+                                                 strlen(nofips) + 1;
+        char *ptr = NULL;
+
+        adjusted_propq = OPENSSL_zalloc(len);
+        if (adjusted_propq != NULL) {
+            ptr = adjusted_propq;
+            if (propq) {
+                memcpy(ptr, propq, strlen(propq));
+                ptr += strlen(propq);
+                *ptr = ',';
+                ptr++;
+            }
+            memcpy(ptr, nofips, strlen(nofips));
+        }
+    }
+
+    kdf = adjusted_propq ? EVP_KDF_fetch(libctx, "PKCS12KDF", adjusted_propq) : EVP_KDF_fetch(libctx, "PKCS12KDF", propq);
+    if (kdf == NULL) {
+        OPENSSL_free(adjusted_propq);
         return 0;
+    }
     ctx = EVP_KDF_CTX_new(kdf);
     EVP_KDF_free(kdf);
-    if (ctx == NULL)
+    if (ctx == NULL) {
+        OPENSSL_free(adjusted_propq);
         return 0;
+    }
 
     *p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST,
                                             (char *)EVP_MD_get0_name(md_type),
@@ -127,6 +151,7 @@ int PKCS12_key_gen_uni_ex(unsigned char *pass, int passlen, unsigned char *salt,
         } OSSL_TRACE_END(PKCS12_KEYGEN);
     }
     EVP_KDF_CTX_free(ctx);
+    OPENSSL_free(adjusted_propq);
     return res;
 }
 

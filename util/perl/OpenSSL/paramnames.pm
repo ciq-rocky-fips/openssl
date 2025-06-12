@@ -137,12 +137,13 @@ my %params = (
 # If "engine",or "properties",are specified, they should always be paired
 # with "cipher",or "digest".
 
-    'MAC_PARAM_CIPHER' =>           '*ALG_PARAM_CIPHER',        # utf8 string
-    'MAC_PARAM_DIGEST' =>           '*ALG_PARAM_DIGEST',        # utf8 string
-    'MAC_PARAM_PROPERTIES' =>       '*ALG_PARAM_PROPERTIES',    # utf8 string
-    'MAC_PARAM_SIZE' =>             "size",                     # size_t
-    'MAC_PARAM_BLOCK_SIZE' =>       "block-size",               # size_t
-    'MAC_PARAM_TLS_DATA_SIZE' =>    "tls-data-size",            # size_t
+    'MAC_PARAM_CIPHER' =>                '*ALG_PARAM_CIPHER',        # utf8 string
+    'MAC_PARAM_DIGEST' =>                '*ALG_PARAM_DIGEST',        # utf8 string
+    'MAC_PARAM_PROPERTIES' =>            '*ALG_PARAM_PROPERTIES',    # utf8 string
+    'MAC_PARAM_SIZE' =>                  "size",                     # size_t
+    'MAC_PARAM_BLOCK_SIZE' =>            "block-size",               # size_t
+    'MAC_PARAM_TLS_DATA_SIZE' =>         "tls-data-size",            # size_t
+    'MAC_PARAM_REDHAT_FIPS_INDICATOR' => "redhat-fips-indicator",    # size_t
 
 # KDF / PRF parameters
     'KDF_PARAM_SECRET' =>       "secret",                   # octet string

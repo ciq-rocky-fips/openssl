@@ -46,3 +46,6 @@ void ossl_release_default_drbg_ctx(void);
 #if defined(OPENSSL_THREADS)
 void ossl_threads_ctx_free(void *);
 #endif
+
+void *ossl_ctx_legacy_digest_signatures_new(OSSL_LIB_CTX *);
+void ossl_ctx_legacy_digest_signatures_free(void *);

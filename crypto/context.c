@@ -83,6 +83,8 @@ struct ossl_lib_ctx_st {
     void *fips_prov;
 #endif
 
+    void *legacy_digest_signatures;
+
     unsigned int ischild:1;
 };
 
@@ -222,6 +224,10 @@ static int context_init(OSSL_LIB_CTX *ctx)
     if (ctx->threads == NULL)
         goto err;
 #endif
+
+    ctx->legacy_digest_signatures = ossl_ctx_legacy_digest_signatures_new(ctx);
+    if (ctx->legacy_digest_signatures == NULL)
+        goto err;
 
     /* Low priority. */
 #ifndef FIPS_MODULE
@@ -365,6 +371,11 @@ static void context_deinit_objs(OSSL_LIB_CTX *ctx)
         ctx->threads = NULL;
     }
 #endif
+
+    if (ctx->legacy_digest_signatures != NULL) {
+        ossl_ctx_legacy_digest_signatures_free(ctx->legacy_digest_signatures);
+        ctx->legacy_digest_signatures = NULL;
+    }
 
     /* Low priority. */
 #ifndef FIPS_MODULE
@@ -662,6 +673,9 @@ void *ossl_lib_ctx_get_data(OSSL_LIB_CTX *ctx, int index)
     case OSSL_LIB_CTX_FIPS_PROV_INDEX:
         return ctx->fips_prov;
 #endif
+
+    case OSSL_LIB_CTX_LEGACY_DIGEST_SIGNATURES_INDEX:
+        return ctx->legacy_digest_signatures;
 
     default:
         return NULL;

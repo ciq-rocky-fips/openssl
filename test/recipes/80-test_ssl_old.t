@@ -493,6 +493,18 @@ sub testssl {
             # the default choice if TLSv1.3 enabled
             my $flag = $protocol eq "-tls1_3" ? "" : $protocol;
             my $ciphersuites = "";
+            my %redhat_skip_cipher = map {$_ => 1} qw(
+AES256-GCM-SHA384:@SECLEVEL=0
+AES256-CCM8:@SECLEVEL=0
+AES256-CCM:@SECLEVEL=0
+AES128-GCM-SHA256:@SECLEVEL=0
+AES128-CCM8:@SECLEVEL=0
+AES128-CCM:@SECLEVEL=0
+AES256-SHA256:@SECLEVEL=0
+AES128-SHA256:@SECLEVEL=0
+AES256-SHA:@SECLEVEL=0
+AES128-SHA:@SECLEVEL=0
+	    );
             foreach my $cipher (@{$ciphersuites{$protocol}}) {
                 if ($protocol eq "-ssl3" && $cipher =~ /ECDH/ ) {
                     note "*****SKIPPING $protocol $cipher";
@@ -504,11 +516,16 @@ sub testssl {
                     } else {
                         $cipher = $cipher.':@SECLEVEL=0';
                     }
-                    ok(run(test([@ssltest, @exkeys, "-cipher",
-                                 $cipher,
-                                 "-ciphersuites", $ciphersuites,
-                                 $flag || ()])),
-                       "Testing $cipher");
+                    if ($provider eq "fips" && exists $redhat_skip_cipher{$cipher}) {
+                        note "*****SKIPPING $cipher in Red Hat FIPS mode";
+                        ok(1);
+                    } else {
+                        ok(run(test([@ssltest, @exkeys, "-cipher",
+                                     $cipher,
+                                     "-ciphersuites", $ciphersuites,
+                                     $flag || ()])),
+                           "Testing $cipher");
+                    }
                 }
             }
             next if $protocol eq "-tls1_3";

@@ -20,6 +20,7 @@
 #include <openssl/bn.h>
 #include <openssl/provider.h>
 #include <openssl/param_build.h>
+#include "crypto/x509.h"
 #include "internal/sslconf.h"
 #include "internal/nelem.h"
 #include "internal/sizes.h"
@@ -1979,19 +1980,27 @@ int tls12_check_peer_sigalg(SSL_CONNECTION *s, uint16_t sig, EVP_PKEY *pkey)
         SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE, SSL_R_UNKNOWN_DIGEST);
         return 0;
     }
-    /*
-     * Make sure security callback allows algorithm. For historical
-     * reasons we have to pass the sigalg as a two byte char array.
-     */
-    sigalgstr[0] = (sig >> 8) & 0xff;
-    sigalgstr[1] = sig & 0xff;
-    secbits = sigalg_security_bits(SSL_CONNECTION_GET_CTX(s), lu);
-    if (secbits == 0 ||
-        !ssl_security(s, SSL_SECOP_SIGALG_CHECK, secbits,
-                      md != NULL ? EVP_MD_get_type(md) : NID_undef,
-                      (void *)sigalgstr)) {
-        SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE, SSL_R_WRONG_SIGNATURE_TYPE);
-        return 0;
+
+    if (lu->hash == NID_sha1
+            && ossl_ctx_legacy_digest_signatures_allowed(s->session_ctx->libctx, 0)
+            && SSL_get_security_level(SSL_CONNECTION_GET_SSL(s)) < 3) {
+        /* when rh-allow-sha1-signatures = yes and security level <= 2,
+         * explicitly allow SHA1 for backwards compatibility */
+    } else {
+        /*
+         * Make sure security callback allows algorithm. For historical
+         * reasons we have to pass the sigalg as a two byte char array.
+         */
+        sigalgstr[0] = (sig >> 8) & 0xff;
+        sigalgstr[1] = sig & 0xff;
+        secbits = sigalg_security_bits(s->session_ctx, lu);
+        if (secbits == 0 ||
+            !ssl_security(s, SSL_SECOP_SIGALG_CHECK, secbits,
+                          md != NULL ? EVP_MD_get_type(md) : NID_undef,
+                          (void *)sigalgstr)) {
+            SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE, SSL_R_WRONG_SIGNATURE_TYPE);
+            return 0;
+        }
     }
     /* Store the sigalg the peer uses */
     s->s3.tmp.peer_sigalg = lu;
@@ -2563,6 +2572,14 @@ static int tls12_sigalg_allowed(const SSL_CONNECTION *s, int op,
             if (i == num)
                 return 0;
         }
+    }
+
+    if (lu->hash == NID_sha1
+            && ossl_ctx_legacy_digest_signatures_allowed(s->session_ctx->libctx, 0)
+            && SSL_get_security_level(SSL_CONNECTION_GET_SSL(s)) < 3) {
+        /* when rh-allow-sha1-signatures = yes and security level <= 2,
+         * explicitly allow SHA1 for backwards compatibility */
+        return 1;
     }
 
     /* Finally see if security callback allows it */
@@ -3490,6 +3507,8 @@ static int ssl_security_cert_sig(SSL_CONNECTION *s, SSL_CTX *ctx, X509 *x,
 {
     /* Lookup signature algorithm digest */
     int secbits, nid, pknid;
+    OSSL_LIB_CTX *libctx = NULL;
+
 
     /* Don't check signature if self signed */
     if ((X509_get_extension_flags(x) & EXFLAG_SS) != 0)
@@ -3499,6 +3518,25 @@ static int ssl_security_cert_sig(SSL_CONNECTION *s, SSL_CTX *ctx, X509 *x,
     /* If digest NID not defined use signature NID */
     if (nid == NID_undef)
         nid = pknid;
+
+    if (x && x->libctx)
+        libctx = x->libctx;
+    else if (ctx && ctx->libctx)
+        libctx = ctx->libctx;
+    else if (s && s->session_ctx && s->session_ctx->libctx)
+        libctx = s->session_ctx->libctx;
+    else
+        libctx = OSSL_LIB_CTX_get0_global_default();
+
+    if (nid == NID_sha1
+            && ossl_ctx_legacy_digest_signatures_allowed(libctx, 0)
+            && ((s != NULL && SSL_get_security_level(SSL_CONNECTION_GET_SSL(s)) < 3)
+                || (ctx != NULL && SSL_CTX_get_security_level(ctx) < 3)
+            ))
+        /* When rh-allow-sha1-signatures = yes and security level <= 2,
+         * explicitly allow SHA1 for backwards compatibility. */
+        return 1;
+
     if (s != NULL)
         return ssl_security(s, op, secbits, nid, x);
     else

@@ -313,7 +313,12 @@ When set to B<no>, any attempt to create or verify a signature with a SHA1
 digest will fail.  For compatibility with older versions of OpenSSL, set this
 option to B<yes>.  This setting also affects TLS, where signature algorithms
 that use SHA1 as digest will no longer be supported if this option is set to
-B<no>.
+B<no>.  Note that enabling B<rh-allow-sha1-signatures> will allow TLS signature
+algorithms that use SHA1 in security level 2, despite the definition of
+security level 2 of 112 bits of security, which SHA1 does not meet.  Because
+TLS 1.1 or lower use MD5-SHA1 as pseudorandom function (PRF) to derive key
+material, disabling B<rh-allow-sha1-signatures> requires the use of TLS 1.2 or
+newer.
 
 =item B<fips_mode> (deprecated)
 

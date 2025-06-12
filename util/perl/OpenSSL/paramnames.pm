@@ -183,6 +183,7 @@ my %params = (
     'KDF_PARAM_X942_SUPP_PUBINFO' =>    "supp-pubinfo",
     'KDF_PARAM_X942_SUPP_PRIVINFO' =>   "supp-privinfo",
     'KDF_PARAM_X942_USE_KEYBITS' =>     "use-keybits",
+    'KDF_PARAM_REDHAT_FIPS_INDICATOR' =>     "redhat-fips-indicator",
     'KDF_PARAM_HMACDRBG_ENTROPY' =>     "entropy",
     'KDF_PARAM_HMACDRBG_NONCE' =>       "nonce",
     'KDF_PARAM_THREADS' =>        "threads",                # uint32_t

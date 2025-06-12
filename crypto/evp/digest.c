@@ -553,7 +553,12 @@ legacy:
     return ret;
 }
 
-EVP_MD_CTX *EVP_MD_CTX_dup(const EVP_MD_CTX *in)
+EVP_MD_CTX
+#if !defined(FIPS_MODULE)
+__attribute__ ((symver ("EVP_MD_CTX_dup@@OPENSSL_3.1.0"),
+                    symver ("EVP_MD_CTX_dup@OPENSSL_3.2.0")))
+#endif
+*EVP_MD_CTX_dup(const EVP_MD_CTX *in)
 {
     EVP_MD_CTX *out = EVP_MD_CTX_new();
 

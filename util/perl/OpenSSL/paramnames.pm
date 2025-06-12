@@ -101,8 +101,9 @@ my %params = (
     'CIPHER_PARAM_SPEED' =>                "speed",       # uint
     'CIPHER_PARAM_CTS_MODE' =>             "cts_mode",    # utf8_string
 # For passing the AlgorithmIdentifier parameter in DER form
-    'CIPHER_PARAM_ALGORITHM_ID_PARAMS' =>  "alg_id_param",# octet_string
-    'CIPHER_PARAM_XTS_STANDARD' =>         "xts_standard",# utf8_string
+    'CIPHER_PARAM_ALGORITHM_ID_PARAMS' =>   "alg_id_param",# octet_string
+    'CIPHER_PARAM_REDHAT_FIPS_INDICATOR' => "redhat-fips-indicator", # int
+    'CIPHER_PARAM_XTS_STANDARD' =>          "xts_standard",# utf8_string
 
     'CIPHER_PARAM_TLS1_MULTIBLOCK_MAX_SEND_FRAGMENT' =>  "tls1multi_maxsndfrag",# uint
     'CIPHER_PARAM_TLS1_MULTIBLOCK_MAX_BUFSIZE' =>        "tls1multi_maxbufsz",  # size_t

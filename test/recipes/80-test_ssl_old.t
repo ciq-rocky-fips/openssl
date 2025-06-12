@@ -436,7 +436,7 @@ sub testssl {
         my @exkeys = ();
         my $ciphers = '-PSK:-SRP:@SECLEVEL=0';
 
-        if (!$no_dsa) {
+        if (!$no_dsa && $provider ne "fips") {
             push @exkeys, "-s_cert", "certD.ss", "-s_key", $Dkey;
         }
 

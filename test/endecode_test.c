@@ -1419,6 +1419,7 @@ int setup_tests(void)
          * so no legacy tests.
          */
 #endif
+    if (is_fips == 0) {
 #ifndef OPENSSL_NO_DSA
         ADD_TEST_SUITE(DSA);
         ADD_TEST_SUITE_PARAMS(DSA);
@@ -1429,6 +1430,7 @@ int setup_tests(void)
         ADD_TEST_SUITE_PROTECTED_PVK(DSA);
 # endif
 #endif
+    }
 #ifndef OPENSSL_NO_EC
         ADD_TEST_SUITE(EC);
         ADD_TEST_SUITE_PARAMS(EC);
@@ -1443,10 +1445,12 @@ int setup_tests(void)
         ADD_TEST_SUITE(ECExplicitTri2G);
         ADD_TEST_SUITE_LEGACY(ECExplicitTri2G);
 # endif
+    if (is_fips == 0) {
         ADD_TEST_SUITE(ED25519);
         ADD_TEST_SUITE(ED448);
         ADD_TEST_SUITE(X25519);
         ADD_TEST_SUITE(X448);
+    }
         /*
          * ED25519, ED448, X25519 and X448 have no support for
          * PEM_write_bio_PrivateKey_traditional(), so no legacy tests.

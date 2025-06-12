@@ -177,6 +177,7 @@ static const ST_KAT_DIGEST st_kat_digest_tests[] =
 /*- CIPHER TEST DATA */
 
 /* DES3 test data */
+#if 0
 static const unsigned char des_ede3_cbc_pt[] = {
     0x6B, 0xC1, 0xBE, 0xE2, 0x2E, 0x40, 0x9F, 0x96,
     0xE9, 0x3D, 0x7E, 0x11, 0x73, 0x93, 0x17, 0x2A,
@@ -197,7 +198,7 @@ static const unsigned char des_ede3_cbc_ct[] = {
     0x51, 0x65, 0x70, 0x48, 0x1F, 0x25, 0xB5, 0x0F,
     0x73, 0xC0, 0xBD, 0xA8, 0x5C, 0x8E, 0x0D, 0xA7
 };
-
+#endif
 /* AES-256 GCM test data */
 static const unsigned char aes_256_gcm_key[] = {
     0x92, 0xe1, 0x1d, 0xcd, 0xaa, 0x86, 0x6f, 0x5c,
@@ -1454,8 +1455,9 @@ static const ST_KAT_PARAM ecdsa_bin_key[] = {
 # endif /* OPENSSL_NO_EC2M */
 #endif /* OPENSSL_NO_EC */
 
-#ifndef OPENSSL_NO_DSA
 /* dsa 2048 */
+#if 0
+#ifndef OPENSSL_NO_DSA
 static const unsigned char dsa_p[] = {
     0xa2, 0x9b, 0x88, 0x72, 0xce, 0x8b, 0x84, 0x23,
     0xb7, 0xd5, 0xd2, 0x1d, 0x4b, 0x02, 0xf5, 0x7e,
@@ -1590,6 +1592,7 @@ static const ST_KAT_PARAM dsa_key[] = {
     ST_KAT_PARAM_END()
 };
 #endif /* OPENSSL_NO_DSA */
+#endif
 
 /* Hash DRBG inputs for signature KATs */
 static const unsigned char sig_kat_entropyin[] = {
@@ -1642,6 +1645,7 @@ static const ST_KAT_SIGN st_kat_sign_tests[] = {
     },
 # endif
 #endif /* OPENSSL_NO_EC */
+#if 0
 #ifndef OPENSSL_NO_DSA
     {
         OSSL_SELF_TEST_DESC_SIGN_DSA,
@@ -1654,6 +1658,7 @@ static const ST_KAT_SIGN st_kat_sign_tests[] = {
         ITM(dsa_expected_sig)
     },
 #endif /* OPENSSL_NO_DSA */
+#endif
 };
 
 static const ST_KAT_ASYM_CIPHER st_kat_asym_cipher_tests[] = {

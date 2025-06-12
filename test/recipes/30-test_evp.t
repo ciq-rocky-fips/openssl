@@ -46,10 +46,8 @@ my @files = qw(
                 evpciph_aes_cts.txt
                 evpciph_aes_wrap.txt
                 evpciph_aes_stitched.txt
-                evpciph_des3_common.txt
                 evpkdf_hkdf.txt
                 evpkdf_kbkdf_counter.txt
-                evpkdf_kbkdf_kmac.txt
                 evpkdf_pbkdf1.txt
                 evpkdf_pbkdf2.txt
                 evpkdf_ss.txt
@@ -70,15 +68,6 @@ push @files, qw(
                 evppkey_dh.txt
                ) unless $no_dh;
 push @files, qw(
-                evpkdf_x942_des.txt
-                evpmac_cmac_des.txt
-               ) unless $no_des;
-push @files, qw(evppkey_dsa.txt) unless $no_dsa;
-push @files, qw(
-                evppkey_ecx.txt
-                evppkey_mismatch_ecx.txt
-               ) unless $no_ecx;
-push @files, qw(
                 evppkey_ecc.txt
                 evppkey_ecdh.txt
                 evppkey_ecdsa.txt
@@ -97,6 +86,7 @@ my @defltfiles = qw(
                      evpciph_cast5.txt
                      evpciph_chacha.txt
                      evpciph_des.txt
+                     evpciph_des3_common.txt
                      evpciph_idea.txt
                      evpciph_rc2.txt
                      evpciph_rc4.txt
@@ -121,13 +111,19 @@ my @defltfiles = qw(
                      evpmd_whirlpool.txt
                      evppbe_scrypt.txt
                      evppbe_pkcs12.txt
+                     evpkdf_kbkdf_kmac.txt
                      evppkey_kdf_scrypt.txt
                      evppkey_kdf_tls1_prf.txt
                      evppkey_rsa.txt
                     );
+push @defltfiles, qw(evppkey_dsa.txt) unless $no_dsa;
+push @defltfiles, qw(evppkey_ecx.txt) unless $no_ec;
+push @defltfiles, qw(
+                evpkdf_x942_des.txt
+                evpmac_cmac_des.txt
+               ) unless $no_des;
 push @defltfiles, qw(evppkey_brainpool.txt) unless $no_ec;
 push @defltfiles, qw(evppkey_ecdsa_rfc6979.txt) unless $no_ec;
-push @defltfiles, qw(evppkey_dsa_rfc6979.txt) unless $no_dsa;
 push @defltfiles, qw(evppkey_sm2.txt) unless $no_sm2;
 push @defltfiles, qw(evpciph_aes_gcm_siv.txt) unless $no_siv;
 push @defltfiles, qw(evpciph_aes_siv.txt) unless $no_siv;

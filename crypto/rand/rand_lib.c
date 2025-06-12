@@ -11,6 +11,7 @@
 #define OPENSSL_SUPPRESS_DEPRECATED
 
 #include <openssl/err.h>
+#include <openssl/evp.h>
 #include <openssl/opensslconf.h>
 #include <openssl/core_names.h>
 #include "internal/cryptlib.h"
@@ -723,15 +724,7 @@ EVP_RAND_CTX *RAND_get0_primary(OSSL_LIB_CTX *ctx)
         return ret;
     }
 
-#ifndef FIPS_MODULE
-    if (dgbl->seed == NULL) {
-        ERR_set_mark();
-        dgbl->seed = rand_new_seed(ctx);
-        ERR_pop_to_mark();
-    }
-#endif
-
-    ret = dgbl->primary = rand_new_drbg(ctx, dgbl->seed,
+    ret = dgbl->primary = rand_new_drbg(ctx, NULL,
                                         PRIMARY_RESEED_INTERVAL,
                                         PRIMARY_RESEED_TIME_INTERVAL, 1);
     /*
@@ -774,7 +767,7 @@ EVP_RAND_CTX *RAND_get0_public(OSSL_LIB_CTX *ctx)
         if (CRYPTO_THREAD_get_local(&dgbl->private) == NULL
                 && !ossl_init_thread_start(NULL, ctx, rand_delete_thread_state))
             return NULL;
-        rand = rand_new_drbg(ctx, primary, SECONDARY_RESEED_INTERVAL,
+        rand = rand_new_drbg(ctx, NULL, SECONDARY_RESEED_INTERVAL,
                              SECONDARY_RESEED_TIME_INTERVAL, 0);
         CRYPTO_THREAD_set_local(&dgbl->public, rand);
     }
@@ -807,7 +800,7 @@ EVP_RAND_CTX *RAND_get0_private(OSSL_LIB_CTX *ctx)
         if (CRYPTO_THREAD_get_local(&dgbl->public) == NULL
                 && !ossl_init_thread_start(NULL, ctx, rand_delete_thread_state))
             return NULL;
-        rand = rand_new_drbg(ctx, primary, SECONDARY_RESEED_INTERVAL,
+        rand = rand_new_drbg(ctx, NULL, SECONDARY_RESEED_INTERVAL,
                              SECONDARY_RESEED_TIME_INTERVAL, 0);
         CRYPTO_THREAD_set_local(&dgbl->private, rand);
     }

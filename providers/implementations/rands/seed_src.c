@@ -102,7 +102,14 @@ static int seed_src_generate(void *vseed, unsigned char *out, size_t outlen,
         return 0;
     }
 
-    pool = ossl_rand_pool_new(strength, 1, outlen, outlen);
+    /*
+     * OpenSSL still implements an internal entropy pool of
+     * some size that is hashed to get seed data.
+     * Note that this is a conditioning step for which SP800-90C requires
+     * 64 additional bits from the entropy source to claim the requested
+     * amount of entropy.
+     */
+    pool = ossl_rand_pool_new(strength + 64, 1, outlen, outlen);
     if (pool == NULL) {
         ERR_raise(ERR_LIB_PROV, ERR_R_RAND_LIB);
         return 0;
@@ -182,7 +189,14 @@ static size_t seed_get_seed(void *vseed, unsigned char **pout,
     size_t i;
     RAND_POOL *pool;
 
-    pool = ossl_rand_pool_new(entropy, 1, min_len, max_len);
+    /*
+     * OpenSSL still implements an internal entropy pool of
+     * some size that is hashed to get seed data.
+     * Note that this is a conditioning step for which SP800-90C requires
+     * 64 additional bits from the entropy source to claim the requested
+     * amount of entropy.
+     */
+    pool = ossl_rand_pool_new(entropy + 64, 1, min_len, max_len);
     if (pool == NULL) {
         ERR_raise(ERR_LIB_PROV, ERR_R_RAND_LIB);
         return 0;

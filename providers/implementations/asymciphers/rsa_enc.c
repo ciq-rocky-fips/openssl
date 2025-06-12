@@ -462,6 +462,27 @@ static int rsa_get_ctx_params(void *vprsactx, OSSL_PARAM *params)
     if (p != NULL && !OSSL_PARAM_set_uint(p, prsactx->implicit_rejection))
         return 0;
 
+#ifdef FIPS_MODULE
+    p = OSSL_PARAM_locate(params, OSSL_ASYM_CIPHER_PARAM_REDHAT_FIPS_INDICATOR);
+    if (p != NULL) {
+        int fips_indicator = EVP_PKEY_REDHAT_FIPS_INDICATOR_APPROVED;
+
+        /* NIST SP 800-56Br2 section 6.4.2.1 requires either explicit key
+         * confirmation (section 6.4.2.3.2), or assurance from a trusted third
+         * party (section 6.4.2.3.1) for the KTS-OAEP key transport scheme, but
+         * explicit key confirmation is not implemented here and cannot be
+         * implemented without protocol changes, and the FIPS provider does not
+         * implement trusted third party validation, since it relies on its
+         * callers to do that. We must thus mark RSA-OAEP as unapproved until
+         * we have received clarification from NIST on how library modules such
+         * as OpenSSL should implement TTP validation. */
+        fips_indicator = EVP_PKEY_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+
+        if (!OSSL_PARAM_set_int(p, fips_indicator))
+            return 0;
+    }
+#endif /* defined(FIPS_MODULE) */
+
     return 1;
 }
 
@@ -475,6 +496,7 @@ static const OSSL_PARAM known_gettable_ctx_params[] = {
     OSSL_PARAM_uint(OSSL_ASYM_CIPHER_PARAM_TLS_NEGOTIATED_VERSION, NULL),
 #ifdef FIPS_MODULE
     OSSL_PARAM_octet_string(OSSL_ASYM_CIPHER_PARAM_REDHAT_KAT_OEAP_SEED, NULL, 0),
+    OSSL_PARAM_int(OSSL_ASYM_CIPHER_PARAM_REDHAT_FIPS_INDICATOR, NULL),
 #endif /* FIPS_MODULE */
     OSSL_PARAM_uint(OSSL_ASYM_CIPHER_PARAM_IMPLICIT_REJECTION, NULL),
     OSSL_PARAM_END

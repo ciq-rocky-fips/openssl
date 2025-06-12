@@ -406,6 +406,7 @@ my %params = (
     'ASYM_CIPHER_PARAM_TLS_NEGOTIATED_VERSION' =>   "tls-negotiated-version",
     'ASYM_CIPHER_PARAM_IMPLICIT_REJECTION' =>       "implicit-rejection",
     'ASYM_CIPHER_PARAM_REDHAT_KAT_OEAP_SEED' =>     "redhat-kat-oaep-seed",
+    'ASYM_CIPHER_PARAM_REDHAT_FIPS_INDICATOR' =>    "redhat-fips-indicator",
 
 # Encoder / decoder parameters
 
@@ -438,8 +439,9 @@ my %params = (
     'SIGNATURE_PARAM_KAT' =>     "kat",
 
 # KEM parameters
-    'KEM_PARAM_OPERATION' =>            "operation",
-    'KEM_PARAM_IKME' =>                 "ikme",
+    'KEM_PARAM_OPERATION' =>             "operation",
+    'KEM_PARAM_REDHAT_FIPS_INDICATOR' => "redhat-fips-indicator",
+    'KEM_PARAM_IKME' =>                  "ikme",
 
 # Capabilities
 

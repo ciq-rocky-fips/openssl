@@ -102,7 +102,7 @@ my %params = (
     'CIPHER_PARAM_CTS_MODE' =>             "cts_mode",    # utf8_string
 # For passing the AlgorithmIdentifier parameter in DER form
     'CIPHER_PARAM_ALGORITHM_ID_PARAMS' =>   "alg_id_param",# octet_string
-    'CIPHER_PARAM_REDHAT_FIPS_INDICATOR' => "redhat-fips-indicator", # int
+    'CIPHER_PARAM_ROCKY_FIPS_INDICATOR' => "rocky-fips-indicator", # int
     'CIPHER_PARAM_XTS_STANDARD' =>          "xts_standard",# utf8_string
 
     'CIPHER_PARAM_TLS1_MULTIBLOCK_MAX_SEND_FRAGMENT' =>  "tls1multi_maxsndfrag",# uint
@@ -144,7 +144,7 @@ my %params = (
     'MAC_PARAM_SIZE' =>                  "size",                     # size_t
     'MAC_PARAM_BLOCK_SIZE' =>            "block-size",               # size_t
     'MAC_PARAM_TLS_DATA_SIZE' =>         "tls-data-size",            # size_t
-    'MAC_PARAM_REDHAT_FIPS_INDICATOR' => "redhat-fips-indicator",    # size_t
+    'MAC_PARAM_ROCKY_FIPS_INDICATOR' => "rocky-fips-indicator",    # size_t
 
 # KDF / PRF parameters
     'KDF_PARAM_SECRET' =>       "secret",                   # octet string
@@ -185,7 +185,7 @@ my %params = (
     'KDF_PARAM_X942_SUPP_PUBINFO' =>    "supp-pubinfo",
     'KDF_PARAM_X942_SUPP_PRIVINFO' =>   "supp-privinfo",
     'KDF_PARAM_X942_USE_KEYBITS' =>     "use-keybits",
-    'KDF_PARAM_REDHAT_FIPS_INDICATOR' =>     "redhat-fips-indicator",
+    'KDF_PARAM_ROCKY_FIPS_INDICATOR' =>     "rocky-fips-indicator",
     'KDF_PARAM_HMACDRBG_ENTROPY' =>     "entropy",
     'KDF_PARAM_HMACDRBG_NONCE' =>       "nonce",
     'KDF_PARAM_THREADS' =>        "threads",                # uint32_t
@@ -386,7 +386,7 @@ my %params = (
     'SIGNATURE_PARAM_MGF1_DIGEST' =>           '*PKEY_PARAM_MGF1_DIGEST',
     'SIGNATURE_PARAM_MGF1_PROPERTIES' =>       '*PKEY_PARAM_MGF1_PROPERTIES',
     'SIGNATURE_PARAM_DIGEST_SIZE' =>           '*PKEY_PARAM_DIGEST_SIZE',
-    'SIGNATURE_PARAM_REDHAT_FIPS_INDICATOR' => "redhat-fips-indicator",
+    'SIGNATURE_PARAM_ROCKY_FIPS_INDICATOR' => "rocky-fips-indicator",
     'SIGNATURE_PARAM_NONCE_TYPE' =>            "nonce-type",
     'SIGNATURE_PARAM_INSTANCE' =>              "instance",
     'SIGNATURE_PARAM_CONTEXT_STRING' =>        "context-string",
@@ -405,8 +405,8 @@ my %params = (
     'ASYM_CIPHER_PARAM_TLS_CLIENT_VERSION' =>       "tls-client-version",
     'ASYM_CIPHER_PARAM_TLS_NEGOTIATED_VERSION' =>   "tls-negotiated-version",
     'ASYM_CIPHER_PARAM_IMPLICIT_REJECTION' =>       "implicit-rejection",
-    'ASYM_CIPHER_PARAM_REDHAT_KAT_OEAP_SEED' =>     "redhat-kat-oaep-seed",
-    'ASYM_CIPHER_PARAM_REDHAT_FIPS_INDICATOR' =>    "redhat-fips-indicator",
+    'ASYM_CIPHER_PARAM_ROCKY_KAT_OEAP_SEED' =>     "rocky-kat-oaep-seed",
+    'ASYM_CIPHER_PARAM_ROCKY_FIPS_INDICATOR' =>    "rocky-fips-indicator",
 
 # Encoder / decoder parameters
 
@@ -440,7 +440,7 @@ my %params = (
 
 # KEM parameters
     'KEM_PARAM_OPERATION' =>             "operation",
-    'KEM_PARAM_REDHAT_FIPS_INDICATOR' => "redhat-fips-indicator",
+    'KEM_PARAM_ROCKY_FIPS_INDICATOR' => "rocky-fips-indicator",
     'KEM_PARAM_IKME' =>                  "ikme",
 
 # Capabilities

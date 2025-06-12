@@ -15,8 +15,8 @@
 extern "C" {
 # endif
 
-# define OSSL_RH_FIPSINDICATOR_UNAPPROVED (0)
-# define OSSL_RH_FIPSINDICATOR_APPROVED (1)
+# define OSSL_RL_FIPSINDICATOR_UNAPPROVED (0)
+# define OSSL_RL_FIPSINDICATOR_APPROVED (1)
 
 /*
  * FIPS indicator dispatch table element.  function_id numbers and the
@@ -25,10 +25,10 @@ extern "C" {
  *
  * An array of these is always terminated by function_id == 0
  */
-typedef struct ossl_rh_fipsindicator_dispatch_st {
+typedef struct ossl_rl_fipsindicator_dispatch_st {
     int function_id;
     int approved;
-} OSSL_RH_FIPSINDICATOR_DISPATCH;
+} OSSL_RL_FIPSINDICATOR_DISPATCH;
 
 /*
  * Type to tie together algorithm names, property definition string and the
@@ -37,27 +37,27 @@ typedef struct ossl_rh_fipsindicator_dispatch_st {
  *
  * An array of these is always terminated by algorithm_names == NULL
  */
-typedef struct ossl_rh_fipsindicator_algorithm_st {
+typedef struct ossl_rl_fipsindicator_algorithm_st {
     const char *algorithm_names;     /* key */
     const char *property_definition; /* key */
-    const OSSL_RH_FIPSINDICATOR_DISPATCH *indicators;
-} OSSL_RH_FIPSINDICATOR_ALGORITHM;
+    const OSSL_RL_FIPSINDICATOR_DISPATCH *indicators;
+} OSSL_RL_FIPSINDICATOR_ALGORITHM;
 
 /**
  * Query FIPS indicator status for the given operation.  Possible values for
  * 'operation_id' are currently only OSSL_OP_SIGNATURE, as all other algorithms
  * use implicit indicators.  The return value is an array of
- * OSSL_RH_FIPSINDICATOR_ALGORITHMs, terminated by an entry with
+ * OSSL_RL_FIPSINDICATOR_ALGORITHMs, terminated by an entry with
  * algorithm_names == NULL.  'algorithm_names' is a colon-separated list of
  * algorithm names, 'property_definition' a comma-separated list of properties,
- * and 'indicators' is a list of OSSL_RH_FIPSINDICATOR_DISPATCH structs.  This
+ * and 'indicators' is a list of OSSL_RL_FIPSINDICATOR_DISPATCH structs.  This
  * list is terminated by function_id == 0.  'function_id' is one of the
  * OSSL_FUNC_* constants, e.g., OSSL_FUNC_SIGNATURE_DIGEST_SIGN_FINAL.
  *
  * If there is no entry in the returned struct for the given operation_id,
  * algorithm name, or function_id, the algorithm is unapproved.
  */
-const OSSL_RH_FIPSINDICATOR_ALGORITHM *redhat_ossl_query_fipsindicator(int operation_id);
+const OSSL_RL_FIPSINDICATOR_ALGORITHM *rocky_ossl_query_fipsindicator(int operation_id);
 
 # ifdef __cplusplus
 }

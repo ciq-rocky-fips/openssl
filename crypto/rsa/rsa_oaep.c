@@ -45,7 +45,7 @@ int RSA_padding_add_PKCS1_OAEP(unsigned char *to, int tlen,
 }
 
 #ifdef FIPS_MODULE
-extern int REDHAT_FIPS_asym_cipher_st;
+extern int ROCKY_FIPS_asym_cipher_st;
 #endif /* FIPS_MODULE */
 
 /*
@@ -61,7 +61,7 @@ int ossl_rsa_padding_add_PKCS1_OAEP_mgf1_ex2(OSSL_LIB_CTX *libctx,
                                              const unsigned char *param,
                                              int plen, const EVP_MD *md,
                                              const EVP_MD *mgf1md,
-                                             const char *redhat_st_seed)
+                                             const char *rocky_st_seed)
 {
     int rv = 0;
     int i, emlen = tlen - 1;
@@ -127,8 +127,8 @@ int ossl_rsa_padding_add_PKCS1_OAEP_mgf1_ex2(OSSL_LIB_CTX *libctx,
     memcpy(db + emlen - flen - mdlen, from, (unsigned int)flen);
     /* step 3d: generate random byte string */
 #ifdef FIPS_MODULE
-    if (redhat_st_seed != NULL && REDHAT_FIPS_asym_cipher_st) {
-        memcpy(seed, redhat_st_seed, mdlen);
+    if (rocky_st_seed != NULL && ROCKY_FIPS_asym_cipher_st) {
+        memcpy(seed, rocky_st_seed, mdlen);
     } else
 #endif
     if (RAND_bytes_ex(libctx, seed, mdlen, 0) <= 0)

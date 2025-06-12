@@ -401,6 +401,7 @@ my %params = (
     'ASYM_CIPHER_PARAM_TLS_CLIENT_VERSION' =>       "tls-client-version",
     'ASYM_CIPHER_PARAM_TLS_NEGOTIATED_VERSION' =>   "tls-negotiated-version",
     'ASYM_CIPHER_PARAM_IMPLICIT_REJECTION' =>       "implicit-rejection",
+    'ASYM_CIPHER_PARAM_REDHAT_KAT_OEAP_SEED' =>     "redhat-kat-oaep-seed",
 
 # Encoder / decoder parameters
 

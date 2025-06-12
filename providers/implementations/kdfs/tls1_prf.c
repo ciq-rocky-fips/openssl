@@ -128,6 +128,7 @@ static void *kdf_tls1_prf_new(void *provctx)
 static void kdf_tls1_prf_free(void *vctx)
 {
     TLS1_PRF *ctx = (TLS1_PRF *)vctx;
+    OSSL_LIB_CTX *libctx = PROV_LIBCTX_OF(ctx->provctx);
 
     if (ctx != NULL) {
         kdf_tls1_prf_reset(ctx);
@@ -210,6 +211,27 @@ static int kdf_tls1_prf_derive(void *vctx, unsigned char *key, size_t keylen,
      * We do the check this way since the PRF is used for other purposes, as well
      * as "extended master secret".
      */
+    if (ossl_tls1_prf_ems_check_enabled(libctx)) {
+        if (ctx->seedlen >= TLS_MD_MASTER_SECRET_CONST_SIZE
+                && memcmp(ctx->seed, TLS_MD_MASTER_SECRET_CONST,
+                          TLS_MD_MASTER_SECRET_CONST_SIZE) == 0) {
+            ERR_raise(ERR_LIB_PROV, PROV_R_EMS_NOT_ENABLED);
+            return 0;
+        }
+    }
+
+    /*
+     * The seed buffer is prepended with a label.
+     * If EMS mode is enforced then the label "master secret" is not allowed,
+     * We do the check this way since the PRF is used for other purposes, as well
+     * as "extended master secret".
+     */
+#ifdef FIPS_MODULE
+    if (ctx->seedlen >= TLS_MD_MASTER_SECRET_CONST_SIZE
+            && memcmp(ctx->seed, TLS_MD_MASTER_SECRET_CONST,
+                      TLS_MD_MASTER_SECRET_CONST_SIZE) == 0)
+    ctx->fips_indicator = EVP_KDF_REDHAT_FIPS_INDICATOR_NOT_APPROVED;
+#endif /* defined(FIPS_MODULE) */
     if (ossl_tls1_prf_ems_check_enabled(libctx)) {
         if (ctx->seedlen >= TLS_MD_MASTER_SECRET_CONST_SIZE
                 && memcmp(ctx->seed, TLS_MD_MASTER_SECRET_CONST,

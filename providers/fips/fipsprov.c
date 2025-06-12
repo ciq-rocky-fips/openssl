@@ -105,7 +105,7 @@ void *ossl_fips_prov_ossl_ctx_new(OSSL_LIB_CTX *libctx)
     if (fgbl == NULL)
         return NULL;
     init_fips_option(&fgbl->fips_security_checks, 1);
-    init_fips_option(&fgbl->fips_tls1_prf_ems_check, 0); /* Disabled by default */
+    init_fips_option(&fgbl->fips_tls1_prf_ems_check, 1); /* Enabled by default */
     init_fips_option(&fgbl->fips_restricted_drgb_digests, 0);
     return fgbl;
 }

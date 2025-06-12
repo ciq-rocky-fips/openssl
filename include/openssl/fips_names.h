@@ -70,6 +70,14 @@ extern "C" {
  */
 # define OSSL_PROV_FIPS_PARAM_DRBG_TRUNC_DIGEST  "drbg-no-trunc-md"
 
+/*
+ * A boolean that determines if the runtime FIPS check for TLS1_PRF EMS is performed.
+ * This is disabled by default.
+ *
+ * Type: OSSL_PARAM_UTF8_STRING
+ */
+# define OSSL_PROV_FIPS_PARAM_TLS1_PRF_EMS_CHECK "tls1-prf-ems-check"
+
 # ifdef __cplusplus
 }
 # endif

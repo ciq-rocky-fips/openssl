@@ -19,7 +19,7 @@ jobs:
             version_name: 'Rocky 9.2'
           - rocky_version: '96'
             config_file: 'rocky-lts96-x86_64.cfg'
-            dist_suffix: 'el9_6.ciqfips'
+            dist_suffix: 'el9_6ciqfips'
             version_name: 'Rocky 9.6'
     container:
       image: quay.io/rockylinux/rockylinux:9

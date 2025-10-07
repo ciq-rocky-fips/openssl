@@ -1,49 +1,94 @@
-- name: Build openssl rpm
-  shell: bash
-  run: |
-    set -euo pipefail
-    unset DEBUG
-    mkdir -p RESULTS
+name: Build OpenSSL FIPS module
 
-    echo "Installing mock and deps"
-    dnf -y install epel-release
-    dnf -y --setopt=tsflags=nodocs install mock rpm-build dnf-plugins-core createrepo_c
-    dnf clean all || true
+on:
+  push:
+  pull_request:
+    branches: [dist-git]
 
-    # Prove and prepare rights
-    echo "Before group fix:"
-    id && groups || true
-    groupadd -f mock
-    usermod -a -G mock root
-    echo "After group fix (shell won't see new groups unless we use sg/newgrp):"
-    id && groups || true
+jobs:
+  mockBuild:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
+    container:
+      image: quay.io/rockylinux/rockylinux:9
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build openssl rpm
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset DEBUG
+          mkdir -p RESULTS
 
-    export HOME=/root XDG_CACHE_HOME=/root/.cache
+          echo "Installing mock and deps"
+          dnf -y install epel-release
+          dnf -y --setopt=tsflags=nodocs install mock rpm-build dnf-plugins-core createrepo_c
+          dnf clean all || true
 
-    echo "Running mock build (via mock group; avoids 'Insufficient rights.')"
-    sg mock -c 'mock -v -r rocky-9-x86_64 \
-      --isolation=simple \
-      --disable-plugin=tmpfs \
-      --config-opts=macros.provider=provider \
-      --spec "./SPECS/openssl.spec" \
-      --sources "./SOURCES" \
-      --resultdir "./RESULTS" \
-      --verbose'
+          # Prove and prepare rights
+          echo "Before group fix:"
+          id && groups || true
+          groupadd -f mock
+          usermod -a -G mock root
+          echo "After group fix (shell won't see new groups unless we use sg/newgrp):"
+          id && groups || true
 
-    echo "Contents of result directory"
-    ls -l ./RESULTS
+          export HOME=/root XDG_CACHE_HOME=/root/.cache
 
-    # Create provider tarball from produced RPMs
-    cd RESULTS
-    shopt -s nullglob
-    rpms=(openssl-libs-3*ciqfips*.x86_64.rpm)
-    if (( ${#rpms[@]} == 0 )); then
-      echo "No matching openssl-libs ciqfips RPMs found" >&2
-      exit 1
-    fi
-    IFS=$'\n' read -r first <<< "$(printf '%s\n' "${rpms[@]}" | sort | head -n1)"
-    RPMVERSION="$(sed -E 's/.*openssl-libs-(3[^ ]*)\.x86_64\.rpm/\1/' <<<"$first")"
-    echo "Creating fips provider tarball for version: ${RPMVERSION}"
-    tarball="openssl-fips-provider-${RPMVERSION}.tar.gz"
-    tar -czf "${tarball}" ./*.rpm
-    sha256sum "${tarball}" > "${tarball}.sha256"
+          echo "Running mock build (via mock group; avoids 'Insufficient rights.')"
+          sg mock -c 'mock -v -r .mock-config/rocky-lts96-x86_64.cfg \
+            --isolation=simple \
+            --disable-plugin=tmpfs \
+            --config-opts=macros.provider=provider \
+            --spec "./SPECS/openssl.spec" \
+            --sources "./SOURCES" \
+            --resultdir "./RESULTS" \
+            --verbose'
+
+          echo "Contents of result directory"
+          ls -l ./RESULTS
+
+          # Create provider tarball from produced RPMs
+          cd RESULTS
+          shopt -s nullglob
+          rpms=(openssl-libs-3*ciqfips*.x86_64.rpm)
+          if (( ${#rpms[@]} == 0 )); then
+            echo "No matching openssl-libs ciqfips RPMs found" >&2
+            exit 1
+          fi
+          IFS=$'\n' read -r first <<< "$(printf '%s\n' "${rpms[@]}" | sort | head -n1)"
+          RPMVERSION="$(sed -E 's/.*openssl-libs-(3[^ ]*)\.x86_64\.rpm/\1/' <<<"$first")"
+          echo "Creating fips provider tarball for version: ${RPMVERSION}"
+          tarball="openssl-fips-provider-${RPMVERSION}.tar.gz"
+          tar -czf "${tarball}" ./*.rpm
+          sha256sum "${tarball}" > "${tarball}.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fips_module_RESULTS
+          retention-days: 365
+          path: |
+            RESULTS/*.log
+            RESULTS/*.rpm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fips_tarball
+          retention-days: 365
+          path: |
+            RESULTS/*.tar.gz
+            RESULTS/*.tar.gz.sha256
+
+      # Create a release for permanent storage (only on 96dist-git branch pushes)
+      - name: Create Release
+        if: github.ref == 'refs/heads/96dist-git' && github.event_name == 'push'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: build-${{ github.sha }}
+          name: "FIPS Module Build ${{ github.sha }}"
+          files: |
+            RESULTS/*.tar.gz
+            RESULTS/*.tar.gz.sha256
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

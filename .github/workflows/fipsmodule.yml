@@ -11,7 +11,10 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
     container:
       image: quay.io/rockylinux/rockylinux:9
-      options: --privileged
+      options: >-
+        --privileged
+        --user root
+        -v ${{ github.workspace }}/.mock-config:/etc/mock:ro
     steps:
       - uses: actions/checkout@v4
       - name: Build openssl rpm
@@ -24,10 +27,14 @@ jobs:
               dnf -y install mock rpm-build
               echo "Running mock build"
               echo "config_opts['macros']['provider'] = 'provider'" >> .mock-config/rocky-lts92-x86_64.cfg
+              export HOME=/root XDG_CACHE_HOME=/root/.cache
               mock -v -r .mock-config/rocky-lts92-x86_64.cfg \
+                --isolation=simple \
+                --disable-plugin=tmpfs \
                 --spec="./SPECS/openssl.spec" \
                 --sources="./SOURCES" \
-                --resultdir="./RESULTS"
+                --resultdir="./RESULTS" \
+                --verbose
           else
               set -x
               set +e

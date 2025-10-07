@@ -36,11 +36,18 @@ jobs:
 
           export HOME=/root XDG_CACHE_HOME=/root/.cache
 
+          echo "Setting up mock config"
+          mkdir -p /etc/mock
+          cp .mock-config/rocky-lts96-x86_64.cfg /etc/mock/
+          echo "config_opts['macros']['provider'] = 'provider'" >> /etc/mock/rocky-lts96-x86_64.cfg
+          
+          echo "Mock config contents:"
+          cat /etc/mock/rocky-lts96-x86_64.cfg
+
           echo "Running mock build (via mock group; avoids 'Insufficient rights.')"
-          sg mock -c 'mock -v -r .mock-config/rocky-lts96-x86_64.cfg \
+          sg mock -c 'mock -v -r rocky-lts96-x86_64 \
             --isolation=simple \
             --disable-plugin=tmpfs \
-            --config-opts=macros.provider=provider \
             --spec "./SPECS/openssl.spec" \
             --sources "./SOURCES" \
             --resultdir "./RESULTS" \

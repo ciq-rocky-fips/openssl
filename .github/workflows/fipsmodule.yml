@@ -38,7 +38,16 @@ jobs:
 
           echo "Setting up mock config"
           mkdir -p /etc/mock
-          cp .mock-config/rocky-lts96-x86_64.cfg /etc/mock/
+          echo "Current directory: $(pwd)"
+          echo "Looking for config file:"
+          ls -la .mock-config/ || echo "No .mock-config directory found"
+          find . -name "rocky-lts96-x86_64.cfg" -type f || echo "Config file not found"
+          
+          # Use absolute path from GitHub workspace
+          cp ${GITHUB_WORKSPACE}/.mock-config/rocky-lts96-x86_64.cfg /etc/mock/ || \
+          cp ./.mock-config/rocky-lts96-x86_64.cfg /etc/mock/ || \
+          { echo "Cannot find mock config file"; exit 1; }
+          
           echo "config_opts['macros']['provider'] = 'provider'" >> /etc/mock/rocky-lts96-x86_64.cfg
           
           echo "Mock config contents:"

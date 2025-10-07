@@ -14,7 +14,6 @@ jobs:
       options: >-
         --privileged
         --user root
-        -v ${{ github.workspace }}/.mock-config:/etc/mock:ro
         --tmpfs /etc/mock:rw,size=32m
     steps:
       - uses: actions/checkout@v4

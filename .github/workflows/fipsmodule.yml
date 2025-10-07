@@ -31,7 +31,7 @@ jobs:
           if [ -z "$DEBUG" ]; then
               echo "Installing mock"
               dnf -y install epel-release
-              dnf -y install mock rpm-build
+              dnf -y --setopt=tsflags=nodocs install mock rpm-build
               echo "Running mock build"
               echo "config_opts['macros']['provider'] = 'provider'" >> .mock-config/rocky-lts92-x86_64.cfg
               export HOME=/root XDG_CACHE_HOME=/root/.cache

@@ -1,75 +1,49 @@
-name: Build OpenSSL FIPS module
+- name: Build openssl rpm
+  shell: bash
+  run: |
+    set -euo pipefail
+    unset DEBUG
+    mkdir -p RESULTS
 
-on:
-  push:
-  pull_request:
-    branches: [dist-git]
+    echo "Installing mock and deps"
+    dnf -y install epel-release
+    dnf -y --setopt=tsflags=nodocs install mock rpm-build dnf-plugins-core createrepo_c
+    dnf clean all || true
 
-jobs:
-  mockBuild:
-    runs-on: ubuntu-latest
-    # Run on pushes; for PRs only if it's NOT from a fork (same-repo PRs)
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
-    container:
-      image: quay.io/rockylinux/rockylinux:9
-      options: >-
-        --privileged
-        --user root
-        --tmpfs /etc/mock:rw,size=64m
-    steps:
-      - uses: actions/checkout@v4
+    # Prove and prepare rights
+    echo "Before group fix:"
+    id && groups || true
+    groupadd -f mock
+    usermod -a -G mock root
+    echo "After group fix (shell won't see new groups unless we use sg/newgrp):"
+    id && groups || true
 
-      - name: Build openssl rpm
-        shell: bash
-        run: |
-          set -euo pipefail
-          id
-          mkdir -p RESULTS
+    export HOME=/root XDG_CACHE_HOME=/root/.cache
 
-          echo "Installing mock and build deps"
-          dnf -y install epel-release
-          dnf -y --setopt=tsflags=nodocs install mock rpm-build dnf-plugins-core createrepo_c
-          dnf clean all || true
+    echo "Running mock build (via mock group; avoids 'Insufficient rights.')"
+    sg mock -c 'mock -v -r rocky-9-x86_64 \
+      --isolation=simple \
+      --disable-plugin=tmpfs \
+      --config-opts=macros.provider=provider \
+      --spec "./SPECS/openssl.spec" \
+      --sources "./SOURCES" \
+      --resultdir "./RESULTS" \
+      --verbose'
 
-          echo "Running mock build"
-          export HOME=/root XDG_CACHE_HOME=/root/.cache
-          mock -v -r rocky-9-x86_64 \
-            --isolation=simple \
-            --disable-plugin=tmpfs \
-            --config-opts=macros.provider=provider \
-            --spec "./SPECS/openssl.spec" \
-            --sources "./SOURCES" \
-            --resultdir "./RESULTS" \
-            --verbose
+    echo "Contents of result directory"
+    ls -l ./RESULTS
 
-          echo "Contents of result directory"
-          ls -l ./RESULTS
-
-          # Create provider tarball from produced RPMs
-          cd RESULTS
-          shopt -s nullglob
-          rpms=(openssl-libs-3*ciqfips*.x86_64.rpm)
-          if (( ${#rpms[@]} == 0 )); then
-            echo "No matching openssl-libs ciqfips RPMs found" >&2
-            exit 1
-          fi
-          IFS=$'\n' read -r first <<< "$(printf '%s\n' "${rpms[@]}" | sort | head -n1)"
-          RPMVERSION="$(sed -E 's/.*openssl-libs-(3[^ ]*)\.x86_64\.rpm/\1/' <<<"$first")"
-          echo "Creating fips provider tarball for version: ${RPMVERSION}"
-          tarball="openssl-fips-provider-${RPMVERSION}.tar.gz"
-          tar -czf "${tarball}" ./*.rpm
-          sha256sum "${tarball}" > "${tarball}.sha256"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: fips_module_RESULTS
-          path: |
-            RESULTS/*.log
-            RESULTS/*.rpm
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: fips_tarball
-          path: |
-            RESULTS/*.tar.gz
-            RESULTS/*.tar.gz.sha256
+    # Create provider tarball from produced RPMs
+    cd RESULTS
+    shopt -s nullglob
+    rpms=(openssl-libs-3*ciqfips*.x86_64.rpm)
+    if (( ${#rpms[@]} == 0 )); then
+      echo "No matching openssl-libs ciqfips RPMs found" >&2
+      exit 1
+    fi
+    IFS=$'\n' read -r first <<< "$(printf '%s\n' "${rpms[@]}" | sort | head -n1)"
+    RPMVERSION="$(sed -E 's/.*openssl-libs-(3[^ ]*)\.x86_64\.rpm/\1/' <<<"$first")"
+    echo "Creating fips provider tarball for version: ${RPMVERSION}"
+    tarball="openssl-fips-provider-${RPMVERSION}.tar.gz"
+    tar -czf "${tarball}" ./*.rpm
+    sha256sum "${tarball}" > "${tarball}.sha256"

@@ -21,6 +21,13 @@ jobs:
         run: |
           unset DEBUG
           mkdir -p RESULTS
+          # Ensure we have room for /etc/mock (bind-mount it to somewhere with space)
+          mkdir -p /var/etc-mock
+          mkdir -p /etc/mock
+          if ! mountpoint -q /etc/mock; then
+            mount -o bind /var/etc-mock /etc/mock
+          fi
+          df -h /etc/mock || true
           if [ -z "$DEBUG" ]; then
               echo "Installing mock"
               dnf -y install epel-release

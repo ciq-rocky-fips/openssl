@@ -9,17 +9,31 @@ jobs:
   mockBuild:
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
+    strategy:
+      matrix:
+        rocky_version: ['92', '96']
+        include:
+          - rocky_version: '92'
+            config_file: 'rocky-lts92-x86_64.cfg'
+            dist_suffix: 'el9_2.ciqfips'
+            version_name: 'Rocky 9.2'
+          - rocky_version: '96'
+            config_file: 'rocky-lts96-x86_64.cfg'
+            dist_suffix: 'el9_6.ciqfips'
+            version_name: 'Rocky 9.6'
     container:
       image: quay.io/rockylinux/rockylinux:9
       options: --privileged
     steps:
       - uses: actions/checkout@v4
-      - name: Build openssl rpm
+      - name: Build openssl rpm for ${{ matrix.version_name }}
         shell: bash
         run: |
           set -euo pipefail
           unset DEBUG
           mkdir -p RESULTS
+
+          echo "Building for ${{ matrix.version_name }} using ${{ matrix.config_file }}"
 
           echo "Installing mock and deps"
           dnf -y install epel-release
@@ -36,31 +50,34 @@ jobs:
 
           export HOME=/root XDG_CACHE_HOME=/root/.cache
 
-          echo "Setting up mock config"
+          echo "Setting up mock config for ${{ matrix.version_name }}"
           mkdir -p /etc/mock
           echo "Current directory: $(pwd)"
-          echo "Looking for config file:"
+          echo "Looking for config file: ${{ matrix.config_file }}"
           ls -la .mock-config/ || echo "No .mock-config directory found"
-          find . -name "rocky-lts96-x86_64.cfg" -type f || echo "Config file not found"
           
           # Use absolute path from GitHub workspace
-          cp ${GITHUB_WORKSPACE}/.mock-config/rocky-lts96-x86_64.cfg /etc/mock/ || \
-          cp ./.mock-config/rocky-lts96-x86_64.cfg /etc/mock/ || \
-          { echo "Cannot find mock config file"; exit 1; }
+          cp ${GITHUB_WORKSPACE}/.mock-config/${{ matrix.config_file }} /etc/mock/ || \
+          cp ./.mock-config/${{ matrix.config_file }} /etc/mock/ || \
+          { echo "Cannot find mock config file: ${{ matrix.config_file }}"; exit 1; }
           
-          echo "config_opts['macros']['provider'] = 'provider'" >> /etc/mock/rocky-lts96-x86_64.cfg
+          echo "config_opts['macros']['provider'] = 'provider'" >> /etc/mock/${{ matrix.config_file }}
           
           echo "Mock config contents:"
-          cat /etc/mock/rocky-lts96-x86_64.cfg
+          cat /etc/mock/${{ matrix.config_file }}
 
-          echo "Running mock build (via mock group; avoids 'Insufficient rights.')"
-          sg mock -c 'mock -v -r rocky-lts96-x86_64 \
+          # Extract config name without .cfg extension
+          CONFIG_NAME="${{ matrix.config_file }}"
+          CONFIG_NAME="${CONFIG_NAME%.cfg}"
+
+          echo "Running mock build for ${{ matrix.version_name }} (via mock group; avoids 'Insufficient rights.')"
+          sg mock -c "mock -v -r ${CONFIG_NAME} \
             --isolation=simple \
             --disable-plugin=tmpfs \
-            --spec "./SPECS/openssl.spec" \
-            --sources "./SOURCES" \
-            --resultdir "./RESULTS" \
-            --verbose'
+            --spec ./SPECS/openssl.spec \
+            --sources ./SOURCES \
+            --resultdir ./RESULTS \
+            --verbose"
 
           echo "Contents of result directory"
           ls -l ./RESULTS
@@ -76,32 +93,37 @@ jobs:
           IFS=$'\n' read -r first <<< "$(printf '%s\n' "${rpms[@]}" | sort | head -n1)"
           RPMVERSION="$(sed -E 's/.*openssl-libs-(3[^ ]*)\.x86_64\.rpm/\1/' <<<"$first")"
           echo "Creating fips provider tarball for version: ${RPMVERSION}"
-          tarball="openssl-fips-provider-${RPMVERSION}.tar.gz"
+          tarball="openssl-fips-provider-rocky${{ matrix.rocky_version }}-${RPMVERSION}.tar.gz"
           tar -czf "${tarball}" ./*.rpm
           sha256sum "${tarball}" > "${tarball}.sha256"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: fips_module_RESULTS
+          name: fips_module_RESULTS_rocky${{ matrix.rocky_version }}
           retention-days: 365
           path: |
             RESULTS/*.log
             RESULTS/*.rpm
       - uses: actions/upload-artifact@v4
         with:
-          name: fips_tarball
+          name: fips_tarball_rocky${{ matrix.rocky_version }}
           retention-days: 365
           path: |
             RESULTS/*.tar.gz
             RESULTS/*.tar.gz.sha256
 
-      # Create a release for permanent storage (only on 96dist-git branch pushes)
+      # Create a release for permanent storage (only on dist-git branch pushes)
       - name: Create Release
-        if: github.ref == 'refs/heads/96dist-git' && github.event_name == 'push'
+        if: github.ref == 'refs/heads/dist-git' && github.event_name == 'push'
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: build-${{ github.sha }}
-          name: "FIPS Module Build ${{ github.sha }}"
+          tag_name: build-rocky${{ matrix.rocky_version }}-${{ github.sha }}
+          name: "FIPS Module ${{ matrix.version_name }} - ${{ github.sha }}"
+          body: |
+            OpenSSL FIPS Module built for ${{ matrix.version_name }}
+            
+            Built from commit: ${{ github.sha }}
+            Build date: ${{ github.run_number }}
           files: |
             RESULTS/*.tar.gz
             RESULTS/*.tar.gz.sha256

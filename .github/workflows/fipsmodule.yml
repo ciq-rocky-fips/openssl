@@ -36,7 +36,7 @@ jobs:
 
           # Extract the FIPS module
           cd RESULTS
-          RPMVERSION=$(ls ./openssl-libs-3*ciqfips*.x86_64.rpm | sed -e 's/.*openssl-libs-\(3.*\)\.x86_64\.rpm/\1/')
+          RPMVERSION=$(ls ./openssl-libs-3*ciq*.x86_64.rpm | sed -e 's/.*openssl-libs-\(3.*\)\.x86_64\.rpm/\1/')
           echo "Creating fips provider tarball"
           tar -czf openssl-fips-provider-${RPMVERSION}.tar.gz *.rpm
           sha256sum openssl-fips-provider-${RPMVERSION}.tar.gz > openssl-fips-provider-${RPMVERSION}.tar.gz.sha256

@@ -7,7 +7,7 @@ on:
 
 jobs:
   mockBuild:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
     strategy:
       matrix:
@@ -15,11 +15,11 @@ jobs:
         include:
           - rocky_version: '92'
             config_file: 'rocky-lts92-x86_64.cfg'
-            dist_suffix: 'el9_2.ciqfips'
+            dist_suffix: 'el9_2.ciq'
             version_name: 'Rocky 9.2'
           - rocky_version: '96'
             config_file: 'rocky-lts96-x86_64.cfg'
-            dist_suffix: 'el9_6ciqfips'
+            dist_suffix: 'el9_6_ciq'
             version_name: 'Rocky 9.6'
     container:
       image: quay.io/rockylinux/rockylinux:9
@@ -85,9 +85,9 @@ jobs:
           # Create provider tarball from produced RPMs
           cd RESULTS
           shopt -s nullglob
-          rpms=(openssl-libs-3*ciqfips*.x86_64.rpm)
+          rpms=(openssl-libs-3*ciq*.x86_64.rpm)
           if (( ${#rpms[@]} == 0 )); then
-            echo "No matching openssl-libs ciqfips RPMs found" >&2
+            echo "No matching openssl-libs ciq RPMs found" >&2
             exit 1
           fi
           IFS=$'\n' read -r first <<< "$(printf '%s\n' "${rpms[@]}" | sort | head -n1)"

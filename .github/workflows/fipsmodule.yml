@@ -7,20 +7,33 @@ on:
 
 jobs:
   mockBuild:
-    runs-on: ubuntu-22.04
+    runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-22.04-arm' || 'ubuntu-22.04' }}
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
     strategy:
       matrix:
         rocky_version: ['92', '96']
+        arch: ['x86_64', 'aarch64']
         include:
           - rocky_version: '92'
+            arch: 'x86_64'
             config_file: 'rocky-lts92-x86_64.cfg'
             dist_suffix: 'el9_2.ciq'
-            version_name: 'Rocky 9.2'
+            version_name: 'Rocky 9.2 x86_64'
+          - rocky_version: '92'
+            arch: 'aarch64'
+            config_file: 'rocky-lts92-aarch64.cfg'
+            dist_suffix: 'el9_2.ciq'
+            version_name: 'Rocky 9.2 aarch64'
           - rocky_version: '96'
+            arch: 'x86_64'
             config_file: 'rocky-lts96-x86_64.cfg'
             dist_suffix: 'el9_6_ciq'
-            version_name: 'Rocky 9.6'
+            version_name: 'Rocky 9.6 x86_64'
+          - rocky_version: '96'
+            arch: 'aarch64'
+            config_file: 'rocky-lts96-aarch64.cfg'
+            dist_suffix: 'el9_6_ciq'
+            version_name: 'Rocky 9.6 aarch64'
     container:
       image: quay.io/rockylinux/rockylinux:9
       options: --privileged
@@ -85,28 +98,28 @@ jobs:
           # Create provider tarball from produced RPMs
           cd RESULTS
           shopt -s nullglob
-          rpms=(openssl-libs-3*ciq*.x86_64.rpm)
+          rpms=(openssl-libs-3*ciq*.${{ matrix.arch }}.rpm)
           if (( ${#rpms[@]} == 0 )); then
             echo "No matching openssl-libs ciq RPMs found" >&2
             exit 1
           fi
           IFS=$'\n' read -r first <<< "$(printf '%s\n' "${rpms[@]}" | sort | head -n1)"
-          RPMVERSION="$(sed -E 's/.*openssl-libs-(3[^ ]*)\.x86_64\.rpm/\1/' <<<"$first")"
+          RPMVERSION="$(sed -E 's/.*openssl-libs-(3[^ ]*)\.'"${{ matrix.arch }}"'\.rpm/\1/' <<<"$first")"
           echo "Creating fips provider tarball for version: ${RPMVERSION}"
-          tarball="openssl-fips-provider-rocky${{ matrix.rocky_version }}-${RPMVERSION}.tar.gz"
+          tarball="openssl-fips-provider-rocky${{ matrix.rocky_version }}-${{ matrix.arch }}-${RPMVERSION}.tar.gz"
           tar -czf "${tarball}" ./*.rpm
           sha256sum "${tarball}" > "${tarball}.sha256"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: fips_module_RESULTS_rocky${{ matrix.rocky_version }}
+          name: fips_module_RESULTS_rocky${{ matrix.rocky_version }}_${{ matrix.arch }}
           retention-days: 365
           path: |
             RESULTS/*.log
             RESULTS/*.rpm
       - uses: actions/upload-artifact@v4
         with:
-          name: fips_tarball_rocky${{ matrix.rocky_version }}
+          name: fips_tarball_rocky${{ matrix.rocky_version }}_${{ matrix.arch }}
           retention-days: 365
           path: |
             RESULTS/*.tar.gz
@@ -117,11 +130,11 @@ jobs:
         if: github.ref == 'refs/heads/dist-git' && github.event_name == 'push'
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: build-rocky${{ matrix.rocky_version }}-${{ github.sha }}
+          tag_name: build-rocky${{ matrix.rocky_version }}-${{ matrix.arch }}-${{ github.sha }}
           name: "FIPS Module ${{ matrix.version_name }} - ${{ github.sha }}"
           body: |
             OpenSSL FIPS Module built for ${{ matrix.version_name }}
-            
+
             Built from commit: ${{ github.sha }}
             Build date: ${{ github.run_number }}
           files: |

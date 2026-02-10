@@ -680,6 +680,69 @@ err:
 }
 #endif
 
+#ifdef FIPS_MODULE
+static int fips_eddsa_pct(OSSL_LIB_CTX *libctx,
+                          ECX_KEY_TYPE type,
+                          uint8_t *pubkey,
+                          uint8_t *privkey,
+                          size_t keylen)
+{
+    int ret = 0;
+    const char *message = "Hello World!";
+    unsigned char test_signature[114];
+    size_t message_len = strlen(message);
+    int is_ed25519 = (type == ECX_KEY_TYPE_ED25519);
+
+    /* Sign the test message */
+    if (is_ed25519) {
+        if (ossl_ed25519_sign(test_signature, (const uint8_t *)message,
+                              message_len, pubkey, privkey,
+                              0, 0, 0, NULL, 0, libctx, NULL) != 1) {
+            goto err;
+        }
+    } else {
+        if (ossl_ed448_sign(libctx, test_signature, (const uint8_t *)message,
+                            message_len, pubkey, privkey, NULL, 0, 0, NULL) != 1) {
+            goto err;
+        }
+    }
+
+    /* Verify the signature */
+    if (is_ed25519) {
+        if (ossl_ed25519_verify((const uint8_t *)message, message_len,
+                                test_signature, pubkey,
+                                0, 0, 0, NULL, 0, libctx, NULL) != 1) {
+            goto err;
+        }
+    } else {
+        if (ossl_ed448_verify(libctx, (const uint8_t *)message, message_len,
+                              test_signature, pubkey, NULL, 0, 0, NULL) != 1) {
+            goto err;
+        }
+    }
+
+    /* Check a bad signature doesn't match */
+    test_signature[0] ^= 0x1;
+    if (is_ed25519) {
+        if (ossl_ed25519_verify((const uint8_t *)message, message_len,
+                                test_signature, pubkey,
+                                0, 0, 0, NULL, 0, libctx, NULL) == 1) {
+            goto err;
+        }
+    } else {
+        if (ossl_ed448_verify(libctx, (const uint8_t *)message, message_len,
+                              test_signature, pubkey, NULL, 0, 0, NULL) == 1) {
+            goto err;
+        }
+    }
+
+    ret = 1;
+
+ err:
+    return ret;
+}
+#endif
+
 static void *ecx_gen(struct ecx_gen_ctx *gctx)
 {
     ECX_KEY *key;
@@ -732,11 +795,31 @@ static void *ecx_gen(struct ecx_gen_ctx *gctx)
         if (!ossl_ed25519_public_from_private(gctx->libctx, key->pubkey, privkey,
                                               gctx->propq))
             goto err;
+#ifdef FIPS_MODULE
+        if (!fips_eddsa_pct(gctx->libctx,
+                            ECX_KEY_TYPE_ED25519,
+                            key->pubkey,
+                            privkey,
+                            key->keylen)) {
+            /* rsa pct aborts on fail, do the same. */
+            abort();
+        }
+#endif
         break;
     case ECX_KEY_TYPE_ED448:
         if (!ossl_ed448_public_from_private(gctx->libctx, key->pubkey, privkey,
                                             gctx->propq))
             goto err;
+#ifdef FIPS_MODULE
+        if (!fips_eddsa_pct(gctx->libctx,
+                            ECX_KEY_TYPE_ED448,
+                            key->pubkey,
+                            privkey,
+                            key->keylen)) {
+            /* rsa pct aborts on fail, do the same. */
+            abort();
+        }
+#endif
         break;
     }
     key->haspubkey = 1;

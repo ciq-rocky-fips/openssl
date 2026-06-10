@@ -426,4 +426,5 @@ int ossl_quic_channel_is_new_local_stream_admissible(QUIC_CHANNEL *ch, int is_un
 
 # endif
 
+void ossl_ch_reset_rx_state(QUIC_CHANNEL *ch);
 #endif

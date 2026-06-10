@@ -151,4 +151,5 @@ QUIC_CFQ_ITEM *ossl_quic_cfq_item_get_priority_next(const QUIC_CFQ_ITEM *item,
 
 # endif
 
+int ossl_quic_cfq_discard_unreliable(QUIC_CFQ *cfq, QUIC_CFQ_ITEM *item);
 #endif

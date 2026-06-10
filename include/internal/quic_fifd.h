@@ -77,4 +77,5 @@ int ossl_quic_fifd_pkt_commit(QUIC_FIFD *fifd, QUIC_TXPIM_PKT *pkt);
 
 # endif
 
+void ossl_quic_fifd_pkt_discard_unreliable(QUIC_FIFD *fifd, QUIC_TXPIM_PKT *tpkt);
 #endif

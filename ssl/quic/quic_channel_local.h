@@ -20,6 +20,28 @@ struct quic_srt_elem_st {
 DEFINE_LIST_OF(stateless_reset_tokens, QUIC_SRT_ELEM);
 
 /*
+ * This is a part of PATH_CHALLENGE flood [1] mitigation. This limits the
+ * number of PATH_CHALLENGE frames  QUIC stack is willing to process for
+ * connection. Local QUIC stack creates PATH_RESPONSE frame for PATH_CHALLENGE
+ * frame it receives from remote peer. The response frame is put Control Frame
+ * Queue waiting to be dispatched. The PATH_RESPONSE frame is removed from CFQ
+ * after it is dispatched. The QUIC_PATH_RESPONSE_QLEN limits the number of
+ * PATH_RESPONSE frames waiting to be dispatched. No new PATH_RESPONSE frames
+ * are inserted into CFQ if queue limit is exceeded.
+ *
+ * QUIC implementations use different limits for PATH_RESPONSE queue lengths:
+ *    quic-go defines maxPathResponses as 256
+ *    quiche from cloadflare sets DEFAULT_MAX_PATH_CHALLENGE_RX_QUEUE_LEN to 3
+ *    t-quic from tencent chooses MAX_PATH_CHALS_RECV to be 8
+ *
+ * OpenSSL here introduces QUIC_PATH_RESPONSE_QLEN as 32.
+ *
+ * [1] https://www.ietf.org/archive/id/draft-chen-quic-logical-vuln-mitigations-00.txt
+ *     (section 4.2)
+ */
+#define QUIC_PATH_RESPONSE_QLEN 32
+
+/*
  * QUIC Channel Structure
  * ======================
  *
@@ -464,12 +486,30 @@ struct quic_channel_st {
     /* Are we using addressed mode? */
     unsigned int                    addressed_mode                      : 1;
 
+    /*
+     * RFC 9000 Section 9.2.1 says:
+     *      However, an endpoint SHOULD NOT send multiple
+     *      PATH_CHALLENGE frames in a single packet.
+     * The counter here allows us to detect multiple presence
+     * of PATH_CHALLENGE frame in packet. We process only the
+     * first PATH_CHALLENGE frame found in packet. Remaining PATH_CHALLENGE
+     * frames are ignored.
+     * seen_path_challenge flag is always reset before
+     * ossl_quic_handle_frames() gets called.
+     */
+    unsigned int seen_path_challenge : 1;
+
     /* Saved error stack in case permanent error was encountered */
     ERR_STATE                       *err_state;
 
     /* Scratch area for use by RXDP to store decoded ACK ranges. */
     OSSL_QUIC_ACK_RANGE             *ack_range_scratch;
     size_t                          num_ack_range_scratch;
+    /*
+     * number of path responses waiting to be dispatched
+     * from control frame queue (CFQ)
+     */
+    unsigned int path_response_limit;
 };
 
 # endif

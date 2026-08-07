@@ -1418,6 +1418,24 @@ if ($target) {
 exit 0 if $dryrun;              # From older 'config'
 
 $config{target} = $target;
+
+# If jitter is enabled but no explicit paths were given, check for the
+# bundled libjitterentropy install directory and use it automatically.
+# This must happen before resolve_config() which evaluates the template
+# subs that consume $withargs{jitter_include} and $withargs{jitter_lib}.
+unless ($disabled{jitter}) {
+    if (!$withargs{jitter_include} && !$withargs{jitter_lib}) {
+        my $bundled_install = catdir($srcdir, "bundled_libjitterentropy", "install");
+        my $bundled_lib = catfile($bundled_install, "lib", "libjitterentropy.a");
+        my $bundled_inc = catfile($bundled_install, "include", "jitterentropy.h");
+        if (-f $bundled_lib && -f $bundled_inc) {
+            $withargs{jitter_include} = catdir($bundled_install, "include");
+            $withargs{jitter_lib} = catdir($bundled_install, "lib");
+            print "Using bundled libjitterentropy from $bundled_install\n";
+        }
+    }
+}
+
 my %target = resolve_config($target);
 
 foreach (keys %target_attr_translate) {

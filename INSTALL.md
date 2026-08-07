@@ -550,6 +550,19 @@ it is outside the system include path.
 This is the directory containing the static libjitterentropy.a
 library, if it is outside the system library path.
 
+If the `bundled_libjitterentropy/` directory is present in the source tree
+and has been built (i.e. `bundled_libjitterentropy/install/lib/libjitterentropy.a`
+and `bundled_libjitterentropy/install/include/jitterentropy.h` exist), Configure
+will automatically use this bundled copy when `enable-jitter` or `enable-fips-jitter`
+is specified, unless `--with-jitter-include` and `--with-jitter-lib` are explicitly
+provided. To build the bundled library, run:
+
+    cd bundled_libjitterentropy && bash libjitterentropy-config.sh && cd ..
+
+Then simply configure with:
+
+    ./Configure enable-fips-jitter [other options...]
+
 Setting the FIPS HMAC key
 -------------------------
 

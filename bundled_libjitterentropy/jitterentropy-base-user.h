@@ -43,6 +43,16 @@
 #define _JITTERENTROPY_BASE_USER_H
 
 /*
+ * glibc only exposes MAP_ANONYMOUS and MAP_LOCKED when a non strict-ISO
+ * feature test macro is set. They are required by the allocator below, so
+ * request them here before any system header is pulled in.
+ */
+#if defined(__linux__) && !defined(_DEFAULT_SOURCE) && \
+    !defined(_BSD_SOURCE) && !defined(_GNU_SOURCE)
+#define _DEFAULT_SOURCE 1
+#endif
+
+/*
  * Set the following defines as needed for your environment
  * Compilation for AWS-LC     #define AWSLC
  * Compilation for libgcrypt  #define LIBGCRYPT
@@ -280,6 +290,108 @@ static inline void jent_memset_secure(void *s, size_t n)
 #endif
 }
 
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__APPLE__)
+
+/*
+ * Anonymous mmap() based allocation with a fallback to malloc().
+ *
+ * mlock() is deliberately not used here: sandboxes such as the OpenSSH
+ * seccomp filter do not allow mlock()/munlock() and terminate the calling
+ * process with SIGKILL. Requesting locked pages via mmap(MAP_LOCKED)
+ * instead only makes the mmap() call fail (the seccomp filter returns
+ * EINVAL), which we can handle by falling back to plain malloc().
+ *
+ * As jent_zfree() is only given the pointer and the payload length, a
+ * header is placed in front of the buffer handed out to the caller. It
+ * records the length of the mapping, or zero if malloc() was used, so the
+ * memory can be released with the matching munmap()/free() call.
+ */
+
+#ifndef MAP_ANONYMOUS
+# ifdef MAP_ANON
+#  define MAP_ANONYMOUS MAP_ANON
+# endif
+#endif
+
+/* MAP_LOCKED is a Linux extension - other systems get unlocked pages */
+#ifdef MAP_LOCKED
+# define JENT_MAP_LOCKED MAP_LOCKED
+#else
+# define JENT_MAP_LOCKED 0
+#endif
+
+union jent_alloc_hdr {
+	size_t maplen;		/* mmap() length, 0 if malloc() was used */
+	/* Keep the payload aligned for any type the caller may store */
+	unsigned char padding[32];
+};
+
+static inline void *jent_mmap_or_malloc(size_t len)
+{
+	union jent_alloc_hdr *hdr;
+	size_t alloclen;
+
+	if (len > SIZE_MAX - sizeof(union jent_alloc_hdr))
+		return NULL;
+	alloclen = len + sizeof(union jent_alloc_hdr);
+
+#ifdef MAP_ANONYMOUS
+	{
+		long pagesize = sysconf(_SC_PAGESIZE);
+		size_t maplen = alloclen;
+		void *map;
+
+		if (pagesize > 0) {
+			size_t psize = (size_t)pagesize;
+
+			if (alloclen > SIZE_MAX - (psize - 1))
+				return NULL;
+			maplen = (alloclen + psize - 1) & ~(psize - 1);
+		}
+
+		map = mmap(NULL, maplen, PROT_READ | PROT_WRITE,
+			   MAP_PRIVATE | MAP_ANONYMOUS | JENT_MAP_LOCKED,
+			   -1, 0);
+		if (map != MAP_FAILED) {
+			hdr = (union jent_alloc_hdr *)map;
+			hdr->maplen = maplen;
+			return (unsigned char *)map +
+			       sizeof(union jent_alloc_hdr);
+		}
+		/*
+		 * The mapping was refused - a seccomp filter rejecting
+		 * MAP_LOCKED reports EINVAL. Use malloc() instead.
+		 */
+	}
+#endif /* MAP_ANONYMOUS */
+
+	hdr = (union jent_alloc_hdr *)malloc(alloclen);
+	if (hdr == NULL)
+		return NULL;
+	hdr->maplen = 0;
+
+	return (unsigned char *)hdr + sizeof(union jent_alloc_hdr);
+}
+
+static inline void jent_munmap_or_free(void *ptr, size_t len)
+{
+	union jent_alloc_hdr *hdr = (union jent_alloc_hdr *)
+		((unsigned char *)ptr - sizeof(union jent_alloc_hdr));
+	size_t maplen = hdr->maplen;
+
+	jent_memset_secure(ptr, len);
+
+	if (maplen) {
+#ifdef MAP_ANONYMOUS
+		munmap(hdr, maplen);
+#endif
+	} else {
+		free(hdr);
+	}
+}
+
+#endif /* __linux__ || __FreeBSD__ || __OpenBSD__ || __NetBSD__ || __APPLE__ */
+
 static inline void *jent_zalloc(size_t len)
 {
 	#define JENT_BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
@@ -331,27 +443,19 @@ static inline void *jent_zalloc(size_t len)
 	}
 
 #elif defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__APPLE__)
-	tmp = malloc(len);
-	if (!tmp)
-		return NULL;
 	/*
-	 * prevent paging out of the memory state to swap space
-	 * if this fails, check the current memory lock limits
-	 * and capabilities (e.g. RLIMIT_MEMLOCK and CAP_IPC_LOCK)
+	 * Prevent paging out of the memory state to swap space by asking
+	 * mmap() for locked pages. mlock() is not used as it is fatal under
+	 * sandboxes like the OpenSSH seccomp filter - see the comment above
+	 * jent_mmap_or_malloc(). If the mapping is refused (a seccomp filter
+	 * rejecting MAP_LOCKED returns EINVAL), malloc() is used instead.
 	 */
 #ifndef JENT_CONF_RELAX_MLOCK
 #define CONFIG_CRYPTO_CPU_JITTERENTROPY_SECURE_MEMORY
-	if (mlock(tmp, len)) {
-#else
-	/*
-	 * use this only for CI or restricted containers if not possible
-	 * otherwise
-	 */
-	if (mlock(tmp, len) && errno != EPERM && errno != EAGAIN) {
 #endif
-		free(tmp);
+	tmp = jent_mmap_or_malloc(len);
+	if (!tmp)
 		return NULL;
-	}
 
 #else /* LIBGCRYPT */
 
@@ -387,13 +491,11 @@ static inline void jent_zfree(void *ptr, size_t len)
 	OPENSSL_secure_free(ptr);
 
 #elif defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__APPLE__)
-	/* while memory returned to the OS is automatically unlocked,
-	 * it is not known how long libc keeps this memory cached
-	 * internally therefore its more robust to nevertheless
-	 * unlock here. */
-	munlock(ptr, len);
-	jent_memset_secure(ptr, len);
-	free(ptr);
+	/* The memory is wiped and then released with munmap() if it was
+	 * obtained from mmap(), or with free() if malloc() was used as the
+	 * fallback. munlock() is not called as mlock() is never used - it
+	 * is fatal under sandboxes like the OpenSSH seccomp filter. */
+	jent_munmap_or_free(ptr, len);
 
 #else
 	jent_memset_secure(ptr, len);

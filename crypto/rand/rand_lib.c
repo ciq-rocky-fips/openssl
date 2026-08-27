@@ -613,7 +613,7 @@ static EVP_RAND_CTX *rand_new_seed(OSSL_LIB_CTX *libctx)
     const char *propq;
     char *name;
     EVP_RAND_CTX *ctx = NULL;
-#ifdef OPENSSL_NO_FIPS_JITTER
+#if defined(OPENSSL_NO_FIPS_JITTER) || !defined(FIPS_MODULE)
     RAND_GLOBAL *dgbl = rand_get_global(libctx);
 
     if (dgbl == NULL)
@@ -621,10 +621,10 @@ static EVP_RAND_CTX *rand_new_seed(OSSL_LIB_CTX *libctx)
     propq = dgbl->seed_propq;
     name = dgbl->seed_name != NULL ? dgbl->seed_name
                                    : OPENSSL_MSTR(OPENSSL_DEFAULT_SEED_SRC);
-#else /* !OPENSSL_NO_FIPS_JITTER */
+#else /* FIPS_MODULE && !OPENSSL_NO_FIPS_JITTER */
     name = "JITTER";
     propq = "";
-#endif /* OPENSSL_NO_FIPS_JITTER */
+#endif /* OPENSSL_NO_FIPS_JITTER || !FIPS_MODULE */
 
     rand = EVP_RAND_fetch(libctx, name, propq);
     if (rand == NULL) {

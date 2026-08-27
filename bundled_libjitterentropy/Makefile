@@ -5,6 +5,8 @@ CC ?= gcc
 ENABLE_STACK_PROTECTOR ?= 1
 CFLAGS ?= -fwrapv --param ssp-buffer-size=4 -fvisibility=hidden -fPIE -Wcast-align -Wmissing-field-initializers -Wshadow -Wswitch-enum
 CFLAGS +=-Wextra -Wall -pedantic -fPIC -O0 -fwrapv -Wconversion -std=c11
+# -std=c11 hides MAP_ANONYMOUS/MAP_LOCKED in glibc - the allocator needs them
+CFLAGS += -D_DEFAULT_SOURCE
 LDFLAGS +=-Wl,-z,relro,-z,now -lpthread
 
 # Enable internal timer support

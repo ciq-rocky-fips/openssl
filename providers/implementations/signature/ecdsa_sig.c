@@ -373,6 +373,9 @@ static int ecdsa_signverify_message_update(void *vctx,
 {
     PROV_ECDSA_CTX *ctx = (PROV_ECDSA_CTX *)vctx;
 
+    if (!ossl_prov_is_running())
+        return 0;
+
     if (ctx == NULL)
         return 0;
 

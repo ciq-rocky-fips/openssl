@@ -185,6 +185,9 @@ static int cmac_update(void *vmacctx, const unsigned char *data,
 {
     struct cmac_data_st *macctx = vmacctx;
 
+    if (!ossl_prov_is_running())
+        return 0;
+
     return CMAC_Update(macctx->ctx, data, datalen);
 }
 

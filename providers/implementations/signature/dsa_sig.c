@@ -371,6 +371,9 @@ static int dsa_signverify_message_update(void *vpdsactx,
 {
     PROV_DSA_CTX *pdsactx = (PROV_DSA_CTX *)vpdsactx;
 
+    if (!ossl_prov_is_running())
+        return 0;
+
     if (pdsactx == NULL)
         return 0;
 

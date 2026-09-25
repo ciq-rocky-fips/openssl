@@ -23,12 +23,15 @@
 #include <openssl/engine.h>
 #endif
 #include <openssl/self_test.h>
+#include <openssl/evp.h>
+#include <openssl/core_names.h>
+#include <openssl/param_build.h>
 #include "prov/providercommon.h"
 #include "prov/ecx.h"
 #include "crypto/bn.h"
 
-static int ecdsa_keygen_pairwise_test(EC_KEY *eckey, OSSL_CALLBACK *cb,
-    void *cbarg);
+static int ecdsa_keygen_pairwise_test(EC_KEY *eckey, BN_CTX *bnctx,
+    OSSL_CALLBACK *cb, void *cbarg);
 
 #ifndef FIPS_MODULE
 EC_KEY *EC_KEY_new(void)
@@ -332,7 +335,7 @@ static int ec_generate_key(EC_KEY *eckey, int pairwise_test)
         void *cbarg = NULL;
 
         OSSL_SELF_TEST_get_callback(eckey->libctx, &cb, &cbarg);
-        ok = ecdsa_keygen_pairwise_test(eckey, cb, cbarg);
+        ok = ecdsa_keygen_pairwise_test(eckey, ctx, cb, cbarg);
     }
 err:
     /* Step (9): If there is an error return an invalid keypair. */
@@ -1040,14 +1043,21 @@ int EC_KEY_can_sign(const EC_KEY *eckey)
  * specified in SP800-56A) when generating keys. Hence pairwise ECDH tests are
  * omitted here.
  */
-static int ecdsa_keygen_pairwise_test(EC_KEY *eckey, OSSL_CALLBACK *cb,
-    void *cbarg)
+static int ecdsa_keygen_pairwise_test(EC_KEY *eckey, BN_CTX *bnctx,
+    OSSL_CALLBACK *cb, void *cbarg)
 {
     int ret = 0;
-    unsigned char dgst[16] = { 0 };
-    int dgst_len = (int)sizeof(dgst);
-    ECDSA_SIG *sig = NULL;
+    unsigned char msg[16] = { 0 };
+    unsigned char *sig = NULL;
+    unsigned char *pubbuf = NULL;
+    size_t sig_len = 0, pub_len = 0;
     OSSL_SELF_TEST *st = NULL;
+    OSSL_PARAM_BLD *bld = NULL;
+    OSSL_PARAM *params = NULL;
+    unsigned char *gen_buf = NULL;
+    EVP_PKEY_CTX *kctx = NULL, *sctx = NULL;
+    EVP_PKEY *pkey = NULL;
+    EVP_SIGNATURE *sig_alg = NULL;
 
     st = OSSL_SELF_TEST_new(cb, cbarg);
     if (st == NULL)
@@ -1056,19 +1066,73 @@ static int ecdsa_keygen_pairwise_test(EC_KEY *eckey, OSSL_CALLBACK *cb,
     OSSL_SELF_TEST_onbegin(st, OSSL_SELF_TEST_TYPE_PCT,
         OSSL_SELF_TEST_DESC_PCT_ECDSA);
 
-    sig = ECDSA_do_sign(dgst, dgst_len, eckey);
-    if (sig == NULL)
+    /*
+     * Perform the test using the approved digest-and-sign signature service
+     * (SHA-256 followed by ECDSA), rather than signing a raw digest with the
+     * low level ECDSA_do_sign()/ECDSA_do_verify() functions.  This requires an
+     * EVP_PKEY, so wrap the freshly generated key material via EVP_PKEY_fromdata.
+     */
+    bld = OSSL_PARAM_BLD_new();
+    if (bld == NULL)
+        goto err;
+    if (!ossl_ec_group_todata(eckey->group, bld, NULL, eckey->libctx,
+            eckey->propq, bnctx, &gen_buf))
+        goto err;
+    pub_len = EC_POINT_point2buf(eckey->group, eckey->pub_key,
+        POINT_CONVERSION_UNCOMPRESSED, &pubbuf, bnctx);
+    if (pub_len == 0)
+        goto err;
+    if (!OSSL_PARAM_BLD_push_octet_string(bld, OSSL_PKEY_PARAM_PUB_KEY,
+            pubbuf, pub_len)
+        || !OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_PRIV_KEY,
+            eckey->priv_key))
+        goto err;
+    params = OSSL_PARAM_BLD_to_param(bld);
+    if (params == NULL)
         goto err;
 
-    OSSL_SELF_TEST_oncorrupt_byte(st, dgst);
+    kctx = EVP_PKEY_CTX_new_from_name(eckey->libctx, "EC", eckey->propq);
+    if (kctx == NULL
+        || EVP_PKEY_fromdata_init(kctx) <= 0
+        || EVP_PKEY_fromdata(kctx, &pkey, EVP_PKEY_KEYPAIR, params) <= 0)
+        goto err;
 
-    if (ECDSA_do_verify(dgst, dgst_len, sig, eckey) != 1)
+    sig_alg = EVP_SIGNATURE_fetch(eckey->libctx, "ECDSA-SHA256", eckey->propq);
+    if (sig_alg == NULL)
+        goto err;
+    sctx = EVP_PKEY_CTX_new_from_pkey(eckey->libctx, pkey, eckey->propq);
+    if (sctx == NULL)
+        goto err;
+
+    /* Sign the message (hash with SHA-256, then ECDSA sign) */
+    if (EVP_PKEY_sign_message_init(sctx, sig_alg, NULL) <= 0
+        || EVP_PKEY_sign(sctx, NULL, &sig_len, msg, sizeof(msg)) <= 0)
+        goto err;
+    sig = OPENSSL_malloc(sig_len);
+    if (sig == NULL)
+        goto err;
+    if (EVP_PKEY_sign(sctx, sig, &sig_len, msg, sizeof(msg)) <= 0)
+        goto err;
+
+    OSSL_SELF_TEST_oncorrupt_byte(st, sig);
+
+    /* Verify the message (hash with SHA-256, then ECDSA verify) */
+    if (EVP_PKEY_verify_message_init(sctx, sig_alg, NULL) <= 0
+        || EVP_PKEY_verify(sctx, sig, sig_len, msg, sizeof(msg)) != 1)
         goto err;
 
     ret = 1;
 err:
     OSSL_SELF_TEST_onend(st, ret);
     OSSL_SELF_TEST_free(st);
-    ECDSA_SIG_free(sig);
+    EVP_PKEY_free(pkey);
+    EVP_PKEY_CTX_free(kctx);
+    EVP_PKEY_CTX_free(sctx);
+    EVP_SIGNATURE_free(sig_alg);
+    OSSL_PARAM_free(params);
+    OSSL_PARAM_BLD_free(bld);
+    OPENSSL_free(gen_buf);
+    OPENSSL_free(pubbuf);
+    OPENSSL_free(sig);
     return ret;
 }

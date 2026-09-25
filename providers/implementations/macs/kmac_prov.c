@@ -364,6 +364,9 @@ static int kmac_update(void *vmacctx, const unsigned char *data,
 {
     struct kmac_data_st *kctx = vmacctx;
 
+    if (!ossl_prov_is_running())
+        return 0;
+
     return EVP_DigestUpdate(kctx->ctx, data, datalen);
 }
 

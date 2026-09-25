@@ -130,6 +130,9 @@ static int gmac_update(void *vmacctx, const unsigned char *data,
     EVP_CIPHER_CTX *ctx = macctx->ctx;
     int outlen;
 
+    if (!ossl_prov_is_running())
+        return 0;
+
     if (datalen == 0)
         return 1;
 

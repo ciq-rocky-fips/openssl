@@ -183,7 +183,81 @@ static int test_provider_status(void)
     if (!TEST_true(OSSL_PROVIDER_self_test(prov)))
         goto err;
 
-    /* Setup a callback that corrupts the self tests and causes status failures */
+    ret = 1;
+err:
+    EVP_MD_free(fetch);
+    OSSL_PROVIDER_unload(prov);
+    return ret;
+}
+
+/*
+ * Verify that the module honours the error state in the Update APIs, not only
+ * in Init and Final.
+ *
+ * A digest, a cipher and a MAC context are initialised while the module is
+ * running, then the on-demand self test is corrupted to drive the module into
+ * the error state.  The Update calls on those already-initialised contexts
+ * must then fail.
+ *
+ * This runs after test_provider_status(), which leaves the module running.  It
+ * must own the corruption itself: the module's error state is process-global
+ * and terminal (it cannot be reset), so only the last test may enter it, and a
+ * context can only be initialised beforehand while the module is still running.
+ */
+static int test_provider_status_error_state(void)
+{
+    int ret = 0;
+    unsigned int status = 0;
+    OSSL_PROVIDER *prov = NULL;
+    OSSL_PARAM params[2];
+    OSSL_PARAM mac_params[2];
+    EVP_MD *fetch = NULL;
+    EVP_MD *md = NULL;
+    EVP_MD_CTX *mdctx = NULL;
+    EVP_CIPHER *cipher = NULL;
+    EVP_CIPHER_CTX *cctx = NULL;
+    EVP_MAC *mac = NULL;
+    EVP_MAC_CTX *mctx = NULL;
+    unsigned char inbuf[16] = { 0 };
+    unsigned char outbuf[32];
+    int outlen = 0;
+    static const unsigned char key[32] = { 0 };
+    static const unsigned char iv[16] = { 0 };
+
+    if (!TEST_ptr(prov = OSSL_PROVIDER_load(libctx, provider_name)))
+        goto err;
+
+    params[0] = OSSL_PARAM_construct_uint(OSSL_PROV_PARAM_STATUS, &status);
+    params[1] = OSSL_PARAM_construct_end();
+    if (!TEST_true(OSSL_PROVIDER_get_params(prov, params))
+        || !TEST_true(status == 1))
+        goto err;
+
+    /* Initialise a digest, a cipher and a MAC context while the module runs */
+    if (!TEST_ptr(md = EVP_MD_fetch(libctx, "SHA256", NULL))
+        || !TEST_ptr(mdctx = EVP_MD_CTX_new())
+        || !TEST_true(EVP_DigestInit_ex2(mdctx, md, NULL))
+        || !TEST_true(EVP_DigestUpdate(mdctx, inbuf, sizeof(inbuf))))
+        goto err;
+
+    if (!TEST_ptr(cipher = EVP_CIPHER_fetch(libctx, "AES-256-CBC", NULL))
+        || !TEST_ptr(cctx = EVP_CIPHER_CTX_new())
+        || !TEST_true(EVP_EncryptInit_ex2(cctx, cipher, key, iv, NULL))
+        || !TEST_true(EVP_EncryptUpdate(cctx, outbuf, &outlen,
+                                        inbuf, sizeof(inbuf))))
+        goto err;
+
+    if (!TEST_ptr(mac = EVP_MAC_fetch(libctx, "HMAC", NULL))
+        || !TEST_ptr(mctx = EVP_MAC_CTX_new(mac)))
+        goto err;
+    mac_params[0] = OSSL_PARAM_construct_utf8_string(OSSL_MAC_PARAM_DIGEST,
+                                                     "SHA256", 0);
+    mac_params[1] = OSSL_PARAM_construct_end();
+    if (!TEST_true(EVP_MAC_init(mctx, key, sizeof(key), mac_params))
+        || !TEST_true(EVP_MAC_update(mctx, inbuf, sizeof(inbuf))))
+        goto err;
+
+    /* Corrupt the on-demand self test to drive the module into the error state */
     self_test_args.count = 0;
     OSSL_SELF_TEST_set_callback(libctx, self_test_on_demand_fail, &self_test_args);
     if (!TEST_false(OSSL_PROVIDER_self_test(prov)))
@@ -191,12 +265,29 @@ static int test_provider_status(void)
     if (!TEST_true(OSSL_PROVIDER_get_params(prov, params))
         || !TEST_uint_eq(status, 0))
         goto err;
+
+    /* Init/fetch is already refused in the error state */
     if (!TEST_ptr_null(fetch = EVP_MD_fetch(libctx, "SHA256", NULL)))
+        goto err;
+
+    /* Update on the contexts initialised while running must now fail too */
+    if (!TEST_false(EVP_DigestUpdate(mdctx, inbuf, sizeof(inbuf))))
+        goto err;
+    if (!TEST_false(EVP_EncryptUpdate(cctx, outbuf, &outlen,
+                                      inbuf, sizeof(inbuf))))
+        goto err;
+    if (!TEST_false(EVP_MAC_update(mctx, inbuf, sizeof(inbuf))))
         goto err;
 
     ret = 1;
 err:
     EVP_MD_free(fetch);
+    EVP_MD_CTX_free(mdctx);
+    EVP_MD_free(md);
+    EVP_CIPHER_CTX_free(cctx);
+    EVP_CIPHER_free(cipher);
+    EVP_MAC_CTX_free(mctx);
+    EVP_MAC_free(mac);
     OSSL_PROVIDER_unload(prov);
     return ret;
 }
@@ -246,6 +337,7 @@ int setup_tests(void)
             return 0;
         }
         ADD_TEST(test_provider_status);
+        ADD_TEST(test_provider_status_error_state);
     } else {
         ADD_TEST(test_provider_gettable_params);
     }

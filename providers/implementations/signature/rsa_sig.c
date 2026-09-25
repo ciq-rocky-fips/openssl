@@ -829,6 +829,9 @@ static int rsa_signverify_message_update(void *vprsactx,
 {
     PROV_RSA_CTX *prsactx = (PROV_RSA_CTX *)vprsactx;
 
+    if (!ossl_prov_is_running())
+        return 0;
+
     if (prsactx == NULL || prsactx->mdctx == NULL)
         return 0;
 

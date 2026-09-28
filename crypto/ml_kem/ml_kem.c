@@ -1822,6 +1822,7 @@ static int decap(uint8_t secret[ML_KEM_SHARED_SECRET_BYTES],
     const ML_KEM_VINFO *vinfo = key->vinfo;
     int i;
     uint8_t mask;
+    int ret = 0;
 
     /*
      * If our KDF is unavailable, fail early! Otherwise, keep going ignoring
@@ -1842,23 +1843,27 @@ static int decap(uint8_t secret[ML_KEM_SHARED_SECRET_BYTES],
         ERR_raise_data(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR,
             "internal error while performing %s decapsulation",
             vinfo->algorithm_name);
-        return 0;
+        goto done;
     }
     decrypt_cpa(decrypted, ctext, tmp, key);
     memcpy(decrypted + ML_KEM_SHARED_SECRET_BYTES, pkhash, ML_KEM_PKHASH_BYTES);
     if (!hash_g(Kr, decrypted, sizeof(decrypted), mdctx, key)
         || !encrypt_cpa(tmp_ctext, decrypted, r, tmp, mdctx, key)) {
         memcpy(secret, failure_key, ML_KEM_SHARED_SECRET_BYTES);
-        OPENSSL_cleanse(decrypted, ML_KEM_SHARED_SECRET_BYTES);
-        return 1;
+        ret = 1;
+        goto done;
     }
     mask = constant_time_eq_int_8(0,
         CRYPTO_memcmp(ctext, tmp_ctext, vinfo->ctext_bytes));
     for (i = 0; i < ML_KEM_SHARED_SECRET_BYTES; i++)
         secret[i] = constant_time_select_8(mask, Kr[i], failure_key[i]);
-    OPENSSL_cleanse(decrypted, ML_KEM_SHARED_SECRET_BYTES);
+    ret = 1;
+ done:
+    OPENSSL_cleanse(decrypted, sizeof(decrypted));
+    OPENSSL_cleanse(failure_key, sizeof(failure_key));
     OPENSSL_cleanse(Kr, sizeof(Kr));
-    return 1;
+    OPENSSL_cleanse(&mask, sizeof(mask));
+    return ret;
 }
 
 /*

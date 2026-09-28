@@ -1383,8 +1383,10 @@ static __owur int cbd_3(scalar *out, uint8_t in[ML_KEM_RANDOM_BYTES + 1],
     uint8_t b1, b2, b3;
     uint16_t value, mask;
 
-    if (!prf(randbuf, sizeof(randbuf), in, mdctx, key))
+    if (!prf(randbuf, sizeof(randbuf), in, mdctx, key)) {
+        OPENSSL_cleanse(randbuf, sizeof(randbuf));
         return 0;
+    }
 
     do {
         b1 = *r++;
@@ -1418,6 +1420,7 @@ static __owur int cbd_3(scalar *out, uint8_t in[ML_KEM_RANDOM_BYTES + 1],
         mask = constish_time_non_zero(value >> 15);
         *curr++ = value + (kPrime & mask);
     } while (curr < end);
+    OPENSSL_cleanse(randbuf, sizeof(randbuf));
     return 1;
 }
 

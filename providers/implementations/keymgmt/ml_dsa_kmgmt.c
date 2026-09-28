@@ -457,7 +457,7 @@ static void *ml_dsa_gen_init(void *provctx, int selection,
     if ((gctx = OPENSSL_zalloc(sizeof(*gctx))) != NULL) {
         gctx->provctx = provctx;
         if (!ml_dsa_gen_set_params(gctx, params)) {
-            OPENSSL_free(gctx);
+            ml_dsa_gen_cleanup(gctx);
             gctx = NULL;
         }
     }

@@ -1795,6 +1795,7 @@ static int encap(uint8_t *ctext, uint8_t secret[ML_KEM_SHARED_SECRET_BYTES],
         ERR_raise_data(ERR_LIB_CRYPTO, ERR_R_INTERNAL_ERROR,
             "internal error while performing %s encapsulation",
             key->vinfo->algorithm_name);
+    OPENSSL_cleanse(Kr, sizeof(Kr));
     return ret;
 }
 

@@ -156,9 +156,12 @@ void ossl_ml_dsa_key_reset(ML_DSA_KEY *key)
         key->t0.poly = NULL;
     }
     /* The |t1| vector is public and allocated separately */
+    vector_zero(&key->t1);
     vector_free(&key->t1);
     OPENSSL_cleanse(key->K, sizeof(key->K));
-    OPENSSL_free(key->pub_encoding);
+    OPENSSL_cleanse(key->rho, sizeof(key->rho));
+    OPENSSL_cleanse(key->tr, sizeof(key->tr));
+    OPENSSL_clear_free(key->pub_encoding, key->params->pk_len);
     key->pub_encoding = NULL;
     if (key->priv_encoding != NULL)
         OPENSSL_clear_free(key->priv_encoding, key->params->sk_len);

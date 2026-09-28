@@ -1864,7 +1864,7 @@ static int decap(uint8_t secret[ML_KEM_SHARED_SECRET_BYTES],
     if (!hash_g(Kr, decrypted, sizeof(decrypted), mdctx, key)
         || !encrypt_cpa(tmp_ctext, decrypted, r, tmp, mdctx, key)) {
         memcpy(secret, failure_key, ML_KEM_SHARED_SECRET_BYTES);
-        OPENSSL_cleanse(decrypted, ML_KEM_SHARED_SECRET_BYTES);
+        OPENSSL_cleanse(decrypted, sizeof(decrypted));
         OPENSSL_cleanse(Kr, sizeof(Kr));
         OPENSSL_cleanse(failure_key, sizeof(failure_key));
         return 1;
@@ -1873,9 +1873,10 @@ static int decap(uint8_t secret[ML_KEM_SHARED_SECRET_BYTES],
         CRYPTO_memcmp(ctext, tmp_ctext, vinfo->ctext_bytes));
     for (i = 0; i < ML_KEM_SHARED_SECRET_BYTES; i++)
         secret[i] = constant_time_select_8(mask, Kr[i], failure_key[i]);
-    OPENSSL_cleanse(decrypted, ML_KEM_SHARED_SECRET_BYTES);
+    OPENSSL_cleanse(decrypted, sizeof(decrypted));
     OPENSSL_cleanse(Kr, sizeof(Kr));
     OPENSSL_cleanse(failure_key, sizeof(failure_key));
+    OPENSSL_cleanse(&mask, sizeof(mask));
     return 1;
 }
 

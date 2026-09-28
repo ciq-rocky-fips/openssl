@@ -1437,9 +1437,12 @@ static __owur int gencbd_vector(scalar *out, CBD_FUNC cbd, uint8_t *counter,
     memcpy(input, seed, ML_KEM_RANDOM_BYTES);
     do {
         input[ML_KEM_RANDOM_BYTES] = (*counter)++;
-        if (!cbd(out++, input, mdctx, key))
+        if (!cbd(out++, input, mdctx, key)) {
+            OPENSSL_cleanse(input, sizeof(input));
             return 0;
+        }
     } while (--rank > 0);
+    OPENSSL_cleanse(input, sizeof(input));
     return 1;
 }
 

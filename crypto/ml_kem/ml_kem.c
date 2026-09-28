@@ -1936,6 +1936,8 @@ void ossl_ml_kem_key_reset(ML_KEM_KEY *key)
     if (ossl_ml_kem_have_prvkey(key))
         OPENSSL_cleanse(key->s,
             key->vinfo->rank * sizeof(scalar) + 2 * ML_KEM_RANDOM_BYTES);
+    OPENSSL_cleanse(key->t, key->vinfo->puballoc);
+    OPENSSL_cleanse(key->seedbuf, sizeof(key->seedbuf));
     OPENSSL_free(key->t);
     key->d = key->z = (uint8_t *)(key->s = key->m = key->t = NULL);
 }

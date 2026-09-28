@@ -2324,8 +2324,10 @@ int ossl_ml_kem_encap_rand(uint8_t *ctext, size_t clen,
 
     if (RAND_bytes_ex(key->libctx, r, ML_KEM_RANDOM_BYTES,
             key->vinfo->secbits)
-        < 1)
+        < 1) {
+        OPENSSL_cleanse(r, sizeof(r));
         return 0;
+    }
 
     ret = ossl_ml_kem_encap_seed(ctext, clen, shared_secret, slen,
         r, sizeof(r), key);

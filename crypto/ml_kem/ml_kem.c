@@ -1504,10 +1504,11 @@ static __owur int encrypt_cpa(uint8_t out[ML_KEM_SHARED_SECRET_BYTES],
     uint8_t counter = 0;
     int du = vinfo->du;
     int dv = vinfo->dv;
+    int ret = 0;
 
     /* FIPS 203 "y" vector */
     if (!gencbd_vector_ntt(y, cbd_1, &counter, r, rank, mdctx, key))
-        return 0;
+        goto done;
     /* FIPS 203 "v" scalar */
     inner_product(&v, key->t, y, rank);
     scalar_inverse_ntt(&v);
@@ -1516,7 +1517,7 @@ static __owur int encrypt_cpa(uint8_t out[ML_KEM_SHARED_SECRET_BYTES],
 
     /* All done with |y|, now free to reuse tmp[0] for FIPS 203 |e1| */
     if (!gencbd_vector(e1, cbd_2, &counter, r, rank, mdctx, key))
-        return 0;
+        goto done;
     vector_add(u, e1, rank);
     vector_compress(u, du, rank);
     vector_encode(out, u, du, rank);
@@ -1525,14 +1526,18 @@ static __owur int encrypt_cpa(uint8_t out[ML_KEM_SHARED_SECRET_BYTES],
     memcpy(input, r, ML_KEM_RANDOM_BYTES);
     input[ML_KEM_RANDOM_BYTES] = counter;
     if (!cbd_2(e2, input, mdctx, key))
-        return 0;
+        goto done;
     scalar_add(&v, e2);
 
     /* Combine message with |v| */
     scalar_decode_decompress_add(&v, message);
     scalar_compress(&v, dv);
     scalar_encode(out + vinfo->u_vector_bytes, &v, dv);
-    return 1;
+    ret = 1;
+ done:
+    OPENSSL_cleanse(&v, sizeof(v));
+    OPENSSL_cleanse(input, sizeof(input));
+    return ret;
 }
 
 /*

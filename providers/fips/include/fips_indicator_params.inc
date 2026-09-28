@@ -26,3 +26,11 @@ OSSL_FIPS_PARAM(x963kdf_key_check, X963KDF_KEY_CHECK, 0)
 OSSL_FIPS_PARAM(x942kdf_key_check, X942KDF_KEY_CHECK, 0)
 OSSL_FIPS_PARAM(pbkdf2_lower_bound_check, PBKDF2_LOWER_BOUND_CHECK, 1)
 OSSL_FIPS_PARAM(ecdh_cofactor_check, ECDH_COFACTOR_CHECK, 0)
+/*
+ * Caller-supplied ML-KEM encapsulation entropy (ikmE) is a non-approved
+ * service and always trips the approval indicator.  It defaults to tolerant
+ * (never blocked) and is intentionally left out of the pedantic fipsmodule.cnf:
+ * the ML-KEM encapsulation KAT supplies ikmE, so enforcing it strictly would
+ * fail POST.
+ */
+OSSL_FIPS_PARAM(ml_kem_ikme_disabled, ML_KEM_IKME_DISABLED, 0)

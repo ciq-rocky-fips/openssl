@@ -1561,6 +1561,8 @@ decrypt_cpa(uint8_t out[ML_KEM_SHARED_SECRET_BYTES],
     scalar_sub(&v, &mask);
     scalar_compress(&v, 1);
     scalar_encode_1(out, &v);
+    OPENSSL_cleanse(&v, sizeof(v));
+    OPENSSL_cleanse(&mask, sizeof(mask));
 }
 
 /*-

@@ -2298,17 +2298,22 @@ int ossl_ml_kem_encap_rand(uint8_t *ctext, size_t clen,
     const ML_KEM_KEY *key)
 {
     uint8_t r[ML_KEM_RANDOM_BYTES];
+    int ret;
 
     if (key == NULL)
         return 0;
 
     if (RAND_bytes_ex(key->libctx, r, ML_KEM_RANDOM_BYTES,
             key->vinfo->secbits)
-        < 1)
+        < 1) {
+        OPENSSL_cleanse(r, sizeof(r));
         return 0;
+    }
 
-    return ossl_ml_kem_encap_seed(ctext, clen, shared_secret, slen,
+    ret = ossl_ml_kem_encap_seed(ctext, clen, shared_secret, slen,
         r, sizeof(r), key);
+    OPENSSL_cleanse(r, sizeof(r));
+    return ret;
 }
 
 int ossl_ml_kem_decap(uint8_t *shared_secret, size_t slen,

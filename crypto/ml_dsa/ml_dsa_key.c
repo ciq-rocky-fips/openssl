@@ -60,8 +60,8 @@ int ossl_ml_dsa_set_prekey(ML_DSA_KEY *key, int flags_set, int flags_clr,
 
 end:
     if (!ret) {
-        OPENSSL_free(key->priv_encoding);
-        OPENSSL_free(key->seed);
+        OPENSSL_clear_free(key->priv_encoding, key->params->sk_len);
+        OPENSSL_clear_free(key->seed, ML_DSA_SEED_BYTES);
         key->priv_encoding = key->seed = NULL;
     }
     return ret;

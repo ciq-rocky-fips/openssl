@@ -45,6 +45,7 @@ my %params = (
     'PROV_PARAM_DSA_SIGN_DISABLED' =>      "dsa-sign-disabled",      # uint
     'PROV_PARAM_TDES_ENCRYPT_DISABLED' =>  "tdes-encrypt-disabled",  # uint
     'PROV_PARAM_ML_KEM_IKME_DISABLED' =>   "ml-kem-ikme-disabled",   # uint
+    'PROV_PARAM_ML_DSA_TEST_ENTROPY_DISABLED' =>  "ml-dsa-test-entropy-disabled",  # uint
     'PROV_PARAM_RSA_PSS_SALTLEN_CHECK' =>  "rsa-pss-saltlen-check",  # uint
     'PROV_PARAM_RSA_SIGN_X931_PAD_DISABLED' =>  "rsa-sign-x931-pad-disabled",   # uint
     'PROV_PARAM_RSA_PKCS15_PAD_DISABLED' => "rsa-pkcs15-pad-disabled", # uint

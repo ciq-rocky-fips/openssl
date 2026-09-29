@@ -18,6 +18,7 @@
 #include "prov/implementations.h"
 #include "prov/providercommon.h"
 #include "prov/provider_ctx.h"
+#include "prov/securitycheck.h"
 #include "prov/der_ml_dsa.h"
 #include "crypto/ml_dsa.h"
 #include "internal/packet.h"
@@ -43,6 +44,7 @@ static OSSL_FUNC_signature_dupctx_fn ml_dsa_dupctx;
 typedef struct {
     ML_DSA_KEY *key;
     OSSL_LIB_CTX *libctx;
+    OSSL_FIPS_IND_DECLARE
     uint8_t context_string[ML_DSA_MAX_CONTEXT_STRING_LEN];
     size_t context_string_len;
     uint8_t test_entropy[ML_DSA_ENTROPY_LEN];
@@ -78,6 +80,7 @@ static void *ml_dsa_newctx(void *provctx, int evp_type, const char *propq)
     ctx->libctx = PROV_LIBCTX_OF(provctx);
     ctx->msg_encode = ML_DSA_MESSAGE_ENCODE_PURE;
     ctx->evp_type = evp_type;
+    OSSL_FIPS_IND_INIT(ctx)
     return ctx;
 }
 
@@ -145,6 +148,7 @@ static int ml_dsa_signverify_msg_init(void *vctx, void *vkey,
     set_alg_id_buffer(ctx);
     ctx->mu = 0;
 
+    OSSL_FIPS_IND_SET_APPROVED(ctx)
     return ml_dsa_set_ctx_params(ctx, params);
 }
 
@@ -167,8 +171,10 @@ static int ml_dsa_digest_signverify_init(void *vctx, const char *mdname,
 
     ctx->mu = 0;
 
-    if (vkey == NULL && ctx->key != NULL)
+    if (vkey == NULL && ctx->key != NULL) {
+        OSSL_FIPS_IND_SET_APPROVED(ctx)
         return ml_dsa_set_ctx_params(ctx, params);
+    }
 
     return ml_dsa_signverify_msg_init(vctx, vkey, params,
         EVP_PKEY_OP_SIGN, "ML_DSA Sign Init");
@@ -268,6 +274,16 @@ static int ml_dsa_set_ctx_params(void *vctx, const OSSL_PARAM params[])
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_SEED_LENGTH);
             return 0;
         }
+#ifdef FIPS_MODULE
+        /*
+         * Caller-supplied signing entropy makes this a non-approved service;
+         * flag it via the approval indicator (never blocked).
+         */
+        if (!OSSL_FIPS_IND_ON_UNAPPROVED(pctx, OSSL_FIPS_IND_SETTABLE0,
+                pctx->libctx, "ML-DSA", "test_entropy",
+                ossl_fips_config_ml_dsa_test_entropy_disabled))
+            return 0;
+#endif
     }
     p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_DETERMINISTIC);
     if (p != NULL && !OSSL_PARAM_get_int(p, &pctx->deterministic))
@@ -301,6 +317,7 @@ static const OSSL_PARAM *ml_dsa_settable_ctx_params(void *vctx,
 
 static const OSSL_PARAM known_gettable_ctx_params[] = {
     OSSL_PARAM_octet_string(OSSL_SIGNATURE_PARAM_ALGORITHM_ID, NULL, 0),
+    OSSL_FIPS_IND_GETTABLE_CTX_PARAM()
     OSSL_PARAM_END
 };
 
@@ -323,6 +340,9 @@ static int ml_dsa_get_ctx_params(void *vctx, OSSL_PARAM *params)
         && !OSSL_PARAM_set_octet_string(p,
             ctx->aid_len == 0 ? NULL : ctx->aid_buf,
             ctx->aid_len))
+        return 0;
+
+    if (!OSSL_FIPS_IND_GET_CTX_PARAM(ctx, params))
         return 0;
 
     return 1;

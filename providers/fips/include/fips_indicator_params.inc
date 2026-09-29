@@ -34,3 +34,11 @@ OSSL_FIPS_PARAM(ecdh_cofactor_check, ECDH_COFACTOR_CHECK, 0)
  * fail POST.
  */
 OSSL_FIPS_PARAM(ml_kem_ikme_disabled, ML_KEM_IKME_DISABLED, 0)
+/*
+ * Caller-supplied ML-DSA signing entropy (OSSL_SIGNATURE_PARAM_TEST_ENTROPY) is
+ * a non-approved service and always trips the approval indicator.  It defaults
+ * to tolerant (never blocked) and is intentionally left out of the pedantic
+ * fipsmodule.cnf: it exists only for known-answer/ACVP testing, which supplies
+ * the entropy, so enforcing it strictly would break those tests.
+ */
+OSSL_FIPS_PARAM(ml_dsa_test_entropy_disabled, ML_DSA_TEST_ENTROPY_DISABLED, 0)

@@ -68,6 +68,56 @@ static int test_is_fips_enabled(void)
     return 1;
 }
 
+#ifndef OPENSSL_NO_ML_KEM
+/* Fetch |name| as a KEM, requiring the fips provider and the given approval. */
+static int kem_fips_approval(const char *name, int approved)
+{
+    EVP_KEM *yes = EVP_KEM_fetch(NULL, name, "fips=yes");
+    EVP_KEM *no = EVP_KEM_fetch(NULL, name, "fips=no");
+    int ret = 1;
+
+    if (approved) {
+        /* Must be available as an approved (fips=yes) algorithm. */
+        if (!TEST_ptr(yes))
+            ret = 0;
+    } else {
+        /*
+         * Must be marked non-approved: not selectable under fips=yes, but
+         * still available under fips=no (marked, not removed).
+         */
+        if (!TEST_ptr_null(yes) || !TEST_ptr(no))
+            ret = 0;
+    }
+    EVP_KEM_free(yes);
+    EVP_KEM_free(no);
+    return ret;
+}
+
+/*
+ * The hybrid ML-KEM KEMs only concatenate the component shared secrets and do
+ * not apply an approved KDF.  Per FIPS 140-3 IG D.S additional comment 8.a the
+ * NIST-curve (SecP*) hybrids and X25519MLKEM768 are approved, but X448MLKEM1024
+ * is not and must be non-approved.
+ */
+static int test_mlx_kem_fips_approval(void)
+{
+    if (!is_fips || bad_fips)
+        return 1; /* Only meaningful with the FIPS module loaded. */
+
+# ifndef OPENSSL_NO_ECX
+    if (!kem_fips_approval("X25519MLKEM768", 1)
+        || !kem_fips_approval("X448MLKEM1024", 0))
+        return 0;
+# endif
+# ifndef OPENSSL_NO_EC
+    if (!kem_fips_approval("SecP256r1MLKEM768", 1)
+        || !kem_fips_approval("SecP384r1MLKEM1024", 1))
+        return 0;
+# endif
+    return 1;
+}
+#endif /* OPENSSL_NO_ML_KEM */
+
 int setup_tests(void)
 {
     size_t argc;
@@ -104,5 +154,8 @@ int setup_tests(void)
 
     /* Must be the first test before any other libcrypto calls are made */
     ADD_TEST(test_is_fips_enabled);
+#ifndef OPENSSL_NO_ML_KEM
+    ADD_TEST(test_mlx_kem_fips_approval);
+#endif
     return 1;
 }

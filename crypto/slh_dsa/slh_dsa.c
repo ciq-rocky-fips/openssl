@@ -281,8 +281,15 @@ int ossl_slh_dsa_sign(SLH_DSA_HASH_CTX *slh_ctx,
             return 0;
     }
     ret = slh_sign_internal(slh_ctx, m, m_len, sig, siglen, sigsize, add_rand);
-    if (m != msg && m != m_tmp)
-        OPENSSL_free(m);
+    /*
+     * The encoded message M' is a local copy of the input and is sensitive, so
+     * destroy it when no longer needed (FIPS 205 Section 3.1).  When encode == 0
+     * m aliases the caller's msg buffer, which must not be touched here.
+     */
+    if (m == m_tmp)
+        OPENSSL_cleanse(m_tmp, m_len);
+    else if (m != msg)
+        OPENSSL_clear_free(m, m_len);
     return ret;
 }
 

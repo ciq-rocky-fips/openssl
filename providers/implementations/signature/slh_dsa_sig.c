@@ -168,6 +168,17 @@ static int slh_dsa_signverify_msg_init(void *vctx, void *vkey,
     }
 
     slh_dsa_set_alg_id_buffer(ctx);
+
+    /*
+     * Caller-supplied test entropy is a one-shot value belonging to a single
+     * initialization.  Clear any value retained from a previous operation so
+     * that this (re-)initialization does not reuse it; hedged signing must use
+     * fresh randomness (FIPS 205 Section 9.2) unless new test entropy is
+     * supplied by slh_dsa_set_ctx_params() below.
+     */
+    OPENSSL_cleanse(ctx->add_random, ctx->add_random_len);
+    ctx->add_random_len = 0;
+
     if (!slh_dsa_set_ctx_params(ctx, params))
         return 0;
     return 1;
@@ -190,8 +201,15 @@ static int slh_dsa_digest_signverify_init(void *vctx, const char *mdname,
         return 0;
     }
 
-    if (vkey == NULL && ctx->key != NULL)
+    if (vkey == NULL && ctx->key != NULL) {
+        /*
+         * Re-initialization with a NULL key: drop any one-shot test entropy
+         * so it is not reused (see slh_dsa_signverify_msg_init()).
+         */
+        OPENSSL_cleanse(ctx->add_random, ctx->add_random_len);
+        ctx->add_random_len = 0;
         return slh_dsa_set_ctx_params(ctx, params);
+    }
 
     return slh_dsa_signverify_msg_init(vctx, vkey, params,
         EVP_PKEY_OP_SIGN, "SLH_DSA Sign Init");

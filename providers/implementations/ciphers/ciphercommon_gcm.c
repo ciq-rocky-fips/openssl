@@ -329,6 +329,9 @@ int ossl_gcm_stream_update(void *vctx, unsigned char *out, size_t *outl,
 {
     PROV_GCM_CTX *ctx = (PROV_GCM_CTX *)vctx;
 
+    if (!ossl_prov_is_running())
+        return 0;
+
     if (inl == 0) {
         *outl = 0;
         return 1;

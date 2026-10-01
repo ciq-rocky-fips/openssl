@@ -625,6 +625,9 @@ static int ecdh_derive(void *vpecdhctx, unsigned char *secret,
 {
     PROV_ECDH_CTX *pecdhctx = (PROV_ECDH_CTX *)vpecdhctx;
 
+    if (!ossl_prov_is_running())
+        return 0;
+
     switch (pecdhctx->kdf_type) {
     case PROV_ECDH_KDF_NONE:
         return ecdh_plain_derive(vpecdhctx, secret, psecretlen, outlen);

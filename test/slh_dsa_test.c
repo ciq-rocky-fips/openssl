@@ -641,6 +641,103 @@ const OPTIONS *test_get_options(void)
     return options;
 }
 
+static int slh_dsa_digest_sign_alloc(EVP_MD_CTX *mctx, const uint8_t *msg,
+    size_t msg_len, uint8_t **sig, size_t *sig_len)
+{
+    *sig = NULL;
+    *sig_len = 0;
+    if (!TEST_int_eq(EVP_DigestSign(mctx, NULL, sig_len, msg, msg_len), 1)
+        || !TEST_ptr(*sig = OPENSSL_malloc(*sig_len))
+        || !TEST_int_eq(EVP_DigestSign(mctx, *sig, sig_len, msg, msg_len), 1)) {
+        OPENSSL_free(*sig);
+        *sig = NULL;
+        return 0;
+    }
+    return 1;
+}
+
+/*
+ * Caller-supplied test entropy must be one-shot: it must not be retained across
+ * a NULL-key re-initialization of the signing context.  Re-initializing with a
+ * NULL key (EVP_DigestSignInit_ex(..., pkey=NULL, ...)) reuses the same provider
+ * context; a subsequent hedged signature must use fresh randomness (FIPS 205
+ * Section 9.2) rather than the stale test value.
+ */
+static int slh_dsa_reinit_entropy_test(void)
+{
+    int ret = 0;
+    const char *alg = "SLH-DSA-SHA2-128f";
+    static const uint8_t msg[] = "SLH-DSA re-init entropy regression message";
+    /* SLH-DSA-SHA2-128f has n = 16, so the test entropy must be 16 bytes. */
+    static const uint8_t ent[16] = {
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f
+    };
+    EVP_PKEY *pkey = NULL;
+    EVP_MD_CTX *mctx = NULL;
+    uint8_t *sig1 = NULL, *sig2 = NULL, *sig3 = NULL;
+    size_t len1 = 0, len2 = 0, len3 = 0;
+    int deterministic = 0; /* hedged signing */
+    OSSL_PARAM p_ent[3], p_noent[2];
+
+    p_ent[0] = OSSL_PARAM_construct_int(OSSL_SIGNATURE_PARAM_DETERMINISTIC,
+        &deterministic);
+    p_ent[1] = OSSL_PARAM_construct_octet_string(OSSL_SIGNATURE_PARAM_TEST_ENTROPY,
+        (void *)ent, sizeof(ent));
+    p_ent[2] = OSSL_PARAM_construct_end();
+    p_noent[0] = OSSL_PARAM_construct_int(OSSL_SIGNATURE_PARAM_DETERMINISTIC,
+        &deterministic);
+    p_noent[1] = OSSL_PARAM_construct_end();
+
+    if (!TEST_ptr(pkey = do_gen_key(alg, NULL, 0))
+        || !TEST_ptr(mctx = EVP_MD_CTX_new()))
+        goto err;
+
+    /* (1) Initialise with the key and explicit test entropy, then sign. */
+    if (!TEST_int_eq(EVP_DigestSignInit_ex(mctx, NULL, NULL, lib_ctx, NULL,
+                         pkey, p_ent),
+            1)
+        || !slh_dsa_digest_sign_alloc(mctx, msg, sizeof(msg), &sig1, &len1))
+        goto err;
+
+    /*
+     * (2) Re-initialise with a NULL key (reusing the provider context) and no
+     * test entropy, then sign.  With the bug the retained test entropy from (1)
+     * is reused, so this hedged signature would be identical to sig1; with fresh
+     * randomness they differ.
+     */
+    if (!TEST_int_eq(EVP_DigestSignInit_ex(mctx, NULL, NULL, lib_ctx, NULL,
+                         NULL, p_noent),
+            1)
+        || !slh_dsa_digest_sign_alloc(mctx, msg, sizeof(msg), &sig2, &len2))
+        goto err;
+    if (len1 == len2 && memcmp(sig1, sig2, len1) == 0) {
+        TEST_error("re-init reused retained test entropy after NULL-key init");
+        goto err;
+    }
+
+    /*
+     * (3) Re-initialise with a NULL key but the same test entropy; this must be
+     * honoured and reproduce sig1.
+     */
+    if (!TEST_int_eq(EVP_DigestSignInit_ex(mctx, NULL, NULL, lib_ctx, NULL,
+                         NULL, p_ent),
+            1)
+        || !slh_dsa_digest_sign_alloc(mctx, msg, sizeof(msg), &sig3, &len3))
+        goto err;
+    if (!TEST_mem_eq(sig1, len1, sig3, len3))
+        goto err;
+
+    ret = 1;
+err:
+    OPENSSL_free(sig1);
+    OPENSSL_free(sig2);
+    OPENSSL_free(sig3);
+    EVP_MD_CTX_free(mctx);
+    EVP_PKEY_free(pkey);
+    return ret;
+}
+
 int setup_tests(void)
 {
     OPTION_CHOICE o;
@@ -671,6 +768,7 @@ int setup_tests(void)
     ADD_ALL_TESTS(slh_dsa_keygen_test, OSSL_NELEM(slh_dsa_keygen_testdata));
     ADD_TEST(slh_dsa_digest_sign_verify_test);
     ADD_TEST(slh_dsa_keygen_invalid_test);
+    ADD_TEST(slh_dsa_reinit_entropy_test);
     return 1;
 }
 

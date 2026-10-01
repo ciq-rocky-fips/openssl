@@ -240,8 +240,15 @@ static int slh_dsa_sign(void *vctx, unsigned char *sig, size_t *siglen,
         ctx->context_string, ctx->context_string_len,
         opt_rand, ctx->msg_encode,
         sig, siglen, sigsize);
-    if (opt_rand != add_rand)
-        OPENSSL_cleanse(opt_rand, n);
+    /*
+     * The per-signature randomness generated above into add_rand is a sensitive
+     * intermediate; destroy it once it is no longer needed (FIPS 205 Section
+     * 3.1).  Caller-supplied test entropy (ctx->add_random) is a separate
+     * one-shot value that is cleared at (re-)initialization, so it is not
+     * touched here.
+     */
+    if (opt_rand == add_rand)
+        OPENSSL_cleanse(add_rand, n);
     return ret;
 }
 

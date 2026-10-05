@@ -1309,8 +1309,16 @@ static void *ec_gen(void *genctx, OSSL_CALLBACK *osslcb, void *cbarg)
     if (gctx->ecdh_mode != -1)
         ret = ret && ossl_ec_set_ecdh_cofactor_mode(ec, gctx->ecdh_mode);
 #ifdef FIPS_MODULE
-    /* Pairwise consistency test */
-    if ((gctx->selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0
+    /*
+     * Pairwise consistency test.  Only run it when key generation actually
+     * succeeded: a failed keygen has already handled the error (and, for a
+     * keygen PCT failure, entered the FIPS error state), and left an invalid
+     * key behind.  Running do_ec_pct() in that case would perform in-provider
+     * ECDSA operations on the cleared key with the module already in the error
+     * state, so they would be refused and do_ec_pct() would abort().
+     */
+    if (ret
+        && (gctx->selection & OSSL_KEYMGMT_SELECT_KEYPAIR) != 0
         && do_ec_pct(gctx->ecdsa_sig_ctx, "sha256", ec) != 1)
         abort();
 #endif

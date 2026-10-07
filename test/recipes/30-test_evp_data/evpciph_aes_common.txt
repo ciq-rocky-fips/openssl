@@ -2341,3 +2341,73 @@ Plaintext = b0af85a6deae5fcaa94778bce015ce2da7400ab768f3e114cc1b645fb2716789e2ae
 AAD = 2134f74e882a44e457c38b6580cd58ce20e81267baeb4a9d50c41ababc2a91ddf300c39963643d3c0797b628c75a5fc39c058d319e7d6deb836334dbe8e1fe3cc5704b90c712e1fb60a3c8b58d474a73d65fae886394f8b2c029e420b923f2af4d54c9de3c7fa2bccaa1e96664ccf681cacbbf9845069a4bfd6c135c4392d7d6be338eca414e3a45f50510718e2a5a3e5815eafa0c50172cf5f147510645d2269929843bbbab682deb5823d4cdf42bd250bdbd20c43e2919d7a6e48973f43a4cab73454b97cdca96721ebd83b6dbaaec7e12cf0dae678a57c431b81421657037dd47dccbee73a41f56495fd7c25c75744fe8f55cbd1eac4a174d8f7dd6f6ba57b3e53449a9ce7806517e3e07cf6546a0fa62c7b1fa244d42eee64a3182461792edb628e567b23a
 Ciphertext = 0fe35823610ea698aeb5b571f3ebbaf0ac3586ecb3b24fcc7c56943d4426f7fdf4e4a53fb430751456d41551f8e5502faa0e1ac5f452b27b13c1dc63e9231c6b192f8dd2978300293298acb6293459d3204429e374881085d49ed6ad76f1d85e3f6dd5455a7a5a9d7127386a30f80658395dc8eb158e5ca052a7137feef28aa247e176cceb9c031f73fb8d48139e3bdb30e2e19627f7fc3501a6d6287e2fb89ad184cefa1774585aa663586f289c778462eee3cd88071140274770e4ed98b9b83cd4fa659fcdd2d1fde7e58333c6cf7f83fe285b97ad8f276a375fafa15f88e6167f5f2bfb95af1aefee80b0620a9bc09402ab79036e716f0c8d518ae2fa15094f6ea4c5e8b283f97cc27f2f1d0b6367b4b508c7bad16f1539325751bd785e9e08cd508bdb3b84
 Tag = 1976d7e121704ce463a8d4fe1b93d90f
+
+Title = AES GCM tag length restrictions (SP 800-38D section 5.2.1.2)
+
+# Base vector is GCM test case 2 (McGrew & Viega). The full 128-bit tag is
+# ab6e47d42cec13bdf53a67b21257bddf; the tests below truncate it to various
+# lengths. In the FIPS provider only the approved tag lengths of 128, 120,
+# 112, 104, 96 and (conditionally) 64, 32 bits may be produced or verified;
+# the default provider keeps accepting any non-zero length.
+
+# A 16-bit tag is not an approved length: verification must be refused in FIPS.
+Availablein = fips
+Cipher = aes-128-gcm
+Operation = DECRYPT
+Key = 00000000000000000000000000000000
+IV = 000000000000000000000000
+Tag = ab6e
+Plaintext = 00000000000000000000000000000000
+Ciphertext = 0388dace60b6a392f328c2b971b2fe78
+Result = TAG_SET_ERROR
+
+# The same short tag is still accepted (and verifies) in the default provider.
+Availablein = default
+Cipher = aes-128-gcm
+Operation = DECRYPT
+Key = 00000000000000000000000000000000
+IV = 000000000000000000000000
+Tag = ab6e
+Plaintext = 00000000000000000000000000000000
+Ciphertext = 0388dace60b6a392f328c2b971b2fe78
+
+# A 16-bit tag is not an approved length: production must be refused in FIPS.
+Availablein = fips
+Cipher = aes-128-gcm
+Operation = ENCRYPT
+Key = 00000000000000000000000000000000
+IV = 000000000000000000000000
+Tag = ab6e
+Plaintext = 00000000000000000000000000000000
+Ciphertext = 0388dace60b6a392f328c2b971b2fe78
+Result = TAG_RETRIEVE_ERROR
+
+# The same truncated tag is still produced in the default provider.
+Availablein = default
+Cipher = aes-128-gcm
+Operation = ENCRYPT
+Key = 00000000000000000000000000000000
+IV = 000000000000000000000000
+Tag = ab6e
+Plaintext = 00000000000000000000000000000000
+Ciphertext = 0388dace60b6a392f328c2b971b2fe78
+
+# A 64-bit tag is an approved (conditional) length: allowed in FIPS on decrypt.
+Availablein = fips
+Cipher = aes-128-gcm
+Operation = DECRYPT
+Key = 00000000000000000000000000000000
+IV = 000000000000000000000000
+Tag = ab6e47d42cec13bd
+Plaintext = 00000000000000000000000000000000
+Ciphertext = 0388dace60b6a392f328c2b971b2fe78
+
+# A 32-bit tag is an approved (conditional) length: allowed in FIPS on encrypt.
+Availablein = fips
+Cipher = aes-128-gcm
+Operation = ENCRYPT
+Key = 00000000000000000000000000000000
+IV = 000000000000000000000000
+Tag = ab6e47d4
+Plaintext = 00000000000000000000000000000000
+Ciphertext = 0388dace60b6a392f328c2b971b2fe78

@@ -141,6 +141,33 @@ static int setivinv(PROV_GCM_CTX *ctx, unsigned char *in, size_t inl)
     return 1;
 }
 
+/*
+ * Restrict GCM authentication tag lengths to those approved by
+ * SP 800-38D, section 5.2.1.2: 128, 120, 112, 104 or 96 bits, and
+ * (conditionally, see Appendix C) 64 or 32 bits. Any other length is
+ * rejected so that a truncated tag can neither be produced on encrypt
+ * nor verified on decrypt. This is only enforced when ctx->fips_taglen
+ * is set, which the FIPS provider does in its newctx; the default
+ * provider keeps its historical behaviour of permitting any non-zero
+ * length.
+ */
+static int gcm_tag_len_approved(size_t taglen)
+{
+    switch (taglen) {
+    case 16: /* 128 bits */
+    case 15: /* 120 bits */
+    case 14: /* 112 bits */
+    case 13: /* 104 bits */
+    case 12: /*  96 bits */
+    case 8:  /*  64 bits */
+    case 4:  /*  32 bits */
+        return 1;
+    default:
+        ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_TAG_LENGTH);
+        return 0;
+    }
+}
+
 int ossl_gcm_get_ctx_params(void *vctx, OSSL_PARAM params[])
 {
     PROV_GCM_CTX *ctx = (PROV_GCM_CTX *)vctx;
@@ -221,6 +248,8 @@ int ossl_gcm_get_ctx_params(void *vctx, OSSL_PARAM params[])
                 ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_TAG);
                 return 0;
             }
+            if (ctx->fips_taglen && !gcm_tag_len_approved(sz))
+                return 0;
             if (!OSSL_PARAM_set_octet_string(p, ctx->buf, sz)) {
                 ERR_raise(ERR_LIB_PROV, PROV_R_FAILED_TO_SET_PARAMETER);
                 return 0;
@@ -268,6 +297,8 @@ int ossl_gcm_set_ctx_params(void *vctx, const OSSL_PARAM params[])
                 ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_TAG);
                 return 0;
             }
+            if (ctx->fips_taglen && !gcm_tag_len_approved(sz))
+                return 0;
             ctx->taglen = sz;
             break;
 

@@ -28,9 +28,20 @@ static void *aes_gcm_newctx(void *provctx, size_t keybits)
         return NULL;
 
     ctx = OPENSSL_zalloc(sizeof(*ctx));
-    if (ctx != NULL)
+    if (ctx != NULL) {
         ossl_gcm_initctx(provctx, &ctx->base, keybits,
             ossl_prov_aes_hw_gcm(keybits));
+#ifdef FIPS_MODULE
+        /*
+         * In the FIPS provider, restrict the authentication tag to the
+         * lengths approved by SP 800-38D, section 5.2.1.2. This flag is
+         * only set here (never in the default provider's build of this
+         * file), so the shared ciphercommon GCM code enforces the
+         * restriction for AES-GCM in FIPS mode only.
+         */
+        ctx->base.fips_taglen = 1;
+#endif /* FIPS_MODULE */
+    }
     return ctx;
 }
 

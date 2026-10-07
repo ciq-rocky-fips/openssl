@@ -71,6 +71,7 @@ typedef struct prov_gcm_ctx_st {
     unsigned int key_set : 1; /* Set if key initialised */
     unsigned int iv_gen_rand : 1; /* No IV was specified, so generate a rand IV */
     unsigned int iv_gen : 1; /* It is OK to generate IVs */
+    unsigned int fips_taglen : 1; /* Restrict tag lengths to the SP 800-38D approved set */
 
     unsigned char iv[GCM_IV_MAX_SIZE]; /* Buffer to use for IV's */
     unsigned char buf[AES_BLOCK_SIZE]; /* Buffer of partial blocks processed via update calls */

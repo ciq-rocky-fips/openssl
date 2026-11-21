@@ -130,7 +130,12 @@ void ossl_slh_dsa_key_free(SLH_DSA_KEY *key)
         return;
 
     slh_dsa_key_hash_cleanup(key);
-    OPENSSL_cleanse(&key->priv, sizeof(key->priv) >> 1);
+    /*
+     * Zeroize the whole key buffer rather than just the private (first) half:
+     * the second half holds the public SEED and ROOT that key->pub points into,
+     * and FIPS 140-3 requires all key material to be zeroized when it is freed.
+     */
+    OPENSSL_cleanse(key->priv, sizeof(key->priv));
     OPENSSL_free(key);
 }
 

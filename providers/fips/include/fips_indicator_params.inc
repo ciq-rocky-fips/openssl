@@ -42,3 +42,14 @@ OSSL_FIPS_PARAM(ml_kem_ikme_disabled, ML_KEM_IKME_DISABLED, 0)
  * the entropy, so enforcing it strictly would break those tests.
  */
 OSSL_FIPS_PARAM(ml_dsa_test_entropy_disabled, ML_DSA_TEST_ENTROPY_DISABLED, 0)
+/*
+ * RSA signature generation with padding but without the module performing the
+ * hashing (the EVP_PKEY_sign() path, as opposed to EVP_DigestSign()) is a
+ * non-approved service under FIPS 140-3 IG 2.4.B and always trips the approval
+ * indicator.  It defaults to tolerant and is intentionally left out of the
+ * pedantic fipsmodule.cnf so it is only ever reported through the indicator,
+ * never enforced as a hard error: signing an externally computed digest with
+ * EVP_PKEY_sign() is a common, legitimate practice (e.g. TLS, CMS, X.509), so
+ * blocking it would break those callers rather than merely flag them.
+ */
+OSSL_FIPS_PARAM(rsa_no_hash_sign_disabled, RSA_NO_HASH_SIGN_DISABLED, 0)

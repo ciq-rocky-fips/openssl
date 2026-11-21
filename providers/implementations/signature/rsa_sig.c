@@ -1023,6 +1023,20 @@ static int rsa_sign(void *vprsactx, unsigned char *sig, size_t *siglen,
         return rsa_signverify_message_update(prsactx, tbs, tbslen)
             && rsa_sign_message_final(prsactx, sig, siglen, sigsize);
     }
+#ifdef FIPS_MODULE
+    /*
+     * FIPS 140-3 IG 2.4.B: generating an RSA signature with padding but without
+     * the module hashing the message (the EVP_PKEY_sign() path, reached here for
+     * any non-SIGNMSG operation) is a non-approved service.  Flag it through the
+     * approval indicator; it is never blocked (see fips_indicator_params.inc).
+     * A NULL sig is only a signature-size query, so it is not flagged.
+     */
+    if (sig != NULL && prsactx->pad_mode != RSA_NO_PADDING
+        && !OSSL_FIPS_IND_ON_UNAPPROVED(prsactx, OSSL_FIPS_IND_SETTABLE4,
+            prsactx->libctx, "RSA Sign", "No Hashing",
+            ossl_fips_config_rsa_no_hash_sign_disabled))
+        return 0;
+#endif
     return rsa_sign_directly(prsactx, sig, siglen, sigsize, tbs, tbslen);
 }
 

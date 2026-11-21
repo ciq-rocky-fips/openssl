@@ -4703,6 +4703,10 @@ static int digestsign_test_run(EVP_TEST *t)
         t->err = "DIGESTSIGNFINAL_ERROR";
         goto err;
     }
+    if (!pkey_check_fips_approved(expected->pctx, t)) {
+        t->err = "FIPSAPPROVED_ERROR";
+        goto err;
+    }
     if (!memory_err_compare(t, "SIGNATURE_MISMATCH",
             expected->output, expected->output_len,
             got, got_len))
@@ -4747,8 +4751,16 @@ static int digestverify_test_run(EVP_TEST *t)
 
     if (EVP_DigestVerifyFinal(mdata->ctx, mdata->output,
             mdata->output_len)
-        <= 0)
+        <= 0) {
         t->err = "VERIFY_ERROR";
+        return 1;
+    }
+
+    if (!pkey_check_fips_approved(mdata->pctx, t)) {
+        t->err = "FIPSAPPROVED_ERROR";
+        return 1;
+    }
+
     return 1;
 }
 
@@ -4789,6 +4801,10 @@ static int oneshot_digestsign_test_run(EVP_TEST *t)
         t->err = "DIGESTSIGN_ERROR";
         goto err;
     }
+    if (!pkey_check_fips_approved(expected->pctx, t)) {
+        t->err = "FIPSAPPROVED_ERROR";
+        goto err;
+    }
     if (!memory_err_compare(t, "SIGNATURE_MISMATCH",
             expected->output, expected->output_len,
             got, got_len))
@@ -4822,8 +4838,16 @@ static int oneshot_digestverify_test_run(EVP_TEST *t)
 
     if (EVP_DigestVerify(mdata->ctx, mdata->output, mdata->output_len,
             mdata->osin, mdata->osin_len)
-        <= 0)
+        <= 0) {
         t->err = "VERIFY_ERROR";
+        return 1;
+    }
+
+    if (!pkey_check_fips_approved(mdata->pctx, t)) {
+        t->err = "FIPSAPPROVED_ERROR";
+        return 1;
+    }
+
     return 1;
 }
 

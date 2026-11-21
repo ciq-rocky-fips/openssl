@@ -2309,3 +2309,54 @@ Ctrl = rsa_padding_mode:pss
 Ctrl = rsa_pss_saltlen:auto-digestmax
 Input = "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"
 Output = 49BA0CA65076271C0FEB69EB5D03E6989238B8F116FEC934F5A1299762E6FE0B6AA8C2B433CA3B11E36D2844265C6B52CD7393FC62A7C6706747BD9454ADE78DE35417D6F6FCE32F1C1D8F40CEF5715BC981AE4B1C94BF8C11E30BC3F19C71BE0FBDED06ECA5FCAC372688A9E821785B9ABA9705D76A1F74A092ACFEF30B018387771031554C43D3C49317C289EC570C603A6356E2FC1FB824F0505029750BC9028B342C27CD8F01C811C0172EFA807218C4657ACA5AA81A2BB1B0C4D63BE32C08BEF11C6E19C565D03246EE021B9293AB3FE33A8946F8EAAAE353E66FA3BB170FDADB7431FFAD4C92623148395FC6F6601495D6FF83E67B20BDDAD082C149E8
+
+# RSA-PSS FIPS approval indicator over the EVP_DigestSign / EVP_DigestVerify APIs
+# (FIPS 186-5 5.4 (g): 0 <= salt length <= digest length).
+#
+# EVP_DigestSignFinal()/EVP_DigestVerifyFinal() run the provider operation on a
+# duplicated EVP_PKEY_CTX and free it afterwards.  The PSS salt-length check is
+# the only FIPS check that runs at that final stage, so the approval indicator
+# it sets must be propagated back to the caller's context rather than lost with
+# the duplicate.  These use the per-context tolerant mode so the indicator is
+# reported regardless of the module's configured default.
+
+# EVP_DigestVerify with a PSS salt length greater than the digest length is
+# unapproved; tolerant mode must still flag the approval indicator.
+Availablein = fips
+FIPSversion = >=3.4.0
+DigestVerify = SHA384
+Key = RSA-PSS
+Unapproved = 1
+CtrlInit = rsa-pss-saltlen-check:0
+Ctrl = rsa_padding_mode:pss
+Ctrl = rsa_pss_saltlen:auto
+Input = "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"
+Output = 068b1bf52a0d811f9efab1bfdc42bedb0da7a94d261df300b35dd8d841567577f47dc9e96c9c540a0e825868cd70707a767de413d2150c1a9dbe50cae74046e1db776a891c3f41721efc2a15133e91a40ba42b833c802ae2911a002021d1d20165d287890afa42fca702dc71d1a7f86bce2c4b53506438da51ea4b944106687436d2a5700b93ab4a1c323729de8aa3c5f3248baa197fe757a5906953c5e7c85943021981678d3bf1dc75fafac3fec513e4dc3606486da60243f26786552474847813fad3e98c1826e19b78a4fc9c13d3e2728adb0c5fca6b41c80580b552a0abb3f4668490a9c21632db59837acf70854e3226cb1c1f8812301741a77c63994e
+
+# EVP_DigestVerify with a compliant PSS salt length stays approved through the
+# duplicated-context path.
+Availablein = fips
+FIPSversion = >=3.4.0
+DigestVerify = SHA384
+Key = RSA-PSS
+CtrlInit = rsa-pss-saltlen-check:0
+Ctrl = rsa_padding_mode:pss
+Ctrl = rsa_pss_saltlen:auto
+Input = "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"
+Output = 84593ce4c55784ddace54d8d89b79ecb83f9a4704f59294905d62164f8614714f1de3ff6054a98fcddd74e1b015c5220a29a73c652c4200b64c3524bb47a5d862fe2948973a7e92c5c6752bfef49f663f77fe2a8c8ab028cba860870342e22a24688048f7a89db4d8c79e87f47b4155d2b243cc5dda9212229f7e8ce3eb5042b4a1e018984545a5dd083faeecaab3e2269d3783df7dc97c41324eb14cbce723f011eea70214143079b132e8cf1352998e5a86fa9cc93ce7927cd2a68af579430c15a4bd6827a97929fb1a8fd19bb62dc88386b334d38a25a1ce31bb5dea36565b2d18fbf2bc6605376b30d4c7b8eed8e0ec39adeb661b2769ac71cf67e62d9b0
+
+# EVP_DigestSign with a PSS salt length greater than the digest length is
+# unapproved; tolerant mode must still flag the approval indicator.  The salt is
+# random so the signature is not comparable: a dummy Output and the expected
+# SIGNATURE_MISMATCH let the stanza exercise the indicator after signing.
+Availablein = fips
+FIPSversion = >=3.4.0
+DigestSign = SHA384
+Key = RSA-PSS
+Unapproved = 1
+CtrlInit = rsa-pss-saltlen-check:0
+Ctrl = rsa_padding_mode:pss
+Ctrl = rsa_pss_saltlen:max
+Input = "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"
+Output = 00
+Result = SIGNATURE_MISMATCH

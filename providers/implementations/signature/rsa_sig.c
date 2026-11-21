@@ -25,6 +25,7 @@
 #include <openssl/proverr.h>
 #include "internal/cryptlib.h"
 #include "internal/nelem.h"
+#include "internal/refcount.h"
 #include "internal/sizes.h"
 #include "internal/sslconf.h"
 #include "crypto/rsa.h"
@@ -75,6 +76,83 @@ static OSSL_ITEM padding_item[] = {
     { RSA_PKCS1_PSS_PADDING, OSSL_PKEY_RSA_PAD_MODE_PSS },
     { 0, NULL }
 };
+
+#ifdef FIPS_MODULE
+/*
+ * Reference-counted flag recording whether the PSS salt-length check (the only
+ * FIPS approval check that runs at signature/verification finalization) found
+ * the operation non-approved.
+ *
+ * EVP_DigestSignFinal()/EVP_DigestVerifyFinal() duplicate the EVP_PKEY_CTX, run
+ * the provider operation on the duplicate and then free it, so an approval
+ * indicator stored in the context would be discarded with the duplicate.  The
+ * duplicate shares this cell with its source (see rsa_dupctx()), so the result
+ * of the final-stage check is still visible to the caller's context in
+ * rsa_get_ctx_params().
+ */
+typedef struct {
+    CRYPTO_REF_COUNT refcnt;
+    /*
+     * A context and its duplicate share this cell and may be used on different
+     * threads, so the flag is accessed atomically.  x86_64 and aarch64 have
+     * lock-free 64-bit atomics, so CRYPTO_atomic_*() never needs the lock
+     * fallback and NULL is passed for it.
+     */
+    uint64_t unapproved;
+} RSA_PSS_SALTLEN_IND;
+
+static RSA_PSS_SALTLEN_IND *rsa_pss_saltlen_ind_new(void)
+{
+    RSA_PSS_SALTLEN_IND *ind = OPENSSL_zalloc(sizeof(*ind));
+
+    if (ind == NULL)
+        return NULL;
+    if (!CRYPTO_NEW_REF(&ind->refcnt, 1)) {
+        OPENSSL_free(ind);
+        return NULL;
+    }
+    return ind;
+}
+
+static void rsa_pss_saltlen_ind_free(RSA_PSS_SALTLEN_IND *ind)
+{
+    int ref = 0;
+
+    if (ind == NULL)
+        return;
+    CRYPTO_DOWN_REF(&ind->refcnt, &ref);
+    if (ref > 0)
+        return;
+    CRYPTO_FREE_REF(&ind->refcnt);
+    OPENSSL_free(ind);
+}
+
+/* Atomically record that the salt-length check was not approved. */
+static int rsa_pss_saltlen_ind_set(RSA_PSS_SALTLEN_IND *ind)
+{
+    uint64_t prev = 0;
+
+    if (ind == NULL)
+        return 1;
+    return CRYPTO_atomic_or(&ind->unapproved, 1, &prev, NULL);
+}
+
+/* Atomically read whether the salt-length check was not approved. */
+static int rsa_pss_saltlen_ind_is_unapproved(RSA_PSS_SALTLEN_IND *ind,
+    int *unapproved)
+{
+    uint64_t val = 0;
+
+    if (ind == NULL) {
+        *unapproved = 0;
+        return 1;
+    }
+    if (!CRYPTO_atomic_load(&ind->unapproved, &val, NULL))
+        return 0;
+    *unapproved = (val != 0);
+    return 1;
+}
+#endif /* FIPS_MODULE */
 
 /*
  * What's passed as an actual key is defined by the KEYMGMT interface.
@@ -151,6 +229,12 @@ typedef struct {
      * permitted.
      */
     int verify_message;
+    /*
+     * Shared salt-length approval indicator, so the result of the PSS
+     * salt-length check survives the EVP_PKEY_CTX duplication performed by
+     * EVP_DigestSignFinal()/EVP_DigestVerifyFinal().
+     */
+    RSA_PSS_SALTLEN_IND *pss_saltlen_ind;
 #endif
 
     /* Temp buffer */
@@ -242,6 +326,13 @@ void *rsa_newctx(void *provctx, const char *propq)
     }
 
     OSSL_FIPS_IND_INIT(prsactx)
+#ifdef FIPS_MODULE
+    if ((prsactx->pss_saltlen_ind = rsa_pss_saltlen_ind_new()) == NULL) {
+        OPENSSL_free(propq_copy);
+        OPENSSL_free(prsactx);
+        return NULL;
+    }
+#endif
     prsactx->libctx = PROV_LIBCTX_OF(provctx);
     prsactx->flag_allow_md = 1;
 #ifdef FIPS_MODULE
@@ -596,6 +687,21 @@ rsa_signverify_init(PROV_RSA_CTX *prsactx, void *vrsa,
     }
 
     OSSL_FIPS_IND_SET_APPROVED(prsactx)
+#ifdef FIPS_MODULE
+    /*
+     * Start the salt-length indicator afresh for this operation.  Detach from
+     * the current cell (which may be shared with a live duplicate) rather than
+     * clearing it in place, so a duplicate's state is left untouched.
+     */
+    {
+        RSA_PSS_SALTLEN_IND *fresh = rsa_pss_saltlen_ind_new();
+
+        if (fresh == NULL)
+            return 0;
+        rsa_pss_saltlen_ind_free(prsactx->pss_saltlen_ind);
+        prsactx->pss_saltlen_ind = fresh;
+    }
+#endif
     if (!set_ctx_params(prsactx, params))
         return 0;
 #ifdef FIPS_MODULE
@@ -642,6 +748,16 @@ static int rsa_pss_saltlen_check_passed(PROV_RSA_CTX *ctx, const char *algoname,
     int approved = (saltlen >= 0 && saltlen <= mdsize);
 
     if (!approved) {
+        /*
+         * Record the result on the shared cell so it is not lost when this
+         * context is a throwaway duplicate created by EVP_DigestSignFinal()/
+         * EVP_DigestVerifyFinal() (see rsa_dupctx() and rsa_get_ctx_params()).
+         * Fail closed if the atomic update cannot be performed.
+         */
+        if (!rsa_pss_saltlen_ind_set(ctx->pss_saltlen_ind)) {
+            ERR_raise(ERR_LIB_PROV, ERR_R_INTERNAL_ERROR);
+            return 0;
+        }
         if (!OSSL_FIPS_IND_ON_UNAPPROVED(ctx, OSSL_FIPS_IND_SETTABLE3,
                 ctx->libctx,
                 algoname, "PSS Salt Length",
@@ -1374,6 +1490,9 @@ void rsa_freectx(void *vprsactx)
     OPENSSL_free(prsactx->propq);
     free_tbuf(prsactx);
     RSA_free(prsactx->rsa);
+#ifdef FIPS_MODULE
+    rsa_pss_saltlen_ind_free(prsactx->pss_saltlen_ind);
+#endif
 
     OPENSSL_clear_free(prsactx, sizeof(*prsactx));
 }
@@ -1398,10 +1517,29 @@ static void *rsa_dupctx(void *vprsactx)
     dstctx->tbuf = NULL;
     dstctx->propq = NULL;
     dstctx->sig = NULL;
+#ifdef FIPS_MODULE
+    /*
+     * Clear before taking a reference so the error path's rsa_freectx() does
+     * not drop a reference that was never taken.  The duplicate shares the
+     * source's salt-length indicator cell so a non-approved result recorded at
+     * finalization is visible through the original context.
+     */
+    dstctx->pss_saltlen_ind = NULL;
+#endif
 
     if (srcctx->rsa != NULL && !RSA_up_ref(srcctx->rsa))
         goto err;
     dstctx->rsa = srcctx->rsa;
+
+#ifdef FIPS_MODULE
+    {
+        int ref = 0;
+
+        if (!CRYPTO_UP_REF(&srcctx->pss_saltlen_ind->refcnt, &ref))
+            goto err;
+        dstctx->pss_saltlen_ind = srcctx->pss_saltlen_ind;
+    }
+#endif
 
     if (srcctx->md != NULL && !EVP_MD_up_ref(srcctx->md))
         goto err;
@@ -1535,6 +1673,23 @@ static int rsa_get_ctx_params(void *vprsactx, OSSL_PARAM *params)
     p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_FIPS_VERIFY_MESSAGE);
     if (p != NULL && !OSSL_PARAM_set_uint(p, prsactx->verify_message))
         return 0;
+
+    /*
+     * Fold in a non-approved PSS salt-length result recorded at finalization.
+     * This may have happened on a throwaway duplicate of this context (see
+     * rsa_dupctx()), so it is tracked on the shared cell rather than in the
+     * indicator itself.  The indicator is monotonic, so only ever cleared.
+     * Fail closed if the atomic read cannot be performed.
+     */
+    {
+        int unapproved = 0;
+
+        if (!rsa_pss_saltlen_ind_is_unapproved(prsactx->pss_saltlen_ind,
+                &unapproved))
+            return 0;
+        if (unapproved)
+            prsactx->indicator.approved = 0;
+    }
 #endif
 
     if (!OSSL_FIPS_IND_GET_CTX_PARAM(prsactx, params))
